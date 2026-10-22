@@ -2538,6 +2538,10 @@ export interface components {
             posted_at: string | null;
             /** Reversal Entry Id */
             reversal_entry_id: string | null;
+            /** Sales Order Id */
+            sales_order_id?: string | null;
+            /** Sales Order Number */
+            sales_order_number?: string | null;
             /** Status */
             status: string;
             /** Subtotal */

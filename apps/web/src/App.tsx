@@ -9,8 +9,12 @@ import { AuditPage, MembersPage, OrgSettingsPage, RolesPage } from "./pages/Admi
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { CustomersPage } from "./pages/Customers";
 import { HomePage } from "./pages/Home";
+import { InvoiceDetailPage, InvoiceEditorPage, InvoicesPage } from "./pages/Invoices";
+import { InventoryPage } from "./pages/Inventory";
 import { OrgsPage, useMyOrgs } from "./pages/Orgs";
 import { ProductsPage } from "./pages/Products";
+import { ReportsPage } from "./pages/Reports";
+import { SalesOrderDetailPage, SalesOrderEditorPage, SalesOrdersPage } from "./pages/Sales";
 import { SoonPage } from "./pages/Soon";
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
@@ -80,6 +84,16 @@ export function App() {
             <Route index element={<HomePage />} />
             <Route path="customers" element={<CustomersPage />} />
             <Route path="products" element={<ProductsPage />} />
+            <Route path="invoices" element={<InvoicesPage />} />
+            <Route path="invoices/new" element={<InvoiceEditorPage />} />
+            <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />
+            <Route path="invoices/:invoiceId/edit" element={<InvoiceEditorPage />} />
+            <Route path="sales" element={<SalesOrdersPage />} />
+            <Route path="sales/new" element={<SalesOrderEditorPage />} />
+            <Route path="sales/:orderId" element={<SalesOrderDetailPage />} />
+            <Route path="sales/:orderId/edit" element={<SalesOrderEditorPage />} />
+            <Route path="inventory" element={<InventoryPage />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="settings/members" element={<MembersPage />} />
             <Route path="settings/roles" element={<RolesPage />} />
             <Route path="settings/audit" element={<AuditPage />} />

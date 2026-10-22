@@ -107,6 +107,7 @@ def test_full_sales_cycle(api, shop):
     inv = inv.json()
     assert [(l["description"], l["quantity"]) for l in inv["lines"]] == [("Office chair", "8"), ("Assembly", "1")]
     assert inv["total"] == "4715.00"                                   # (4000 + 100) * 1.15
+    assert (inv["sales_order_id"], inv["sales_order_number"]) == (so["id"], so["number"])
     # Nothing more can be invoiced until more is delivered.
     again = api.req("POST", SALES, f"/orgs/{org}/sales-orders/{so['id']}/invoice", json={"issue_date": "2026-03-02"})
     assert again.status_code == 409

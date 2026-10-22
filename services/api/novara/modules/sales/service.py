@@ -153,7 +153,7 @@ def create_invoice(db: Session, order: SalesOrder, *, issue_date: date, due_date
     if not items:
         raise OrderStateError("nothing to invoice: deliver goods first, or everything is already invoiced")
     invoice = Invoice(customer_id=order.customer_id, issue_date=issue_date, due_date=due_date or issue_date,
-                      currency=order.currency, notes=f"Sales order {order.number}", created_by=user_id)
+                      currency=order.currency, notes="", created_by=user_id)
     db.add(invoice)
     db.flush()
     lines = [
@@ -181,3 +181,10 @@ def cancel(db: Session, order: SalesOrder) -> None:
 def order_has_invoice_links(db: Session, invoice: Invoice) -> bool:
     return bool(db.scalar(select(func.count()).select_from(InvoiceLine).where(
         InvoiceLine.invoice_id == invoice.id, InvoiceLine.sales_order_line_id.is_not(None))))
+
+
+def order_of_invoice(db: Session, invoice: Invoice) -> SalesOrder | None:
+    """The sales order an invoice was created from, if any."""
+    return db.scalar(select(SalesOrder).join(SalesOrderLine, SalesOrderLine.order_id == SalesOrder.id)
+                     .join(InvoiceLine, InvoiceLine.sales_order_line_id == SalesOrderLine.id)
+                     .where(InvoiceLine.invoice_id == invoice.id).limit(1))

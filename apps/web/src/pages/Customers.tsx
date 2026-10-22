@@ -7,6 +7,7 @@ import { useOrg } from "../auth/Org";
 import {
   Badge, Button, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, Textarea, useToast,
 } from "../components/ui";
+import { CsvActions } from "../components/CsvTools";
 import { useI18n } from "../i18n/I18n";
 import { useDebounced } from "../lib/useDebounced";
 
@@ -60,11 +61,14 @@ export function CustomersPage() {
       <PageHeader
         title={t("customers.title")}
         actions={
-          can("customers.write") && (
-            <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing("new")}>
-              {t("customers.new")}
-            </Button>
-          )
+          <>
+            <CsvActions kind="customers" canWrite={can("customers.write")} />
+            {can("customers.write") && (
+              <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing("new")}>
+                {t("customers.new")}
+              </Button>
+            )}
+          </>
         }
       />
       <div className="row">

@@ -18,7 +18,7 @@ from novara.modules.invoicing import service as svc
 from novara.modules.invoicing.lines import LineIn, resolve_lines
 from novara.modules.invoicing.models import Invoice, InvoiceLine, Payment
 from novara.modules.partners.models import Customer
-from novara.modules.sales.service import order_has_invoice_links
+from novara.modules.sales.service import order_has_invoice_links, order_of_invoice
 from novara.money import fmt_decimal, from_minor, to_minor
 
 router = APIRouter(tags=["invoices"])
@@ -89,6 +89,9 @@ class InvoiceOut(BaseModel):
     reversal_entry_id: str | None
     posted_at: datetime | None
     created_at: datetime
+    # Set when the invoice was created from a sales order (its draft is then edited through the order).
+    sales_order_id: str | None = None
+    sales_order_number: str | None = None
     lines: list[LineOut]
     taxes: list[TaxLineOut]
 
@@ -127,6 +130,7 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
     groups = svc.tax_groups(lines, inv.currency)
     tax_names = {t.id: t.name for t in db.scalars(select(Tax).where(Tax.id.in_([g.tax_id for g in groups])))}
     c = inv.currency
+    order = order_of_invoice(db, inv)
     return InvoiceOut(
         id=inv.id, number=inv.number, status=inv.status, customer_id=inv.customer_id, customer_name=customer.name,
         issue_date=inv.issue_date, due_date=inv.due_date, currency=c, notes=inv.notes,
@@ -134,7 +138,8 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
         amount_paid=_money(inv.amount_paid_minor, c),
         amount_due=_money(0 if inv.status in ("draft", "cancelled") else inv.total_minor - inv.amount_paid_minor, c),
         journal_entry_id=inv.journal_entry_id, reversal_entry_id=inv.reversal_entry_id, posted_at=inv.posted_at,
-        created_at=inv.created_at,
+        created_at=inv.created_at, sales_order_id=order.id if order else None,
+        sales_order_number=order.number if order else None,
         lines=[
             LineOut(id=l.id, position=l.position, product_id=l.product_id, description=l.description,
                     quantity=fmt_decimal(l.quantity), unit_price=fmt_decimal(l.unit_price),

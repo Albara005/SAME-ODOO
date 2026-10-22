@@ -1437,6 +1437,28 @@
       ],
       "title": "Reversal Entry Id"
      },
+     "sales_order_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sales Order Id"
+     },
+     "sales_order_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sales Order Number"
+     },
      "status": {
       "title": "Status",
       "type": "string"

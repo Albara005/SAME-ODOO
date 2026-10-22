@@ -6,20 +6,13 @@ import { useOrg } from "../auth/Org";
 import {
   Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, Textarea,
 } from "../components/ui";
+import { CsvActions } from "../components/CsvTools";
+import { useTaxes } from "../components/business";
 import { useI18n } from "../i18n/I18n";
 import { useDebounced } from "../lib/useDebounced";
 
 type Product = Schemas["ProductOut"];
 type Tax = Schemas["TaxOut"];
-
-export function useTaxes() {
-  const { org, can } = useOrg();
-  return useQuery({
-    queryKey: ["taxes", org.id],
-    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/taxes", { params: { path: { org_id: org.id } } })),
-    enabled: can("products.read") || can("invoices.read") || can("taxes.manage"),
-  });
-}
 
 export function ProductsPage() {
   const { t, money } = useI18n();
@@ -41,11 +34,14 @@ export function ProductsPage() {
       <PageHeader
         title={t("products.title")}
         actions={
-          can("products.write") && (
-            <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing("new")}>
-              {t("products.new")}
-            </Button>
-          )
+          <>
+            <CsvActions kind="products" canWrite={can("products.write")} />
+            {can("products.write") && (
+              <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing("new")}>
+                {t("products.new")}
+              </Button>
+            )}
+          </>
         }
       />
       <div style={{ maxWidth: 420 }}>

@@ -214,3 +214,37 @@ dialog.dialog::backdrop { background: rgb(0 0 0 / 0.4); }
 .kv dt { color: var(--color-text-muted); }
 .kv dd { margin: 0; }
 code, .mono { font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; font-size: 0.85em; direction: ltr; unicode-bidi: isolate; }
+
+/* ---------------------------------------------------------------- reports */
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+.filters { align-items: flex-end; }
+.refetching { opacity: 0.6; transition: opacity 0.15s; }
+tfoot th { background: var(--color-surface-raised); color: var(--color-text); border-block-end: 0; }
+details > summary { cursor: pointer; color: var(--color-link); }
+
+/* Single-series column chart: brand hue for marks, text tokens for every label. */
+.chart { width: 100%; }
+.chart-scroll { position: relative; overflow-x: auto; }
+.chart svg { display: block; }
+.chart-grid { stroke: var(--color-border); stroke-width: 1; }
+.chart-axis { stroke: var(--color-text-muted); stroke-width: 1; }
+.chart-tick { fill: var(--color-text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart-label { fill: var(--color-text); font-size: 11px; font-weight: 600; }
+.chart-bar { fill: var(--color-link); }
+.chart-col { outline: none; cursor: default; }
+.chart-col.active .chart-bar { fill: var(--color-primary-hover); }
+.chart-col:focus-visible .chart-bar { stroke: var(--color-focus-ring); stroke-width: 2; }
+.chart-tip {
+  position: absolute; inset-block-start: 0; transform: translateX(-50%); pointer-events: none;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border-radius: var(--radius-sm);
+  background: var(--color-surface); border: 1px solid var(--color-border); box-shadow: var(--shadow); white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- print (invoices, reports) */
+@media print {
+  .sidebar, .topbar, .no-print, .toasts, .scrim { display: none !important; }
+  .shell { display: block; }
+  .content { padding: 0; max-width: none; }
+  .card, .table-wrap { border-color: #999; box-shadow: none; break-inside: avoid; }
+  body { background: #fff; color: #000; }
+}
