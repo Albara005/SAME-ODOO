@@ -9,6 +9,7 @@ from sqlalchemy import text
 from novara.ai.provider import AnthropicProvider, ModelProvider
 from novara.ai.router import router as assistant_router
 from novara.config import Settings, load_settings
+from novara.studio.router import router as studio_router, sites_router
 from novara.db import Base, make_engine, make_sessionmaker
 from novara.modules.access.router import router as access_router
 from novara.modules.accounting.router import router as accounting_router
@@ -34,6 +35,7 @@ from novara.modules.partners import models as _partner_models  # noqa: F401
 from novara.modules.sales import models as _sales_models  # noqa: F401
 from novara import idempotency as _idempotency_models  # noqa: F401
 from novara.ai import models as _ai_models  # noqa: F401
+from novara.studio import models as _studio_models  # noqa: F401
 from novara.modules.audit import models as _audit_models  # noqa: F401
 from novara.modules.files import models as _files_models  # noqa: F401
 from novara.modules.identity import models as _identity_models  # noqa: F401
@@ -72,6 +74,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     for r in (identity_router, organizations_router, access_router, audit_router, files_router,
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router,
-              inventory_router, sales_router, assistant_router):
+              inventory_router, sales_router, assistant_router, studio_router):
         app.include_router(r, prefix="/api/v1")
+    app.include_router(sites_router)  # public, unauthenticated: published App Studio sites
     return app

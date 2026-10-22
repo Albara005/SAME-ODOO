@@ -18,6 +18,9 @@ class Settings:
     storage_root: str = "./storage"
     max_upload_bytes: int = 25 * 1024 * 1024
     cors_origins: list[str] = field(default_factory=list)
+    # Where published App Studio sites are served. Use a separate domain in production,
+    # e.g. https://sites.example.com (it must route /{site_key}/... to the API's /sites/...).
+    sites_base_url: str = ""
 
     def validate(self) -> None:
         if self.env == "production" and self.jwt_secret == _DEV_SECRET:
@@ -36,6 +39,7 @@ def load_settings() -> Settings:
         storage_root=env.get("NOVARA_STORAGE_ROOT", Settings.storage_root),
         max_upload_bytes=int(env.get("NOVARA_MAX_UPLOAD_BYTES", Settings.max_upload_bytes)),
         cors_origins=[o for o in env.get("NOVARA_CORS_ORIGINS", "").split(",") if o],
+        sites_base_url=env.get("NOVARA_SITES_BASE_URL", "").rstrip("/"),
     )
     settings.validate()
     return settings

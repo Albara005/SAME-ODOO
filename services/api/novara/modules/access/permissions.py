@@ -40,6 +40,9 @@ INVENTORY_READ = "inventory.read"
 INVENTORY_WRITE = "inventory.write"
 AI_USE = "ai.use"
 AI_MANAGE = "ai.manage"
+APPS_READ = "apps.read"
+APPS_WRITE = "apps.write"
+APPS_DEPLOY = "apps.deploy"
 
 CATALOG: dict[str, str] = {
     ORG_MANAGE: "Edit organization settings",
@@ -67,6 +70,9 @@ CATALOG: dict[str, str] = {
     INVENTORY_WRITE: "Receive, deliver and adjust stock",
     AI_USE: "Use the AI assistant (it can only do what the user is allowed to do)",
     AI_MANAGE: "Enable or disable the AI assistant, set its budget and models, view AI usage",
+    APPS_READ: "View App Studio projects, versions and deployments",
+    APPS_WRITE: "Create and edit App Studio projects, cut versions, publish previews",
+    APPS_DEPLOY: "Approve production deployments and roll them back",
 }
 
 OWNER_ROLE = "owner"
@@ -85,6 +91,8 @@ SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     "accountant": ("Accountant", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, *_ACCOUNTING})),
     "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, *_SALES})),
     "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, AI_USE, *_WAREHOUSE})),
+    # Builds apps and publishes previews; production needs someone with apps.deploy.
+    "developer": ("Developer", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, APPS_READ, APPS_WRITE})),
     "member": ("Member", [AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ]),
     "viewer": ("Viewer", [FILES_READ]),
 }

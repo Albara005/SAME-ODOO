@@ -12,7 +12,8 @@ A unified platform combining an ERP-style business suite with AI app building, a
 | 1. الأساس: الحسابات، المؤسسات، الصلاحيات، العزل، التدقيق، النسخ الاحتياطي | ✅ الخلفية مكتملة | [`docs/phase-1-foundation.md`](docs/phase-1-foundation.md) |
 | 2. الأعمال: العملاء، المنتجات، الفواتير، دفتر الأستاذ، المخزون، المبيعات | ✅ الخلفية مكتملة | [`docs/phase-2-business.md`](docs/phase-2-business.md) |
 | 3. المساعد الذكي: أدوات بصلاحيات المستخدم، موافقة على كل تغيير، ميزانية وتتبع | ✅ الخلفية مكتملة | [`docs/phase-3-assistant.md`](docs/phase-3-assistant.md) |
-| 4. AI App Studio | قيد العمل | |
+| 4. AI App Studio: قالب محدد، مُنشئ ذكي، إصدارات وفحوص، معاينة، نشر إنتاج بموافقة | ✅ الخلفية مكتملة | [`docs/phase-4-app-studio.md`](docs/phase-4-app-studio.md) |
+| 5. الوكلاء والأتمتة | قيد العمل | |
 
 ```
 services/api/            FastAPI + SQLAlchemy (Python)
@@ -20,6 +21,7 @@ services/api/            FastAPI + SQLAlchemy (Python)
   novara/modules/        identity · organizations · access · audit · files
                          partners · catalog · accounting · invoicing · inventory · sales · dataio
   novara/ai/             المساعد الذكي: النماذج، الأدوات، الموافقات، الاستهلاك
+  novara/studio/         App Studio: المشاريع، الإصدارات، الفحوص، المُنشئ الذكي، النشر
   migrations/postgres/   المخطط + Row-Level Security + صلاحيات دور التشغيل
   tests/                 اختبارات العزل والصلاحيات (SQLite و PostgreSQL)
 infrastructure/

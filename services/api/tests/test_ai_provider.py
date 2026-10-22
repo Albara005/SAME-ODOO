@@ -91,3 +91,53 @@ def test_cost_and_routing():
     assert resolve("assistant", None).model == "claude-opus-5-5"
     with pytest.raises(RouteError):
         validate_overrides({"assistant": {"model": "claude-opus-5-5", "temperature": "1"}})
+
+
+class StubStream:
+    def __init__(self, message, fail_times: int, counter: list):
+        self.message, self.fail_times, self.counter = message, fail_times, counter
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def __iter__(self):
+        self.counter.append(1)
+        if len(self.counter) <= self.fail_times:
+            raise ValueError("Unable to parse tool parameter JSON")
+        return iter(())
+
+    def get_final_message(self):
+        return self.message
+
+
+class StreamingMessages(StubMessages):
+    def __init__(self, result, fail_times=0):
+        super().__init__(result=result)
+        self.fail_times, self.attempts = fail_times, []
+
+    def stream(self, **kw):
+        self.calls.append(kw)
+        return StubStream(self.result, self.fail_times, self.attempts)
+
+
+def test_streaming_requests_use_eager_tool_input_and_retry_unparseable_json():
+    stub = StreamingMessages(BetaMessage.model_validate(SDK_MESSAGE), fail_times=1)
+    reply = AnthropicProvider(client=StubClient(stub)).create(
+        model="claude-opus-5-5", effort="high", system="s", tools=TOOLS, messages=[], max_tokens=64000, stream=True)
+    assert reply.stop_reason == "tool_use"
+    assert len(stub.attempts) == 2                                   # one unparseable attempt, then success
+    assert all(t["eager_input_streaming"] is True for t in stub.calls[0]["tools"])
+    assert "eager_input_streaming" not in TOOLS[0]                   # caller's definitions are not mutated
+
+    always_bad = StreamingMessages(BetaMessage.model_validate(SDK_MESSAGE), fail_times=99)
+    with pytest.raises(ProviderError):
+        AnthropicProvider(client=StubClient(always_bad)).create(
+            model="claude-opus-5-5", effort="high", system="s", tools=TOOLS, messages=[], max_tokens=64000, stream=True)
+    assert len(always_bad.attempts) == 3
+
+
+def test_non_streaming_requests_do_not_set_eager_input():
+    assert all("eager_input_streaming" not in t for t in kwargs()["tools"])

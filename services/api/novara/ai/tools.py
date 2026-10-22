@@ -12,7 +12,7 @@ Safety model (enforced here, not by the prompt):
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from typing import Callable, Literal
@@ -24,7 +24,9 @@ from sqlalchemy.orm import Session
 from novara.deps import OrgContext
 from novara.modules.access import permissions as P
 
-Kind = Literal["read", "write"]
+# read: runs at once. edit: runs at once on a draft that has its own review step (e.g. an app's
+# working copy). write: changes business data, so it waits for the user's approval.
+Kind = Literal["read", "edit", "write"]
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,7 @@ class ToolContext:
     db: Session
     org: OrgContext
     ip: str = ""
+    extra: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -274,9 +277,10 @@ TOOLS: dict[str, Tool] = {t.name: t for t in [
 ]}
 
 
-def tools_for(permissions: set[str]) -> list[Tool]:
+def tools_for(permissions: set[str], registry: dict[str, Tool] | None = None) -> list[Tool]:
     """Tools the user may use, in a fixed order so the prompt-cache prefix stays stable."""
-    return [TOOLS[name] for name in sorted(TOOLS) if TOOLS[name].permission in permissions]
+    registry = TOOLS if registry is None else registry
+    return [registry[name] for name in sorted(registry) if registry[name].permission in permissions]
 
 
 def parse_args(tool: Tool, arguments: dict) -> BaseModel:

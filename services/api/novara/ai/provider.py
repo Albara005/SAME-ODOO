@@ -43,7 +43,7 @@ class ProviderError(RuntimeError):
 
 class ModelProvider(Protocol):
     def create(self, *, model: str, effort: str, system: str, tools: list[dict], messages: list[dict],
-               max_tokens: int) -> ModelReply: ...
+               max_tokens: int, stream: bool = False) -> ModelReply: ...
 
 
 class AnthropicProvider:
@@ -62,7 +62,11 @@ class AnthropicProvider:
 
     @staticmethod
     def request_kwargs(*, model: str, effort: str, system: str, tools: list[dict], messages: list[dict],
-                       max_tokens: int) -> dict:
+                       max_tokens: int, stream: bool = False) -> dict:
+        if stream:
+            # Large tool inputs (whole files) stream as they're generated. The server then no longer
+            # validates them, so the caller validates every input before running a tool (tools.parse_args).
+            tools = [t | {"eager_input_streaming": True} for t in tools]
         kwargs = dict(
             model=model,
             max_tokens=max_tokens,
@@ -80,15 +84,26 @@ class AnthropicProvider:
         return kwargs
 
     def create(self, *, model: str, effort: str, system: str, tools: list[dict], messages: list[dict],
-               max_tokens: int) -> ModelReply:
+               max_tokens: int, stream: bool = False) -> ModelReply:
         kwargs = self.request_kwargs(model=model, effort=effort, system=system, tools=tools, messages=messages,
-                                     max_tokens=max_tokens)
+                                     max_tokens=max_tokens, stream=stream)
+        api = self.client.beta.messages if "betas" in kwargs else self.client.messages
         started = time.monotonic()
         try:
-            if "betas" in kwargs:
-                message = self.client.beta.messages.create(**kwargs)
+            if not stream:
+                message = api.create(**kwargs)
             else:
-                message = self.client.messages.create(**kwargs)
+                for attempt in range(3):
+                    try:
+                        with api.stream(**kwargs) as s:
+                            for _ in s:  # consume events; only the final message is needed
+                                pass
+                            message = s.get_final_message()
+                        break
+                    except ValueError:
+                        # Tool input the SDK couldn't parse at all; no tool_use id to answer, so re-issue.
+                        if attempt == 2:
+                            raise ProviderError("the model produced unreadable tool input", retryable=True)
         except anthropic.AuthenticationError as e:
             raise ProviderError(f"AI provider rejected the credentials: {e.message}", retryable=False)
         except anthropic.BadRequestError as e:

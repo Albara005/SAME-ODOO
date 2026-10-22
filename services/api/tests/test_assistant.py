@@ -269,3 +269,17 @@ def test_refusal_and_provider_errors_are_handled(api, biz):
 def test_viewer_cannot_use_the_assistant(api, biz):
     api.add_member(OWNER, biz["org"], OUTSIDER, "viewer")
     assert api.req("POST", OUTSIDER, f"/orgs/{biz['org']}/assistant/conversations", json={}).status_code == 403
+
+
+def test_cut_off_tool_call_is_answered_so_history_stays_valid(api, biz):
+    truncated = ModelReply(content=[{"type": "tool_use", "id": "toolu_cut", "name": "search_customers",
+                                     "input": {"query": "No"}}], stop_reason="max_tokens", usage=Usage(10, 10),
+                           model="claude-opus-5-5")
+    biz["ai"].script = [truncated, text_reply("next")]
+    conv = conversation(api, biz)
+    out = say(api, biz, conv, "first").json()
+    assert out["stop"] == "max_tokens" and out["tool_calls"] == []      # the truncated call never ran
+    say(api, biz, conv, "second")
+    msgs = biz["ai"].requests[1]["messages"]
+    answer = msgs[2]["content"][0]
+    assert (answer["type"], answer["tool_use_id"], answer["is_error"]) == ("tool_result", "toolu_cut", True)

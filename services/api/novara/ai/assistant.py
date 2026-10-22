@@ -117,9 +117,10 @@ def _tool_result(tool_use_id: str, payload: object, *, error: bool = False) -> d
     return block
 
 
-def _handle_tool_use(db: Session, ctx: T.ToolContext, conversation: Conversation, block: dict) -> tuple[dict, ToolCall]:
+def _handle_tool_use(db: Session, ctx: T.ToolContext, conversation: Conversation, block: dict,
+                     registry: dict[str, T.Tool]) -> tuple[dict, ToolCall]:
     name, args, use_id = block.get("name", ""), block.get("input") or {}, block["id"]
-    tool = T.TOOLS.get(name)
+    tool = registry.get(name)
     call = ToolCall(conversation_id=conversation.id, user_id=ctx.org.user.id, tool_use_id=use_id, name=name,
                     kind=tool.kind if tool else "unknown", arguments=args, status="denied")
     db.add(call)
@@ -148,16 +149,21 @@ def _handle_tool_use(db: Session, ctx: T.ToolContext, conversation: Conversation
 
 
 def run_turn(db: Session, org: OrgContext, conversation: Conversation, text: str, *, provider: ModelProvider,
-             route_name: str = "assistant", ip: str = "", today: date | None = None) -> TurnResult:
+             route_name: str = "assistant", ip: str = "", today: date | None = None,
+             registry: dict[str, T.Tool] | None = None, system: str = SYSTEM_PROMPT, extra: dict | None = None,
+             context_note: str = "") -> TurnResult:
+    """One user message through the agent loop. ``registry`` is the agent's full tool set;
+    only the tools the user holds the permission for are offered to the model."""
     settings = check_available(db)
     route = routing.resolve(route_name, settings.routes)
-    tools = T.tools_for(org.permissions)
+    registry = T.TOOLS if registry is None else registry
+    tools = T.tools_for(org.permissions, registry)
     tool_defs = [t.definition() for t in tools]
-    ctx = T.ToolContext(db=db, org=org, ip=ip)
+    ctx = T.ToolContext(db=db, org=org, ip=ip, extra=extra or {})
 
     # Volatile context goes in the user turn, after the cached prefix (system + tools + history).
     preface = f"Today is {(today or date.today()).isoformat()}. Organization: {org.organization.name} " \
-              f"(currency {org.organization.default_currency})."
+              f"(currency {org.organization.default_currency})." + (f"\n{context_note}" if context_note else "")
     updates = _status_updates(db, conversation)
     user_blocks = [{"type": "text", "text": preface + ("\n\n" + updates if updates else "")},
                    {"type": "text", "text": text}]
@@ -173,8 +179,9 @@ def run_turn(db: Session, org: OrgContext, conversation: Conversation, text: str
                 return result
         usage = ModelUsage(user_id=org.user.id, conversation_id=conversation.id, route=route_name, model=route.model)
         try:
-            reply = provider.create(model=route.model, effort=route.effort, system=SYSTEM_PROMPT, tools=tool_defs,
-                                    messages=history(db, conversation), max_tokens=route.max_tokens)
+            reply = provider.create(model=route.model, effort=route.effort, system=system, tools=tool_defs,
+                                    messages=history(db, conversation), max_tokens=route.max_tokens,
+                                    stream=route.stream)
         except ProviderError as e:
             usage.ok, usage.error, usage.stop_reason = False, str(e)[:2000], "error"
             db.add(usage)
@@ -203,12 +210,18 @@ def run_turn(db: Session, org: OrgContext, conversation: Conversation, text: str
             continue
         uses = [b for b in reply.content if b.get("type") == "tool_use"]
         if reply.stop_reason != "tool_use" or not uses:
+            if uses:
+                # Output was cut off mid tool call: never run a possibly truncated input, but answer
+                # every tool_use so the stored history stays valid for the next request.
+                _append(db, conversation, "user", [_tool_result(
+                    b["id"], {"error": "not run: the output was cut off before the tool call was complete"},
+                    error=True) for b in uses])
             result.reply = "\n".join(t for t in texts if t).strip()
             result.stop = "max_tokens" if reply.stop_reason == "max_tokens" else "end_turn"
             return result
         tool_results = []
         for block in uses:  # all results go back in a single user message
-            block_result, call = _handle_tool_use(db, ctx, conversation, block)
+            block_result, call = _handle_tool_use(db, ctx, conversation, block, registry)
             tool_results.append(block_result)
             result.tool_calls.append(call)
         _append(db, conversation, "user", tool_results)

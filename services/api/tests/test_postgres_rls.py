@@ -59,3 +59,16 @@ def test_audit_log_cannot_be_updated_or_deleted_by_app_role(app, two_orgs):
             bind_tenant(db, a)
             with pytest.raises(ProgrammingError, match="permission denied"):
                 db.execute(text(stmt))
+
+
+def test_app_versions_are_immutable_for_the_api_role(api, app):
+    api.signup("dev@pg.example.com")
+    org = api.create_org("dev@pg.example.com", "pg-studio")
+    pid = api.req("POST", "dev@pg.example.com", f"/orgs/{org}/studio/projects",
+                  json={"name": "Site", "slug": "pg-site"}).json()["id"]
+    api.req("POST", "dev@pg.example.com", f"/orgs/{org}/studio/projects/{pid}/versions", json={"message": "v1"})
+    for stmt in ("UPDATE app_versions SET checks_passed = true", "DELETE FROM app_versions"):
+        with app.state.sessionmaker() as db:
+            bind_tenant(db, org)
+            with system_scope(db), pytest.raises(ProgrammingError, match="permission denied"):
+                db.execute(text(stmt))

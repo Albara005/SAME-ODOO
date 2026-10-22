@@ -25,11 +25,13 @@ class Route:
     model: str
     effort: str
     max_tokens: int = 16000
+    stream: bool = False  # long outputs (whole files) are streamed to avoid HTTP timeouts
 
 
 DEFAULT_ROUTES: dict[str, Route] = {
     "assistant": Route("claude-opus-5-5", "medium"),        # everyday questions, lookups, drafts
     "assistant_deep": Route("claude-opus-5-5", "high"),     # multi-step analysis and planning
+    "app_builder": Route("claude-opus-5-5", "high", max_tokens=64000, stream=True),  # writes app code
 }
 
 
@@ -42,7 +44,8 @@ def resolve(route: str, overrides: dict | None) -> Route:
     if base is None:
         raise RouteError(f"unknown route: {route}")
     o = (overrides or {}).get(route) or {}
-    return Route(model=o.get("model", base.model), effort=o.get("effort", base.effort), max_tokens=base.max_tokens)
+    return Route(model=o.get("model", base.model), effort=o.get("effort", base.effort), max_tokens=base.max_tokens,
+                 stream=base.stream)
 
 
 def validate_overrides(overrides: dict) -> dict:
