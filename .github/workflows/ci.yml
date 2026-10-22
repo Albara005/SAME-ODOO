@@ -71,3 +71,10 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: End-to-end (real API + production build)
         run: PYTHON=python npm run e2e
+      - name: Keep screenshots and traces of failed end-to-end tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: apps/web/test-results/
+          retention-days: 7
