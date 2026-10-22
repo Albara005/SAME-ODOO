@@ -3463,8 +3463,18 @@ export interface components {
         };
         /** SettingsOut */
         SettingsOut: {
+            /**
+             * Efforts
+             * @default []
+             */
+            efforts: string[];
             /** Enabled */
             enabled: boolean;
+            /**
+             * Models
+             * @default []
+             */
+            models: string[];
             /** Month Spend Usd */
             month_spend_usd: string;
             /** Monthly Budget Usd */
@@ -3889,6 +3899,8 @@ export interface components {
             steps: components["schemas"]["StepOut"][];
             /** Workflow Id */
             workflow_id: string;
+            /** Workflow Name */
+            workflow_name: string;
         };
         /** VersionOut */
         novara__studio__router__VersionOut: {

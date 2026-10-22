@@ -467,3 +467,66 @@ ol.journey { list-style: none; margin: 0; padding-inline: 0; }
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3);
 }
+
+/* ---------------------------------------------------------------- assistant */
+.assistant { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--space-4); block-size: calc(100vh - 56px - var(--space-5) * 2); min-block-size: 480px; }
+.assistant-list { display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; }
+.conv-link {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0; text-align: start; inline-size: 100%;
+  border: 0; background: none; font: inherit; color: var(--color-text); cursor: pointer;
+  padding: 8px var(--space-3); border-radius: var(--radius-sm);
+}
+.conv-link:hover { background: color-mix(in srgb, var(--color-surface-raised) 60%, transparent); }
+.conv-link.active { background: var(--color-primary-subtle); }
+.conv-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 100%; font-weight: 500; }
+.chat {
+  display: flex; flex-direction: column; min-block-size: 0; background: var(--color-surface); border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent); box-shadow: var(--shadow-soft); overflow: hidden;
+}
+.chat-thread { flex: 1; overflow-y: auto; padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
+.chat-welcome { margin: auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); max-inline-size: 520px; }
+.chat-welcome h1 { font-size: 1.5rem; margin-block-start: var(--space-2); }
+.chat-welcome .star-mark-inner { fill: var(--color-surface); }
+.idea {
+  border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 0.88rem;
+  border-radius: 999px; padding: 6px 14px; cursor: pointer; margin-block-start: var(--space-2);
+}
+.idea:hover { border-color: var(--color-primary); color: var(--color-link); }
+.bubble { display: flex; gap: var(--space-2); align-items: flex-start; max-inline-size: min(720px, 92%); }
+.bubble-text { white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px 14px; border-radius: 16px; line-height: 1.7; }
+.bubble-user { align-self: flex-end; }
+.bubble-user .bubble-text { background: var(--color-primary); color: var(--color-on-primary); border-end-end-radius: 4px; }
+.bubble-assistant { align-self: flex-start; }
+.bubble-assistant .bubble-text { background: color-mix(in srgb, var(--color-surface-raised) 60%, var(--color-surface)); border-end-start-radius: 4px; }
+.bubble-assistant > svg { flex-shrink: 0; margin-block-start: 8px; }
+.bubble .star-mark-inner, .thinking .star-mark-inner { fill: var(--color-surface); }
+.thinking { align-items: center; color: var(--color-text-muted); padding-inline: 2px; }
+.thinking svg { animation: spin 2.4s linear infinite; }
+.action-card {
+  border: 1px solid var(--color-border); border-radius: var(--radius); padding: var(--space-3) var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-2); max-inline-size: 560px; background: var(--color-surface);
+}
+.action-card.pending { border-color: var(--gold-deep); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 22%, transparent); }
+.composer { border-block-start: 1px solid var(--color-border); padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
+.composer .textarea { min-block-size: 64px; resize: none; }
+@media (max-width: 900px) {
+  .assistant { grid-template-columns: 1fr; block-size: auto; }
+  .assistant-list { max-block-size: 180px; }
+  .chat { min-block-size: 70vh; }
+}
+
+/* ---------------------------------------------------------------- lists (tasks, notifications) */
+.list { list-style: none; margin: 0; padding: 0; background: var(--color-surface); border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent); box-shadow: var(--shadow-soft); }
+.list-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); flex-wrap: wrap; }
+.list-item + .list-item { border-block-start: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent); }
+.task-check { inline-size: 20px; block-size: 20px; accent-color: var(--gold-deep); cursor: pointer; }
+.list-item .dot { inline-size: 8px; block-size: 8px; border-radius: 50%; background: transparent; flex-shrink: 0; }
+.list-item.unread .dot { background: var(--color-primary); }
+.list-item.unread { background: color-mix(in srgb, var(--color-primary-subtle) 40%, transparent); }
+
+/* ---------------------------------------------------------------- meter: fill carries severity, track is a lighter step */
+.meter { block-size: 8px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--meter) 18%, var(--color-surface)); --meter: var(--color-primary); }
+.meter > span { display: block; block-size: 100%; border-radius: 999px; background: var(--meter); }
+.meter-warning { --meter: var(--color-warning); }
+.meter-danger { --meter: var(--color-danger); }

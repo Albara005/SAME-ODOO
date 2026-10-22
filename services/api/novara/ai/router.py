@@ -25,6 +25,9 @@ class SettingsOut(BaseModel):
     monthly_budget_usd: str
     month_spend_usd: str
     routes: dict[str, dict[str, str]]
+    # What a route can be set to, so clients offer only valid choices.
+    models: list[str] = []
+    efforts: list[str] = []
 
 
 class SettingsUpdate(BaseModel):
@@ -125,13 +128,14 @@ def get_settings(ctx: OrgContext = Depends(require(P.AI_MANAGE)), db: Session = 
     return SettingsOut(enabled=s.enabled, monthly_budget_usd=_usd(s.monthly_budget_micros),
                        month_spend_usd=_usd(A.month_spend_micros(db)),
                        routes={name: {"model": r.model, "effort": r.effort}
-                               for name, r in ((n, routing.resolve(n, s.routes)) for n in routing.DEFAULT_ROUTES)})
+                               for name, r in ((n, routing.resolve(n, s.routes)) for n in routing.DEFAULT_ROUTES)},
+                       models=list(routing.MODEL_PRICES), efforts=list(routing.EFFORTS))
 
 
 @router.patch("/orgs/{org_id}/assistant/settings", response_model=SettingsOut)
 def update_settings(body: SettingsUpdate, request: Request, ctx: OrgContext = Depends(require(P.AI_MANAGE)),
                     db: Session = Depends(get_db)):
-    s = A.settings_for(db)
+    s = A.settings_for(db, for_update=True)
     changes: dict = {}
     if body.enabled is not None:
         s.enabled = changes["enabled"] = body.enabled

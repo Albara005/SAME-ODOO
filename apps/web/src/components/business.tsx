@@ -15,6 +15,8 @@ const TONES: Record<string, Tone> = {
   draft: "neutral", quotation: "neutral", posted: "info", confirmed: "info", partially_paid: "warning", partial: "warning",
   paid: "success", delivered: "success", invoiced: "success", cancelled: "danger", pending: "neutral",
   not_applicable: "neutral", nothing_to_invoice: "neutral",
+  approved: "success", rejected: "neutral", approval_failed: "danger", waiting_approval: "warning",
+  completed: "success", failed: "danger", running: "info", queued: "neutral", skipped: "neutral", open: "info", done: "success",
 };
 
 export function StatusBadge({ status }: { status: string }) {

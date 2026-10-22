@@ -3963,9 +3963,25 @@
    },
    "SettingsOut": {
     "properties": {
+     "efforts": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Efforts",
+      "type": "array"
+     },
      "enabled": {
       "title": "Enabled",
       "type": "boolean"
+     },
+     "models": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Models",
+      "type": "array"
      },
      "month_spend_usd": {
       "title": "Month Spend Usd",
@@ -5153,11 +5169,16 @@
      "workflow_id": {
       "title": "Workflow Id",
       "type": "string"
+     },
+     "workflow_name": {
+      "title": "Workflow Name",
+      "type": "string"
      }
     },
     "required": [
      "id",
      "workflow_id",
+     "workflow_name",
      "status",
      "attempts",
      "error",

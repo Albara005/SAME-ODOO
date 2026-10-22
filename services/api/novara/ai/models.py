@@ -11,6 +11,9 @@ from novara.db import Base, IdMixin, TimestampMixin
 from novara.tenancy import TenantScoped, org_unique_id, same_org_fk
 
 
+DEFAULT_BUDGET_MICROS = 20_000_000  # 20 USD a month
+
+
 class AISettings(IdMixin, TimestampMixin, TenantScoped, Base):
     """Per-organization switch, budget and model choices. Absent row = defaults."""
 
@@ -19,7 +22,7 @@ class AISettings(IdMixin, TimestampMixin, TenantScoped, Base):
 
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # Monthly spend cap in micro-USD (1 USD = 1_000_000). 0 means no AI spend allowed.
-    monthly_budget_micros: Mapped[int] = mapped_column(BigInteger, default=20_000_000, nullable=False)
+    monthly_budget_micros: Mapped[int] = mapped_column(BigInteger, default=DEFAULT_BUDGET_MICROS, nullable=False)
     # Optional per-route overrides: {"assistant": {"model": "...", "effort": "..."}}
     routes: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
 

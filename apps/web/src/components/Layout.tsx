@@ -1,6 +1,8 @@
 import { Languages, LogOut, Menu, Moon } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { api, unwrap } from "../api/client";
 import { useAuth } from "../auth/Auth";
 import { useOrg } from "../auth/Org";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
@@ -37,9 +39,30 @@ export function TopActions() {
   );
 }
 
+/** Counts for the menu, refreshed every minute and whenever a page changes them. */
+function useCounts(): Record<string, number | undefined> {
+  const { org } = useOrg();
+  const id = { path: { org_id: org.id } };
+  const every = { refetchInterval: 60_000 };
+  const unread = useQuery({
+    queryKey: ["notifications", org.id, "unread"], ...every,
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/notifications", { params: { ...id, query: { unread_only: true } } })),
+  });
+  const approvals = useQuery({
+    queryKey: ["approvals", org.id], ...every,
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/approvals", { params: id })),
+  });
+  const tasks = useQuery({
+    queryKey: ["tasks", org.id, "open"], ...every,
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/tasks", { params: { ...id, query: { status_filter: "open" } } })),
+  });
+  return { notifications: unread.data?.length, approvals: approvals.data?.length, tasks: tasks.data?.length };
+}
+
 export function Layout() {
   const { t } = useI18n();
   const roleLabel = useRoleLabel();
+  const counts = useCounts();
   const { org, can, path } = useOrg();
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
@@ -72,6 +95,9 @@ export function Layout() {
                 >
                   <item.icon size={18} aria-hidden />
                   {t(item.label)}
+                  {Boolean(counts[item.to]) && (
+                    <span className="nav-badge" aria-label={t("nav.count", { n: counts[item.to]! })}>{counts[item.to]}</span>
+                  )}
                 </NavLink>
               ))}
             </div>

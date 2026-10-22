@@ -28,7 +28,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `${python} -m uvicorn novara.main:create_app --factory --host 127.0.0.1 --port 8000`,
+      command: `${python} -m uvicorn tests.e2e_app:create_app --factory --host 127.0.0.1 --port 8000`,
       cwd: path.resolve(here, "../../services/api"),
       env: {
         NOVARA_DATABASE_URL: `sqlite:///${db}`,

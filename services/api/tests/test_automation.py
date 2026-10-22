@@ -136,7 +136,8 @@ def test_approval_step_pauses_until_an_allowed_user_approves(api, wf):
     run = runs(api, wf, w["id"])[0]
     assert run["status"] == "waiting_approval"
     assert run["steps"][0]["result"]["message"] == "Approve follow-up for INV-2026-00001?"
-    assert [r["id"] for r in api.req("GET", ACCT, f"/orgs/{wf['org']}/approvals").json()] == [run["id"]]
+    assert [(r["id"], r["workflow_name"]) for r in api.req("GET", ACCT, f"/orgs/{wf['org']}/approvals").json()] \
+        == [(run["id"], w["name"])]
     assert api.req("GET", SALES, f"/orgs/{wf['org']}/approvals").json() == []
     assert api.req("POST", SALES, f"/orgs/{wf['org']}/workflow-runs/{run['id']}/approve").status_code == 403
     done = api.req("POST", ACCT, f"/orgs/{wf['org']}/workflow-runs/{run['id']}/approve").json()

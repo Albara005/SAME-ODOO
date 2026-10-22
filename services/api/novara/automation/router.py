@@ -55,6 +55,7 @@ class StepOut(BaseModel):
 class RunOut(BaseModel):
     id: str
     workflow_id: str
+    workflow_name: str
     status: str
     attempts: int
     error: str
@@ -94,7 +95,9 @@ def _wf_out(w: Workflow) -> WorkflowOut:
 
 def _run_out(db: Session, r: WorkflowRun) -> RunOut:
     steps = db.scalars(select(WorkflowStep).where(WorkflowStep.run_id == r.id).order_by(WorkflowStep.index))
-    return RunOut(id=r.id, workflow_id=r.workflow_id, status=r.status, attempts=r.attempts, error=r.error,
+    workflow = db.get(Workflow, r.workflow_id)
+    return RunOut(id=r.id, workflow_id=r.workflow_id, workflow_name=workflow.name if workflow else "",
+                  status=r.status, attempts=r.attempts, error=r.error,
                   current_step=r.current_step, created_at=r.created_at,
                   steps=[StepOut(index=s.index, type=s.type, status=s.status, result=s.result) for s in steps])
 

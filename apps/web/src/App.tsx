@@ -6,6 +6,8 @@ import { Layout } from "./components/Layout";
 import { ErrorNotice, Loading } from "./components/ui";
 import { useI18n } from "./i18n/I18n";
 import { AuditPage, MembersPage, OrgSettingsPage, RolesPage } from "./pages/Admin";
+import { AiSettingsPage } from "./pages/AiSettings";
+import { AssistantPage } from "./pages/Assistant";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { CustomersPage } from "./pages/Customers";
 import { HomePage } from "./pages/Home";
@@ -16,6 +18,7 @@ import { ProductsPage } from "./pages/Products";
 import { ReportsPage } from "./pages/Reports";
 import { SalesOrderDetailPage, SalesOrderEditorPage, SalesOrdersPage } from "./pages/Sales";
 import { SoonPage } from "./pages/Soon";
+import { ApprovalsPage, NotificationsPage, TasksPage } from "./pages/Work";
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -94,6 +97,12 @@ export function App() {
             <Route path="sales/:orderId/edit" element={<SalesOrderEditorPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="assistant" element={<AssistantPage />} />
+            <Route path="assistant/:conversationId" element={<AssistantPage />} />
+            <Route path="tasks" element={<TasksPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="approvals" element={<ApprovalsPage />} />
+            <Route path="settings/ai" element={<AiSettingsPage />} />
             <Route path="settings/members" element={<MembersPage />} />
             <Route path="settings/roles" element={<RolesPage />} />
             <Route path="settings/audit" element={<AuditPage />} />

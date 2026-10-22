@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from novara.ai import routing
 from novara.ai import tools as T
-from novara.ai.models import AISettings, Conversation, ConversationMessage, ModelUsage, ToolCall
+from novara.ai.models import DEFAULT_BUDGET_MICROS, AISettings, Conversation, ConversationMessage, ModelUsage, ToolCall
 from novara.ai.provider import ModelProvider, ProviderError
 from novara.db import utcnow
 from novara.deps import OrgContext
@@ -57,12 +57,15 @@ class TurnResult:
     usage: list[ModelUsage] = field(default_factory=list)
 
 
-def settings_for(db: Session) -> AISettings:
+def settings_for(db: Session, *, for_update: bool = False) -> AISettings:
+    """The organization's settings. Reads never write: an absent row means the defaults, and the
+    row is only created when someone changes a setting (so parallel first reads can't collide)."""
     s = db.scalar(select(AISettings))
     if s is None:
-        s = AISettings()
-        db.add(s)
-        db.flush()
+        s = AISettings(enabled=True, monthly_budget_micros=DEFAULT_BUDGET_MICROS, routes={})
+        if for_update:
+            db.add(s)
+            db.flush()
     return s
 
 

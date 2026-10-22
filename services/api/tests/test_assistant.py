@@ -225,6 +225,7 @@ def test_kill_switch_and_route_overrides(api, biz):
                 json={"routes": {"assistant": {"model": "claude-haiku-5-5", "effort": "low"}}})
     assert r.json()["routes"]["assistant"] == {"model": "claude-haiku-5-5", "effort": "low"}
     assert r.json()["routes"]["assistant_deep"]["model"] == "claude-opus-5-5"
+    assert "claude-haiku-5-5" in r.json()["models"] and r.json()["efforts"][0] == "low"
     bad = api.req("PATCH", OWNER, f"/orgs/{org}/assistant/settings", json={"routes": {"assistant": {"model": "gpt-x"}}})
     assert bad.status_code == 422
     biz["ai"].script = [text_reply("hi", model="claude-haiku-5-5"), text_reply("deep")]
@@ -283,3 +284,27 @@ def test_cut_off_tool_call_is_answered_so_history_stays_valid(api, biz):
     msgs = biz["ai"].requests[1]["messages"]
     answer = msgs[2]["content"][0]
     assert (answer["type"], answer["tool_use_id"], answer["is_error"]) == ("tool_result", "toolu_cut", True)
+
+
+def test_reading_settings_never_writes(api, app, biz):
+    """Two first visits at once must not race to create the settings row: reads use defaults."""
+    from sqlalchemy import func, select
+
+    from novara.ai.models import AISettings
+    from novara.tenancy import bind_tenant
+
+    org = biz["org"]
+    for path in ("settings", "usage", "settings"):
+        assert api.req("GET", OWNER, f"/orgs/{org}/assistant/{path}").status_code == 200
+    biz["ai"].script = [text_reply("hi")]
+    assert say(api, biz, conversation(api, biz), "hello").status_code == 200
+
+    def rows() -> int:
+        with app.state.sessionmaker() as db:
+            bind_tenant(db, org)
+            return db.scalar(select(func.count()).select_from(AISettings))
+
+    assert rows() == 0
+    r = api.req("PATCH", OWNER, f"/orgs/{org}/assistant/settings", json={"monthly_budget_usd": "5"})
+    assert r.json()["monthly_budget_usd"] == "5.0000"
+    assert rows() == 1
