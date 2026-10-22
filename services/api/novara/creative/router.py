@@ -62,6 +62,7 @@ class KitOut(BaseModel):
     tokens: dict
     checks_pass: bool
     notes: list[str]
+    adjustments: list[dict]
     logos: list[LogoOut]
 
 
@@ -77,10 +78,18 @@ def _logos(db: Session, kit: BrandKit) -> list[BrandLogo]:
     return list(db.scalars(select(BrandLogo).where(BrandLogo.brand_kit_id == kit.id).order_by(BrandLogo.created_at)))
 
 
+def _adjustments(k: BrandKit) -> list[dict]:
+    if "adjustments" in k.system:
+        return k.system["adjustments"]
+    # kits saved before adjustments existed: derive them again from the colours
+    return svc.system_for(k.primary_color, k.secondary_color)["adjustments"]
+
+
 def _kit_out(db: Session, k: BrandKit) -> KitOut:
     return KitOut(id=k.id, name=k.name, tagline=k.tagline, primary_color=k.primary_color,
                   secondary_color=k.secondary_color, font_pair=k.font_pair, tokens=k.system["modes"],
                   checks_pass=k.system["all_checks_pass"], notes=k.system["notes"],
+                  adjustments=_adjustments(k),
                   logos=[_logo_out(l) for l in _logos(db, k)])
 
 

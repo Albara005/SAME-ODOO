@@ -1,28 +1,55 @@
-import { Component, type ReactNode } from "react";
+import { Component, lazy, type ComponentType, type ReactNode } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "./auth/Auth";
 import { lastOrg, OrgProvider, rememberOrg, useOrgQuery } from "./auth/Org";
 import { Layout } from "./components/Layout";
 import { ErrorNotice, Loading } from "./components/ui";
 import { useI18n } from "./i18n/I18n";
-import { AuditPage, MembersPage, OrgSettingsPage, RolesPage } from "./pages/Admin";
-import { AgentPage, AgentsPage } from "./pages/Agents";
-import { AiSettingsPage } from "./pages/AiSettings";
-import { AssistantPage } from "./pages/Assistant";
-import { AutomationPage, WorkflowEditorPage, WorkflowPage } from "./pages/Automation";
-import { BrandKitPage, CreativePage } from "./pages/Creative";
 import { LoginPage, RegisterPage } from "./pages/Auth";
-import { CustomersPage } from "./pages/Customers";
 import { HomePage } from "./pages/Home";
-import { HostingPage } from "./pages/Hosting";
-import { InvoiceDetailPage, InvoiceEditorPage, InvoicesPage } from "./pages/Invoices";
-import { InventoryPage } from "./pages/Inventory";
 import { OrgsPage, useMyOrgs } from "./pages/Orgs";
-import { ProductsPage } from "./pages/Products";
-import { ReportsPage } from "./pages/Reports";
-import { SalesOrderDetailPage, SalesOrderEditorPage, SalesOrdersPage } from "./pages/Sales";
-import { ProjectPage, StudioPage } from "./pages/Studio";
-import { ApprovalsPage, NotificationsPage, TasksPage } from "./pages/Work";
+
+// Each area loads when first opened, so signing in and the home page stay light.
+function page<K extends string, M extends Record<K, ComponentType>>(load: () => Promise<M>, name: K) {
+  return lazy(() => load().then((m) => ({ default: m[name] })));
+}
+const admin = () => import("./pages/Admin");
+const AuditPage = page(admin, "AuditPage");
+const MembersPage = page(admin, "MembersPage");
+const OrgSettingsPage = page(admin, "OrgSettingsPage");
+const RolesPage = page(admin, "RolesPage");
+const agents = () => import("./pages/Agents");
+const AgentPage = page(agents, "AgentPage");
+const AgentsPage = page(agents, "AgentsPage");
+const AiSettingsPage = page(() => import("./pages/AiSettings"), "AiSettingsPage");
+const AssistantPage = page(() => import("./pages/Assistant"), "AssistantPage");
+const automation = () => import("./pages/Automation");
+const AutomationPage = page(automation, "AutomationPage");
+const WorkflowEditorPage = page(automation, "WorkflowEditorPage");
+const WorkflowPage = page(automation, "WorkflowPage");
+const creative = () => import("./pages/Creative");
+const BrandKitPage = page(creative, "BrandKitPage");
+const CreativePage = page(creative, "CreativePage");
+const CustomersPage = page(() => import("./pages/Customers"), "CustomersPage");
+const HostingPage = page(() => import("./pages/Hosting"), "HostingPage");
+const invoices = () => import("./pages/Invoices");
+const InvoiceDetailPage = page(invoices, "InvoiceDetailPage");
+const InvoiceEditorPage = page(invoices, "InvoiceEditorPage");
+const InvoicesPage = page(invoices, "InvoicesPage");
+const InventoryPage = page(() => import("./pages/Inventory"), "InventoryPage");
+const ProductsPage = page(() => import("./pages/Products"), "ProductsPage");
+const ReportsPage = page(() => import("./pages/Reports"), "ReportsPage");
+const sales = () => import("./pages/Sales");
+const SalesOrderDetailPage = page(sales, "SalesOrderDetailPage");
+const SalesOrderEditorPage = page(sales, "SalesOrderEditorPage");
+const SalesOrdersPage = page(sales, "SalesOrdersPage");
+const studio = () => import("./pages/Studio");
+const ProjectPage = page(studio, "ProjectPage");
+const StudioPage = page(studio, "StudioPage");
+const work = () => import("./pages/Work");
+const ApprovalsPage = page(work, "ApprovalsPage");
+const NotificationsPage = page(work, "NotificationsPage");
+const TasksPage = page(work, "TasksPage");
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false };

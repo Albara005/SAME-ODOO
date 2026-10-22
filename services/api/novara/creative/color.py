@@ -168,6 +168,8 @@ def build_system(primary: str, secondary: str | None = None) -> dict:
     neutral = scale(oklch_to_hex(0.6, 0.012, hue), chroma=0.012)  # greys tinted with the brand hue
     status = {name: scale(oklch_to_hex(0.6, 0.16, h), chroma=0.16) for name, h in STATUS_HUES.items()}
     notes: list[str] = []
+    # The same adjustments as data, so each client can word them in its own language.
+    adjustments: list[dict] = []
 
     modes = {}
     for mode in ("light", "dark"):
@@ -178,10 +180,12 @@ def build_system(primary: str, secondary: str | None = None) -> dict:
         fill = _fill_for(primary, p, bg)
         if fill != primary:
             notes.append(f"{mode}: buttons use {fill} instead of {primary} so they stand out and their text stays readable")
+            adjustments.append({"kind": "button", "mode": mode, "original": primary, "used": fill})
         link, adjusted = _accessible_step(primary, p, bg, AA_TEXT, prefer_dark=(mode == "light"))
         if adjusted:
             notes.append(f"{mode}: brand colour {primary} is too {'light' if mode == 'light' else 'dark'} for text "
                          f"on the background; links and text accents use {link} instead")
+            adjustments.append({"kind": "text", "mode": mode, "original": primary, "used": link})
         tokens = {
             "color-bg": bg, "color-surface": surface, "color-surface-raised": neutral[100] if mode == "light" else neutral[800],
             "color-text": text, "color-text-muted": muted,
@@ -224,6 +228,7 @@ def build_system(primary: str, secondary: str | None = None) -> dict:
         "checks": [c.as_dict() for c in checks],
         "all_checks_pass": all(c.passed for c in checks),
         "notes": notes,
+        "adjustments": adjustments,
     }
 
 

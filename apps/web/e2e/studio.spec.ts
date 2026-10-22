@@ -59,12 +59,16 @@ test("App Studio: edit, review the diff, version, preview, approved production",
   await expect(dialog.getByLabel(/اسم العنوان/)).toHaveValue("order-tracker");
   await dialog.getByRole("button", { name: "إنشاء" }).click();
 
-  const code = page.getByLabel("الكود");
-  await expect(code).toHaveValue(/<html/);
+  const code = page.getByRole("textbox", { name: "الكود" });
+  await expect(code).toContainText("<html");
   await code.fill("<!doctype html>\n<html lang=\"ar\" dir=\"rtl\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>تتبع الطلبات</title>\n</head>\n<body><h1>تتبع الطلبات</h1></body>\n</html>\n");
   await page.getByRole("button", { name: "حفظ", exact: true }).click();
   await expect(page.getByText("تغييرات غير محفوظة")).toBeVisible();
   await page.screenshot({ path: "test-results/screens/studio-build-ar.png" });
+  await page.getByRole("tab", { name: "معاينة سريعة" }).click();
+  await expect(page.frameLocator('iframe[title="معاينة سريعة"]').getByRole("heading", { name: "تتبع الطلبات" })).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/studio-preview-ar.png" });
+  await page.getByRole("tab", { name: "الكود" }).click();
 
   await page.getByRole("tab", { name: "التغييرات" }).click();
   await expect(page.locator(".diff .add").filter({ hasText: "<h1>تتبع الطلبات</h1>" })).toBeVisible();

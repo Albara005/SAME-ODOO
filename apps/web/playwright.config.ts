@@ -34,6 +34,7 @@ export default defineConfig({
         NOVARA_DATABASE_URL: `sqlite:///${db}`,
         NOVARA_STORAGE_ROOT: storage,
         NOVARA_JWT_SECRET: "e2e-only-secret-not-for-production-0123456789",
+        NOVARA_LIVE_INTERVAL_SECONDS: "0.5",
       },
       url: "http://127.0.0.1:8000/health",
       reuseExistingServer: false,

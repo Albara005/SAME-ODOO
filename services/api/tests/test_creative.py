@@ -46,6 +46,7 @@ def test_unreadable_brand_colours_are_adjusted_and_explained():
     assert yellow["modes"]["light"]["color-primary"] != "#ffd400"   # too light for a button on white
     assert yellow["modes"]["dark"]["color-primary"] == "#ffd400"    # fine on dark
     assert any("#ffd400" in n for n in yellow["notes"])
+    assert {(a["kind"], a["original"]) for a in yellow["adjustments"]} >= {("button", "#ffd400"), ("text", "#ffd400")}
 
 
 def test_scales_go_light_to_dark():

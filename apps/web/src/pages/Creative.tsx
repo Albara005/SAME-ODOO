@@ -15,7 +15,14 @@ import { useDebounced } from "../lib/useDebounced";
 type Kit = Schemas["KitOut"];
 type Logo = Schemas["LogoOut"];
 type Tokens = Record<string, string>;
-type System = { all_checks_pass: boolean; notes: string[]; modes: { light: Tokens; dark: Tokens }; scales: Record<string, Record<string, string>> };
+type Adjustment = { kind: "button" | "text"; mode: "light" | "dark"; original: string; used: string };
+type System = {
+  all_checks_pass: boolean; notes: string[]; adjustments: Adjustment[];
+  modes: { light: Tokens; dark: Tokens }; scales: Record<string, Record<string, string>>;
+};
+
+/** Colour codes stay left-to-right inside Arabic sentences. */
+const isolate = (hex: string) => `\u2066${hex}\u2069`;
 
 const HEX = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/;
 const FONTS = ["kufi", "plex", "naskh", "system"] as const;
@@ -175,9 +182,18 @@ function PalettePreview({ system, name }: { system: System | undefined; name: st
         <MiniApp tokens={system.modes.light} name={name} mode="light" />
         <MiniApp tokens={system.modes.dark} name={name} mode="dark" />
       </div>
-      {system.notes.length > 0 && (
-        <ul className="muted small" style={{ margin: 0, paddingInlineStart: "1.2em" }} dir="ltr">
-          {system.notes.map((n) => <li key={n}>{n}</li>)}
+      {(system.adjustments ?? []).length > 0 && (
+        <ul className="muted small" style={{ margin: 0, paddingInlineStart: "1.2em" }}>
+          {system.adjustments.map((a) => (
+            <li key={`${a.kind}-${a.mode}`}>
+              {t(a.kind === "button" ? "creative.adj.button" : "creative.adj.text", {
+                mode: t(`creative.mode.${a.mode}`),
+                original: isolate(a.original),
+                used: isolate(a.used),
+                tone: t(a.mode === "light" ? "creative.tone.light" : "creative.tone.dark"),
+              })}
+            </li>
+          ))}
         </ul>
       )}
     </div>

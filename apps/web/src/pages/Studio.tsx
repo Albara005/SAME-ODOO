@@ -3,11 +3,12 @@ import {
   CheckCircle2, Download, ExternalLink, FileCode2, FilePlus2, GitCommitVertical, LayoutTemplate, Plus, Rocket, RotateCcw, Save, Send,
   ShieldCheck, Trash2, XCircle,
 } from "lucide-react";
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, tokenStore, toApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { StarMark } from "../components/Art";
+import { CodeEditor } from "../components/CodeEditor";
 import { StatusBadge, Tabs, download } from "../components/business";
 import {
   Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, Textarea, errorText, useToast,
@@ -270,21 +271,11 @@ function BuildTab({ project: p, onChanged }: { project: Project; onChanged: () =
     if (!name) return;
     save.mutate({ path: name, body: "" }, { onSuccess: () => setCurrent(name) });
   }
-  function onKey(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const el = e.currentTarget;
-      const { selectionStart: s, selectionEnd: end } = el;
-      const next = `${el.value.slice(0, s)}  ${el.value.slice(end)}`;
-      setText(next);
-      setDirty(true);
-      requestAnimationFrame(() => el.setSelectionRange(s + 2, s + 2));
-    } else if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-      e.preventDefault();
-      if (text !== null) save.mutate({ path: current, body: text });
-    }
-  }
+  const saveCurrent = () => {
+    if (text !== null && dirty) save.mutate({ path: current, body: text });
+  };
   const write = can("apps.write");
+  const [view, setView] = useState<"code" | "preview">("code");
   return (
     <div className="studio">
       <aside className="file-tree" aria-label={t("studio.files")}>
@@ -300,6 +291,10 @@ function BuildTab({ project: p, onChanged }: { project: Project; onChanged: () =
       </aside>
       <section className="editor">
         <div className="editor-bar">
+          <span className="seg" role="tablist" aria-label={t("studio.view")}>
+            <button type="button" role="tab" aria-selected={view === "code"} onClick={() => setView("code")}>{t("studio.code")}</button>
+            <button type="button" role="tab" aria-selected={view === "preview"} onClick={() => setView("preview")}>{t("studio.quickPreview")}</button>
+          </span>
           <span className="mono small" dir="ltr">{current || "—"}</span>
           {dirty && <Badge tone="warning">{t("studio.notSaved")}</Badge>}
           <span className="grow" />
@@ -308,29 +303,61 @@ function BuildTab({ project: p, onChanged }: { project: Project; onChanged: () =
               <IconButton label={`${t("common.delete")} ${current}`} onClick={() => window.confirm(t("studio.deleteFile", { path: current })) && remove.mutate(current)}>
                 <Trash2 size={16} />
               </IconButton>
-              <Button size="sm" variant="primary" icon={<Save size={14} />} loading={save.isPending} disabled={!dirty}
-                onClick={() => text !== null && save.mutate({ path: current, body: text })}>
+              <Button size="sm" variant="primary" icon={<Save size={14} />} loading={save.isPending} disabled={!dirty} onClick={saveCurrent}>
                 {t("common.save")}
               </Button>
             </>
           )}
         </div>
-        {content.isError ? (
+        {view === "preview" ? (
+          <QuickPreview project={p} current={current} draft={text} />
+        ) : content.isError ? (
           <ErrorNotice error={content.error} />
         ) : (
-          <textarea
-            className="code"
-            aria-label={t("studio.code")}
+          <CodeEditor
+            key={current}
+            path={current}
+            label={t("studio.code")}
             value={text ?? ""}
-            onChange={(e) => { setText(e.target.value); setDirty(true); }}
-            onKeyDown={onKey}
+            onChange={(v) => { setText(v); setDirty(true); }}
+            onSave={saveCurrent}
             readOnly={!write}
-            spellCheck={false}
-            dir="ltr"
           />
         )}
       </section>
       {write && can("ai.use") && <BuilderChat project={p} onChanged={onChanged} />}
+    </div>
+  );
+}
+
+/**
+ * The working copy rendered in a sandboxed frame, with its stylesheets inlined (unsaved edits included).
+ * Scripts don't run here; a preview deployment runs the real thing.
+ */
+function QuickPreview({ project: p, current, draft }: { project: Project; current: string; draft: string | null }) {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  const page = current.endsWith(".html") ? current : "index.html";
+  const base = `/api/v1/orgs/${org.id}/studio/projects/${p.id}/files/`;
+  const doc = useQuery({
+    queryKey: ["quick-preview", org.id, p.id, page, p.files.map((f) => f.sha256).join(), current, draft],
+    queryFn: async () => {
+      const read = async (path: string) => (path === current && draft !== null ? draft : (await fileRequest(base + path)).text());
+      let html = await read(page);
+      const sheets = p.files.map((f) => f.path).filter((x) => x.endsWith(".css"));
+      for (const sheet of sheets) {
+        const cssText = (await read(sheet)).replace(/<\/style/gi, "<\\/style");
+        const link = new RegExp(`<link[^>]*href=["']\\.?/?${sheet.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'][^>]*>`, "gi");
+        html = html.replace(link, () => `<style>${cssText}</style>`);
+      }
+      return html.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+    },
+    enabled: p.files.some((f) => f.path === page),
+  });
+  return (
+    <div className="quick-preview">
+      <p className="muted small">{t("studio.quickPreviewHint")}</p>
+      {doc.isError ? <ErrorNotice error={doc.error} /> : <iframe title={t("studio.quickPreview")} sandbox="" srcDoc={doc.data ?? ""} />}
     </div>
   );
 }

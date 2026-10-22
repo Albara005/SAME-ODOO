@@ -209,15 +209,20 @@ def reject_step(run_id: str, request: Request, ctx: OrgContext = Depends(org_con
     return _decide(run_id, False, request, ctx, db)
 
 
-@router.get("/orgs/{org_id}/approvals", response_model=list[RunOut])
-def my_approvals(ctx: OrgContext = Depends(org_context), db: Session = Depends(get_db)):
-    """Workflow steps waiting for an approval you are allowed to give."""
+def approvable_runs(db: Session, ctx: OrgContext) -> list[WorkflowRun]:
+    """Runs waiting at an approval step this user holds the permission for."""
     out = []
     for run in db.scalars(select(WorkflowRun).where(WorkflowRun.status == "waiting_approval")):
         _, step = _waiting_run(db, run.id)
         if ctx.has(step.result["permission"]):
-            out.append(_run_out(db, run))
+            out.append(run)
     return out
+
+
+@router.get("/orgs/{org_id}/approvals", response_model=list[RunOut])
+def my_approvals(ctx: OrgContext = Depends(org_context), db: Session = Depends(get_db)):
+    """Workflow steps waiting for an approval you are allowed to give."""
+    return [_run_out(db, run) for run in approvable_runs(db, ctx)]
 
 
 @router.get("/orgs/{org_id}/tasks", response_model=list[TaskOut])

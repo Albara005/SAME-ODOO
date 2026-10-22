@@ -6,6 +6,7 @@ import { useOrg } from "../auth/Org";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, useToast,
 } from "../components/ui";
+import type { MessageKey } from "../i18n/en";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
 import { useDebounced } from "../lib/useDebounced";
 
@@ -309,7 +310,11 @@ export function AuditPage() {
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/members", { params: { path: { org_id: org.id } } })),
     retry: false,
   });
-  const who = (id: string | null) => (id ? (members.data?.find((m) => m.user_id === id)?.email ?? id.slice(0, 8)) : "system");
+  const who = (id: string | null) => (id ? (members.data?.find((m) => m.user_id === id)?.email ?? id.slice(0, 8)) : t("audit.system"));
+  const label = (action: string) => {
+    const key = `audit.a.${action}` as MessageKey;
+    return t(key) === key ? action : t(key);
+  };
   const logs = useQuery({
     queryKey: ["audit", org.id, filter],
     queryFn: () =>
@@ -347,14 +352,19 @@ export function AuditPage() {
                     <tr key={l.id}>
                       <td className="small num">{date(l.created_at)}</td>
                       <td>
-                        <Badge tone="primary">
-                          <span className="mono">{l.action}</span>
-                        </Badge>
+                        <span className="stack-sm" style={{ gap: 2 }}>
+                          <Badge tone="primary">{label(l.action)}</Badge>
+                          <span className="mono small muted">{l.action}</span>
+                        </span>
                       </td>
                       <td className="mono small">{who(l.actor_user_id)}</td>
                       <td className="mono small">{l.target_type}</td>
-                      <td className="mono small" style={{ maxWidth: 420, wordBreak: "break-word" }}>
-                        {JSON.stringify(l.details)}
+                      <td className="small" style={{ maxWidth: 420, wordBreak: "break-word" }}>
+                        {Object.entries(l.details ?? {}).map(([k, v]) => (
+                          <div key={k}>
+                            <span className="muted mono">{k}</span>: <bdi>{typeof v === "object" ? JSON.stringify(v) : String(v)}</bdi>
+                          </div>
+                        ))}
                       </td>
                     </tr>
                   ))}

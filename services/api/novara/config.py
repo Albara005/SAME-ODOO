@@ -21,6 +21,10 @@ class Settings:
     # Where published App Studio sites are served. Use a separate domain in production,
     # e.g. https://sites.example.com (it must route /{site_key}/... to the API's /sites/...).
     sites_base_url: str = ""
+    # Live updates (server-sent events): how often the server checks for changes, and how long one
+    # stream stays open before the client reconnects (keeps proxies and stale connections in check).
+    live_interval_seconds: float = 3.0
+    live_max_seconds: int = 300
 
     def validate(self) -> None:
         if self.env == "production" and self.jwt_secret == _DEV_SECRET:
@@ -40,6 +44,8 @@ def load_settings() -> Settings:
         max_upload_bytes=int(env.get("NOVARA_MAX_UPLOAD_BYTES", Settings.max_upload_bytes)),
         cors_origins=[o for o in env.get("NOVARA_CORS_ORIGINS", "").split(",") if o],
         sites_base_url=env.get("NOVARA_SITES_BASE_URL", "").rstrip("/"),
+        live_interval_seconds=float(env.get("NOVARA_LIVE_INTERVAL_SECONDS", Settings.live_interval_seconds)),
+        live_max_seconds=int(env.get("NOVARA_LIVE_MAX_SECONDS", Settings.live_max_seconds)),
     )
     settings.validate()
     return settings

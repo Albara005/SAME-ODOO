@@ -1,15 +1,16 @@
 import { Languages, LogOut, Menu, Moon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, unwrap } from "../api/client";
 import { useAuth } from "../auth/Auth";
 import { useOrg } from "../auth/Org";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
+import { useLiveCounts } from "../lib/live";
 import { useTheme } from "../lib/theme";
 import { StarLattice, StarMark } from "./Art";
 import { visibleNav } from "./nav";
-import { IconButton } from "./ui";
+import { IconButton, Loading, useToast } from "./ui";
 
 export function BrandMark() {
   const { t } = useI18n();
@@ -39,24 +40,30 @@ export function TopActions() {
   );
 }
 
-/** Counts for the menu, refreshed every minute and whenever a page changes them. */
+/** Counts for the menu: pushed live by the server; the first values come from the lists themselves. */
 function useCounts(): Record<string, number | undefined> {
   const { org } = useOrg();
+  const { t } = useI18n();
+  const toast = useToast();
+  const live = useLiveCounts(org.id, (title) => toast(t("notifications.new", { title })));
   const id = { path: { org_id: org.id } };
-  const every = { refetchInterval: 60_000 };
   const unread = useQuery({
-    queryKey: ["notifications", org.id, "unread"], ...every,
+    queryKey: ["notifications", org.id, "unread"],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/notifications", { params: { ...id, query: { unread_only: true } } })),
   });
   const approvals = useQuery({
-    queryKey: ["approvals", org.id], ...every,
+    queryKey: ["approvals", org.id],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/approvals", { params: id })),
   });
   const tasks = useQuery({
-    queryKey: ["tasks", org.id, "open"], ...every,
+    queryKey: ["tasks", org.id, "open"],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/tasks", { params: { ...id, query: { status_filter: "open" } } })),
   });
-  return { notifications: unread.data?.length, approvals: approvals.data?.length, tasks: tasks.data?.length };
+  return {
+    notifications: live?.notifications ?? unread.data?.length,
+    approvals: live?.approvals ?? approvals.data?.length,
+    tasks: live?.tasks ?? tasks.data?.length,
+  };
 }
 
 export function Layout() {
@@ -120,7 +127,9 @@ export function Layout() {
           </IconButton>
         </header>
         <main className="content" id="main">
-          <Outlet />
+          <Suspense fallback={<Loading />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

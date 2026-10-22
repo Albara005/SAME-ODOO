@@ -108,3 +108,20 @@ test("AI settings: switch off, budget and model per task", async ({ page }) => {
   await page.getByRole("button", { name: "إرسال" }).click();
   await expect(page.getByRole("alert")).toContainText("المساعد الذكي متوقف");
 });
+
+test("live: a new notification arrives without reloading", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("live"));
+  await createOrg(page, "شركة اللحظة");
+  const call = await apiFor(page);
+  await call("POST", "/workflows", {
+    name: "ترحيب", trigger: "customer.created",
+    actions: [{ type: "notify", to: "owner", title: "عميل جديد: {{name}}" }],
+  });
+  const sidebar = page.getByRole("complementary");
+  await expect(sidebar.getByRole("link", { name: /^الإشعارات/ })).not.toContainText(/\d/);
+
+  await call("POST", "/customers", { name: "مؤسسة الضحى" });
+  await call("POST", "/automation/process");
+  await expect(page.getByText("إشعار جديد: عميل جديد: مؤسسة الضحى")).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: /^الإشعارات/ })).toContainText("1");
+});

@@ -1,6 +1,5 @@
-/// <reference types="vitest" />
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 // In development the API runs on :8000 and is proxied, so the app and API share an origin.
 const api = process.env.NOVARA_API_URL ?? "http://127.0.0.1:8000";

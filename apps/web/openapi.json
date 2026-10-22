@@ -1731,6 +1731,13 @@
    },
    "KitOut": {
     "properties": {
+     "adjustments": {
+      "items": {
+       "type": "object"
+      },
+      "title": "Adjustments",
+      "type": "array"
+     },
      "checks_pass": {
       "title": "Checks Pass",
       "type": "boolean"
@@ -1795,6 +1802,7 @@
      "tokens",
      "checks_pass",
      "notes",
+     "adjustments",
      "logos"
     ],
     "title": "KitOut",
@@ -10058,6 +10066,62 @@
     "summary": "Post Invoice",
     "tags": [
      "invoices"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/live": {
+   "get": {
+    "description": "Server-sent events: `counts` whenever the user's counts change, `end` when access is gone.\nThe stream closes after a few minutes; clients reconnect (``once=true`` sends one event and closes).",
+    "operationId": "live_api_v1_orgs__org_id__live_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "once",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Once",
+       "type": "boolean"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Live",
+    "tags": [
+     "live"
     ]
    }
   },
