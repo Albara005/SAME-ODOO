@@ -86,6 +86,16 @@ def app(tmp_path, database_url):
 
 
 @pytest.fixture
+def ops_sessionmaker(app, pg_owner_engine):
+    """Operator database access: the schema owner on PostgreSQL (RLS applies to the API role only)."""
+    if pg_owner_engine is None:
+        return app.state.sessionmaker
+    from novara.db import make_sessionmaker
+
+    return make_sessionmaker(pg_owner_engine)
+
+
+@pytest.fixture
 def client(app):
     return TestClient(app)
 

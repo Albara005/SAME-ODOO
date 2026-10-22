@@ -46,6 +46,9 @@ APPS_DEPLOY = "apps.deploy"
 AGENTS_RUN = "agents.run"
 AGENTS_MANAGE = "agents.manage"
 WORKFLOWS_MANAGE = "workflows.manage"
+BRAND_READ = "brand.read"
+BRAND_MANAGE = "brand.manage"
+HOSTING_MANAGE = "hosting.manage"
 
 CATALOG: dict[str, str] = {
     ORG_MANAGE: "Edit organization settings",
@@ -79,6 +82,9 @@ CATALOG: dict[str, str] = {
     AGENTS_RUN: "Run published agents (with your own permissions)",
     AGENTS_MANAGE: "Create, configure, test and publish agents; switch them off",
     WORKFLOWS_MANAGE: "Create and manage automation workflows, see all tasks",
+    BRAND_READ: "View brand kits, logos and design tokens",
+    BRAND_MANAGE: "Create and edit brand kits and logos, use the design agent",
+    HOSTING_MANAGE: "Request dedicated hosting (an owner approves the cost)",
 }
 
 OWNER_ROLE = "owner"
@@ -98,7 +104,7 @@ SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, *_SALES})),
     "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, AI_USE, AGENTS_RUN, *_WAREHOUSE})),
     # Builds apps and publishes previews; production needs someone with apps.deploy.
-    "developer": ("Developer", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, APPS_READ, APPS_WRITE})),
+    "developer": ("Developer", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, BRAND_READ, APPS_READ, APPS_WRITE})),
     "member": ("Member", [AGENTS_RUN, AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ]),
     "viewer": ("Viewer", [FILES_READ]),
 }

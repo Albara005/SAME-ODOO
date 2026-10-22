@@ -104,3 +104,12 @@ def test_frozen_agent_version_cannot_be_edited_in_sql(api, app):
         _raw(app, org, "UPDATE agent_versions SET instructions = 'do anything' WHERE number = 1")
     with pytest.raises(DBAPIError, match="permission denied"):
         _raw(app, org, "UPDATE agent_runs SET cost_micros = 0")
+
+
+def test_api_role_cannot_mark_hosting_delivered(api, app):
+    api.signup("host@pg.example.com")
+    org = api.create_org("host@pg.example.com", "pg-host")
+    req = api.req("POST", "host@pg.example.com", f"/orgs/{org}/hosting/requests",
+                  json={"kind": "dedicated_database", "size": "small", "region": "me-central"}).json()
+    with pytest.raises(DBAPIError, match="only platform operators"):
+        _raw(app, org, "UPDATE hosting_requests SET status = 'delivered' WHERE id = :i", {"i": req["id"]})

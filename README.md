@@ -14,7 +14,7 @@ A unified platform combining an ERP-style business suite with AI app building, a
 | 3. المساعد الذكي: أدوات بصلاحيات المستخدم، موافقة على كل تغيير، ميزانية وتتبع | ✅ الخلفية مكتملة | [`docs/phase-3-assistant.md`](docs/phase-3-assistant.md) |
 | 4. AI App Studio: قالب محدد، مُنشئ ذكي، إصدارات وفحوص، معاينة، نشر إنتاج بموافقة | ✅ الخلفية مكتملة | [`docs/phase-4-app-studio.md`](docs/phase-4-app-studio.md) |
 | 5. الوكلاء والأتمتة: وكلاء باختبارات ونشر وحدود، ومحرك سير عمل بموافقات وإعادة محاولة | ✅ الخلفية مكتملة | [`docs/phase-5-agents-automation.md`](docs/phase-5-agents-automation.md) |
-| 6. Creative Studio والتوسع | قيد العمل | |
+| 6. Creative Studio: ألوان بتباين مقاس، شعارات SVG متجهية حقيقية، حزم هوية، وكيل تصميم، استضافة خاصة بموافقة | ✅ الجزء الأساسي ([ما بقي](docs/phase-6-creative-hosting.md#ما-لم-يُنجز-من-المرحلة-السادسة)) | [`docs/phase-6-creative-hosting.md`](docs/phase-6-creative-hosting.md) |
 
 ```
 services/api/            FastAPI + SQLAlchemy (Python)
@@ -26,6 +26,9 @@ services/api/            FastAPI + SQLAlchemy (Python)
   novara/agents/         Agent Builder: الإصدارات، الاختبارات، النشر، التشغيل
   novara/automation/     الأحداث، سير العمل، الموافقات، المهام، الإشعارات
   novara/worker.py       عامل الأتمتة في الخلفية
+  novara/creative/       Creative Studio: الألوان، الشعارات، حزم الهوية، وكيل التصميم
+  novara/hosting/        طلبات الاستضافة الخاصة
+  novara/ops.py          أوامر مشغلي المنصة (خارج الـ API)
   migrations/postgres/   المخطط + Row-Level Security + صلاحيات دور التشغيل
   tests/                 اختبارات العزل والصلاحيات (SQLite و PostgreSQL)
 infrastructure/
