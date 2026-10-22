@@ -15,8 +15,16 @@ A unified platform combining an ERP-style business suite with AI app building, a
 | 4. AI App Studio: قالب محدد، مُنشئ ذكي، إصدارات وفحوص، معاينة، نشر إنتاج بموافقة | ✅ الخلفية مكتملة | [`docs/phase-4-app-studio.md`](docs/phase-4-app-studio.md) |
 | 5. الوكلاء والأتمتة: وكلاء باختبارات ونشر وحدود، ومحرك سير عمل بموافقات وإعادة محاولة | ✅ الخلفية مكتملة | [`docs/phase-5-agents-automation.md`](docs/phase-5-agents-automation.md) |
 | 6. Creative Studio: ألوان بتباين مقاس، شعارات SVG متجهية حقيقية، حزم هوية، وكيل تصميم، استضافة خاصة بموافقة | ✅ الجزء الأساسي ([ما بقي](docs/phase-6-creative-hosting.md#ما-لم-يُنجز-من-المرحلة-السادسة)) | [`docs/phase-6-creative-hosting.md`](docs/phase-6-creative-hosting.md) |
+| الواجهة: كل الشاشات لكل المراحل، عربية أولاً، فاتح وداكن، جوال | ✅ مكتملة ([ما بقي](docs/frontend.md#ما-لم-يُنجز-بعد-في-الواجهة)) | [`docs/frontend.md`](docs/frontend.md) · [الهوية البصرية](docs/design-identity.md) |
+
+![الرئيسية](docs/screens/home-ar.png)
 
 ```
+apps/web/                الواجهة: React + TypeScript + Vite
+  src/pages/             الشاشات (الأعمال، المساعد، الاستوديوهات، الأتمتة، الإدارة)
+  src/components/        عناصر الواجهة، الهوية (النجمة الثمانية)، الرسم البياني
+  src/api/               عميل مولَّد الأنواع من OpenAPI
+  e2e/                   اختبارات المتصفح (Playwright)
 services/api/            FastAPI + SQLAlchemy (Python)
   novara/tenancy.py      عزل المؤسسات التلقائي في طبقة البيانات
   novara/modules/        identity · organizations · access · audit · files
@@ -33,7 +41,7 @@ services/api/            FastAPI + SQLAlchemy (Python)
   tests/                 اختبارات العزل والصلاحيات (SQLite و PostgreSQL)
 infrastructure/
   backup/                نسخ احتياطي مشفّر + التحقق من الاستعادة
-  deployment/            أدوار PostgreSQL
+  deployment/            أدوار PostgreSQL، وإعداد nginx بسياسة CSP صارمة
 docs/                    المخطط ووثائق المراحل
 ```
 
@@ -45,6 +53,10 @@ python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 pytest
 uvicorn novara.main:create_app --factory --reload   # http://localhost:8000/docs
+
+cd ../../apps/web
+npm ci
+npm run dev                                         # http://localhost:5173
 ```
 
 ## قواعد التطوير

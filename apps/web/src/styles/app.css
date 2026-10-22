@@ -530,3 +530,112 @@ ol.journey { list-style: none; margin: 0; padding-inline: 0; }
 .meter > span { display: block; block-size: 100%; border-radius: 999px; background: var(--meter); }
 .meter-warning { --meter: var(--color-warning); }
 .meter-danger { --meter: var(--color-danger); }
+
+/* ---------------------------------------------------------------- creative studio */
+dialog.dialog.dialog-wide { width: min(880px, calc(100vw - 32px)); }
+.swatches { display: flex; gap: 4px; }
+.swatches span { inline-size: 22px; block-size: 22px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08); }
+.logo-frame {
+  display: grid; place-items: center; border-radius: var(--radius); padding: var(--space-3);
+  background: #ffffff; border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+.logo-frame img { max-inline-size: 100%; max-block-size: 100%; object-fit: contain; }
+.logo-frame.empty { color: var(--color-text-muted); font-size: 0.85rem; background: var(--color-surface-raised); }
+.logo-frame.small { block-size: 52px; padding: 6px; }
+.logo-frame.dark { background: var(--nav-bg); border-color: var(--nav-bg); }
+.logo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--space-4); }
+.logo-card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-lg); border: 1px solid var(--color-border); }
+.logo-card.primary { border-color: var(--gold-deep); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 20%, transparent); }
+.logo-variants { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.color-field { display: flex; gap: var(--space-2); align-items: center; }
+.color-field input[type="color"] {
+  inline-size: 42px; block-size: 38px; padding: 2px; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--color-surface); cursor: pointer; flex-shrink: 0;
+}
+.scale { display: grid; grid-template-columns: repeat(11, 1fr); block-size: 28px; border-radius: var(--radius-sm); overflow: hidden; }
+.scale span { display: block; }
+.mini-app { border: 1px solid; border-radius: var(--radius); overflow: hidden; font-size: 0.85rem; }
+.mini-bar { display: flex; align-items: center; gap: var(--space-2); padding: 8px 12px; border-block-end: 1px solid; }
+.mini-dot { inline-size: 14px; block-size: 14px; border-radius: 4px; }
+.mini-mode { margin-inline-start: auto; font-size: 0.75rem; }
+.mini-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.mini-card { border: 1px solid; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.mini-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-block-start: 4px; }
+.mini-badges span { padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+.mini-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mini-btn { padding: 5px 12px; border-radius: 6px; font-weight: 600; }
+.kit-tile .logo-frame { inline-size: 100%; }
+.quote { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-primary-subtle) 50%, var(--color-surface)); flex-wrap: wrap; }
+.quote > svg { color: var(--color-link); }
+
+/* ---------------------------------------------------------------- automation: the workflow drawn as a flow */
+.wf-row { display: flex; align-items: center; gap: var(--space-3); }
+.flow { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); position: relative; }
+.flow::before {
+  content: ""; position: absolute; inset-inline-start: 21px; inset-block: 22px 22px; inline-size: 2px;
+  background: linear-gradient(var(--gold), color-mix(in srgb, var(--color-border) 80%, transparent));
+}
+.flow-node {
+  position: relative; display: flex; gap: var(--space-4); align-items: flex-start; padding: var(--space-4);
+  padding-inline-start: 0; background: transparent;
+}
+.flow-node > .grow {
+  background: var(--color-surface); border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-lg); padding: var(--space-4); box-shadow: var(--shadow-soft);
+}
+.flow-icon {
+  position: relative; z-index: 1; flex-shrink: 0; inline-size: 44px; block-size: 44px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--color-surface); border: 2px solid var(--color-border); color: var(--color-link);
+}
+.flow-node.trigger .flow-icon { background: var(--gold); border-color: var(--gold-deep); color: #111418; }
+.flow-icon.step { border-color: var(--color-primary); }
+.flow-add { display: flex; align-items: center; gap: var(--space-3); padding-inline-start: 12px; color: var(--color-text-muted); }
+.step-pill {
+  inline-size: 24px; block-size: 24px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 0.75rem; font-weight: 700;
+  background: var(--color-surface-raised); color: var(--color-text-muted);
+}
+.step-pill-done, .step-pill-approved { background: color-mix(in srgb, var(--color-success) 18%, transparent); color: var(--color-success-text); }
+.step-pill-waiting_approval { background: color-mix(in srgb, var(--color-warning) 20%, transparent); color: var(--color-warning-text); }
+.step-pill-rejected, .step-pill-failed { background: color-mix(in srgb, var(--color-danger) 16%, transparent); color: var(--color-danger-text); }
+
+/* ---------------------------------------------------------------- app studio */
+.studio { display: grid; grid-template-columns: 200px minmax(0, 1fr) 300px; gap: var(--space-3); min-block-size: 520px; }
+.file-tree, .builder, .editor {
+  background: var(--color-surface); border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-soft);
+}
+.file-tree { padding: var(--space-3); display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.file {
+  display: flex; align-items: center; gap: 6px; border: 0; background: none; font: inherit; font-size: 0.85rem; color: var(--color-text);
+  padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; text-align: start; font-family: ui-monospace, Menlo, monospace;
+}
+.file:hover { background: color-mix(in srgb, var(--color-surface-raised) 60%, transparent); }
+.file.active { background: var(--color-primary-subtle); color: var(--color-link); }
+.editor { display: flex; flex-direction: column; overflow: hidden; }
+.editor-bar { display: flex; align-items: center; gap: var(--space-2); padding: 6px var(--space-3); border-block-end: 1px solid var(--color-border); min-block-size: 44px; }
+textarea.code {
+  flex: 1; min-block-size: 460px; border: 0; resize: none; padding: var(--space-3) var(--space-4); outline: none;
+  font: 13px/1.6 ui-monospace, "JetBrains Mono", Menlo, monospace; tab-size: 2; white-space: pre; overflow: auto;
+  background: color-mix(in srgb, var(--color-surface-raised) 25%, var(--color-surface)); color: var(--color-text);
+}
+.builder { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.builder .star-mark-inner { fill: var(--color-surface); }
+.builder-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2); max-block-size: 420px; }
+.builder .bubble-text .changed { display: block; margin-block-start: 4px; font-size: 0.78rem; opacity: 0.85; }
+.diff summary { cursor: pointer; padding: var(--space-2) 0; color: var(--color-text); }
+.diff pre {
+  margin: 0; padding: var(--space-3); border-radius: var(--radius); overflow-x: auto; font: 12.5px/1.55 ui-monospace, Menlo, monospace;
+  background: color-mix(in srgb, var(--color-surface-raised) 40%, var(--color-surface)); border: 1px solid var(--color-border);
+}
+.diff pre .add { background: color-mix(in srgb, var(--color-success) 16%, transparent); display: inline-block; min-inline-size: 100%; }
+.diff pre .del { background: color-mix(in srgb, var(--color-danger) 14%, transparent); display: inline-block; min-inline-size: 100%; }
+.diff pre .hunk { color: var(--color-info-text); }
+@media (max-width: 1100px) {
+  .studio { grid-template-columns: 180px minmax(0, 1fr); }
+  .studio .builder { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .studio { grid-template-columns: 1fr; }
+}
+.color-field input[type="color"].unset { opacity: 0.35; }

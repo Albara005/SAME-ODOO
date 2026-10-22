@@ -17,6 +17,7 @@ const TONES: Record<string, Tone> = {
   not_applicable: "neutral", nothing_to_invoice: "neutral",
   approved: "success", rejected: "neutral", approval_failed: "danger", waiting_approval: "warning",
   completed: "success", failed: "danger", running: "info", queued: "neutral", skipped: "neutral", open: "info", done: "success",
+  pending_approval: "warning", provisioning: "info", live: "success", superseded: "neutral", offline: "neutral",
 };
 
 export function StatusBadge({ status }: { status: string }) {
@@ -78,6 +79,21 @@ export async function download(path: string, filename: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** An authenticated image (logo SVG/PNG) as an object URL an <img> can show. Cached per path. */
+export function useBlobUrl(path: string | null) {
+  return useQuery({
+    queryKey: ["blob", path],
+    queryFn: async () => {
+      const token = tokenStore.get();
+      const res = await fetch(path!, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) throw toApiError(res.status, await res.json().catch(() => undefined));
+      return URL.createObjectURL(await res.blob());
+    },
+    enabled: Boolean(path),
+    staleTime: Infinity,
+  }).data;
 }
 
 /** One key per user intent: a retried click (or network retry) reuses it, so it can't pay or ship twice. */

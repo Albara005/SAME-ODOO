@@ -6,18 +6,22 @@ import { Layout } from "./components/Layout";
 import { ErrorNotice, Loading } from "./components/ui";
 import { useI18n } from "./i18n/I18n";
 import { AuditPage, MembersPage, OrgSettingsPage, RolesPage } from "./pages/Admin";
+import { AgentPage, AgentsPage } from "./pages/Agents";
 import { AiSettingsPage } from "./pages/AiSettings";
 import { AssistantPage } from "./pages/Assistant";
+import { AutomationPage, WorkflowEditorPage, WorkflowPage } from "./pages/Automation";
+import { BrandKitPage, CreativePage } from "./pages/Creative";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { CustomersPage } from "./pages/Customers";
 import { HomePage } from "./pages/Home";
+import { HostingPage } from "./pages/Hosting";
 import { InvoiceDetailPage, InvoiceEditorPage, InvoicesPage } from "./pages/Invoices";
 import { InventoryPage } from "./pages/Inventory";
 import { OrgsPage, useMyOrgs } from "./pages/Orgs";
 import { ProductsPage } from "./pages/Products";
 import { ReportsPage } from "./pages/Reports";
 import { SalesOrderDetailPage, SalesOrderEditorPage, SalesOrdersPage } from "./pages/Sales";
-import { SoonPage } from "./pages/Soon";
+import { ProjectPage, StudioPage } from "./pages/Studio";
 import { ApprovalsPage, NotificationsPage, TasksPage } from "./pages/Work";
 
 class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
@@ -103,11 +107,22 @@ export function App() {
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="approvals" element={<ApprovalsPage />} />
             <Route path="settings/ai" element={<AiSettingsPage />} />
+            <Route path="settings/hosting" element={<HostingPage />} />
+            <Route path="studio" element={<StudioPage />} />
+            <Route path="studio/:projectId" element={<ProjectPage />} />
+            <Route path="agents" element={<AgentsPage />} />
+            <Route path="agents/:agentId" element={<AgentPage />} />
+            <Route path="automation" element={<AutomationPage />} />
+            <Route path="automation/new" element={<WorkflowEditorPage />} />
+            <Route path="automation/:workflowId" element={<WorkflowPage />} />
+            <Route path="automation/:workflowId/edit" element={<WorkflowEditorPage />} />
+            <Route path="creative" element={<CreativePage />} />
+            <Route path="creative/:kitId" element={<BrandKitPage />} />
             <Route path="settings/members" element={<MembersPage />} />
             <Route path="settings/roles" element={<RolesPage />} />
             <Route path="settings/audit" element={<AuditPage />} />
             <Route path="settings/organization" element={<OrgSettingsPage />} />
-            <Route path="*" element={<SoonPage />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Route>
         <Route path="*" element={<NotFound />} />

@@ -72,18 +72,40 @@ def _is_rtl(ch: str) -> bool:
     return unicodedata.bidirectional(ch) in ("R", "AL")
 
 
+def _kind(ch: str) -> str | None:
+    """'rtl' (Arabic letters), 'ltr' (Latin letters), 'num' (digits) or None for neutrals."""
+    b = unicodedata.bidirectional(ch)
+    if b in ("R", "AL"):
+        return "rtl"
+    if b == "L":
+        return "ltr"
+    if b in ("EN", "AN"):
+        return "num"
+    return None
+
+
 def _runs(text: str) -> tuple[list[tuple[str, bool]], bool]:
-    """Split into direction runs; neutral characters (spaces, digits, punctuation) join the run before them."""
+    """Split into direction runs (text, is_rtl), following the parts of the Unicode bidi algorithm a
+    one-line logo needs: digits read left to right ("منذ 1985" keeps 1985 in order), digits after
+    Latin text join it ("KSA 2030"), and spaces between runs of different direction stay between them."""
     runs: list[list] = []
     for ch in text:
-        strong = unicodedata.bidirectional(ch) in ("L", "R", "AL")
-        rtl = _is_rtl(ch)
-        if runs and (not strong or runs[-1][1] == rtl):
+        kind = _kind(ch)
+        if runs and (kind is None or runs[-1][1] in (kind, None) or (kind == "num" and runs[-1][1] == "ltr")):
             runs[-1][0] += ch
+            runs[-1][1] = runs[-1][1] or kind
         else:
-            runs.append([ch, rtl])
-    base_rtl = next((_is_rtl(c) for c in text if unicodedata.bidirectional(c) in ("L", "R", "AL")), False)
-    return [(t, r) for t, r in runs], base_rtl
+            runs.append([ch, kind])
+    base_rtl = next((k == "rtl" for k in map(_kind, text) if k in ("rtl", "ltr")), False)
+    for r in runs:
+        r[1] = r[1] == "rtl" if r[1] is not None else base_rtl
+    # Trailing neutrals of a run against the line's direction belong between it and the next run.
+    for this, nxt in zip(runs, runs[1:]):
+        if this[1] != base_rtl:
+            body = this[0].rstrip(" -–—.,:;/")
+            if body:
+                this[0], nxt[0] = body, this[0][len(body):] + nxt[0]
+    return [(t, rtl) for t, rtl in runs], base_rtl
 
 
 def shape(text: str, size: float, weight: int = 700) -> Shaped:

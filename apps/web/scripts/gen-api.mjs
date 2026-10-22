@@ -13,7 +13,7 @@ const python = process.env.PYTHON ?? "python3";
 
 const spec = execFileSync(python, ["-m", "scripts.export_openapi"], { cwd: api, encoding: "utf8", maxBuffer: 64 << 20 });
 writeFileSync(path.join(web, "openapi.json"), spec);
-execFileSync(path.join(web, "node_modules/.bin/openapi-typescript"), ["openapi.json", "-o", "src/api/schema.d.ts"], {
+execFileSync(path.join(web, "node_modules/.bin/openapi-typescript"), ["openapi.json", "-o", "src/api/schema.d.ts", "--empty-objects-unknown"], {
   cwd: web,
   stdio: "inherit",
 });

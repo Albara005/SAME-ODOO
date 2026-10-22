@@ -195,3 +195,18 @@ def test_brand_permissions(api, kit):
     assert api.req("GET", DEV, k_url(kit)).status_code == 200
     assert api.req("PATCH", DEV, k_url(kit), json={"primary": "#000000"}).status_code == 403
     assert api.req("POST", DEV, k_url(kit, "/concepts"), json={"brief": "x"}).status_code == 403
+
+
+def test_logo_text_keeps_numbers_and_mixed_scripts_in_reading_order():
+    """Bidi in a logo line: "منذ 1985" must not be drawn as "منذ 5891"."""
+    from novara.creative.logo import _runs
+
+    def visual(text: str) -> str:  # left-to-right order of characters as drawn
+        runs, base_rtl = _runs(text)
+        return "".join(t[::-1] if rtl else t for t, rtl in (reversed(runs) if base_rtl else runs))
+
+    assert visual("منذ 1985") == "1985 ذنم"
+    assert visual("متجر 24/7 للتوصيل") == "ليصوتلل 24/7 رجتم"
+    assert visual("الرياض - KSA 2030") == "KSA 2030 - ضايرلا"
+    assert visual("Shop متجر 24") == "Shop رجتم 24"
+    assert visual("Bakery 1985") == "Bakery 1985"

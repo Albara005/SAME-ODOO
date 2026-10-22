@@ -2027,7 +2027,7 @@ export interface components {
         /** ActionOut */
         ActionOut: {
             /** Arguments */
-            arguments: Record<string, never>;
+            arguments: Record<string, unknown>;
             /**
              * Created At
              * Format: date-time
@@ -2042,7 +2042,7 @@ export interface components {
             /** Name */
             name: string;
             /** Result */
-            result: Record<string, never> | unknown[] | null;
+            result: Record<string, unknown> | unknown[] | null;
             /** Status */
             status: string;
         };
@@ -2085,7 +2085,7 @@ export interface components {
         /** AgentOut */
         AgentOut: {
             /** Available Tools */
-            available_tools: Record<string, never>[];
+            available_tools: Record<string, unknown>[];
             /** Description */
             description: string;
             /** Disabled Tools */
@@ -2153,7 +2153,7 @@ export interface components {
              */
             created_at: string;
             /** Details */
-            details: Record<string, never>;
+            details: Record<string, unknown>;
             /** Id */
             id: string;
             /** Ip Address */
@@ -2179,7 +2179,7 @@ export interface components {
             /** Stop */
             stop: string;
             /** Tool Calls */
-            tool_calls: Record<string, never>[];
+            tool_calls: Record<string, unknown>[];
         };
         /** CancelIn */
         CancelIn: {
@@ -2661,7 +2661,7 @@ export interface components {
             /** Tagline */
             tagline: string;
             /** Tokens */
-            tokens: Record<string, never>;
+            tokens: Record<string, unknown>;
         };
         /** KitUpdate */
         KitUpdate: {
@@ -2762,7 +2762,7 @@ export interface components {
             /** Source */
             source: string;
             /** Spec */
-            spec: Record<string, never>;
+            spec: Record<string, unknown>;
         };
         /** LogoSpec */
         LogoSpec: {
@@ -3504,7 +3504,7 @@ export interface components {
             /** Index */
             index: number;
             /** Result */
-            result: Record<string, never>;
+            result: Record<string, unknown>;
             /** Status */
             status: string;
             /** Type */
@@ -3777,9 +3777,9 @@ export interface components {
         /** WorkflowIn */
         WorkflowIn: {
             /** Actions */
-            actions: Record<string, never>[];
+            actions: Record<string, unknown>[];
             /** Conditions */
-            conditions?: Record<string, never>[];
+            conditions?: Record<string, unknown>[];
             /**
              * Enabled
              * @default true
@@ -3798,9 +3798,9 @@ export interface components {
         /** WorkflowOut */
         WorkflowOut: {
             /** Actions */
-            actions: Record<string, never>[];
+            actions: Record<string, unknown>[];
             /** Conditions */
-            conditions: Record<string, never>[];
+            conditions: Record<string, unknown>[];
             /**
              * Created At
              * Format: date-time
@@ -3820,9 +3820,9 @@ export interface components {
         /** WorkflowUpdate */
         WorkflowUpdate: {
             /** Actions */
-            actions?: Record<string, never>[] | null;
+            actions?: Record<string, unknown>[] | null;
             /** Conditions */
-            conditions?: Record<string, never>[] | null;
+            conditions?: Record<string, unknown>[] | null;
             /** Enabled */
             enabled?: boolean | null;
             /** Name */
@@ -3850,7 +3850,7 @@ export interface components {
             /** Stop */
             stop: string;
             /** Tool Calls */
-            tool_calls: Record<string, never>[];
+            tool_calls: Record<string, unknown>[];
             /** Trigger */
             trigger: string;
             /** Version */
@@ -8659,7 +8659,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": Record<string, unknown>;
                 };
             };
         };
