@@ -14,23 +14,14 @@ from novara.deps import OrgContext, client_ip, get_db, require
 from novara.modules.access import permissions as P
 from novara.modules.accounting.models import Tax
 from novara.modules.audit import service as audit
-from novara.modules.catalog.models import Product
 from novara.modules.invoicing import service as svc
+from novara.modules.invoicing.lines import LineIn, resolve_lines
 from novara.modules.invoicing.models import Invoice, InvoiceLine, Payment
 from novara.modules.partners.models import Customer
+from novara.modules.sales.service import order_has_invoice_links
 from novara.money import fmt_decimal, from_minor, to_minor
 
 router = APIRouter(tags=["invoices"])
-
-
-class LineIn(BaseModel):
-    product_id: str | None = None
-    description: str | None = Field(default=None, min_length=1, max_length=500)
-    quantity: Decimal = Field(gt=0, max_digits=18, decimal_places=4)
-    unit_price: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=6)
-    discount_percent: Decimal = Field(default=Decimal(0), ge=0, le=100, max_digits=7, decimal_places=4)
-    # Omit to use the product's default tax; send null for no tax.
-    tax_id: str | None = None
 
 
 class InvoiceIn(BaseModel):
@@ -170,28 +161,7 @@ def _unprocessable(msg: str) -> HTTPException:
 
 
 def _build_lines(db: Session, body: InvoiceIn) -> list[InvoiceLine]:
-    lines = []
-    for i, li in enumerate(body.lines, start=1):
-        product = None
-        if li.product_id is not None:
-            product = db.get(Product, li.product_id)
-            if product is None or not product.active:
-                raise _unprocessable(f"line {i}: unknown or archived product")
-        description = li.description or (product.name if product else None)
-        unit_price = li.unit_price if li.unit_price is not None else (product.sale_price if product else None)
-        if description is None or unit_price is None:
-            raise _unprocessable(f"line {i}: description and unit_price are required without a product")
-        tax_id = li.tax_id if "tax_id" in li.model_fields_set else (product.default_tax_id if product else None)
-        rate = Decimal(0)
-        if tax_id is not None:
-            tax = db.get(Tax, tax_id)
-            if tax is None or not tax.active:
-                raise _unprocessable(f"line {i}: unknown or inactive tax")
-            rate = tax.rate
-        lines.append(InvoiceLine(position=i, product_id=li.product_id, description=description,
-                                 quantity=li.quantity, unit_price=unit_price,
-                                 discount_percent=li.discount_percent, tax_id=tax_id, tax_rate=rate))
-    return lines
+    return [InvoiceLine(**fields) for fields in resolve_lines(db, body.lines)]
 
 
 def _apply_header(db: Session, inv: Invoice, body: InvoiceIn) -> None:
@@ -276,6 +246,9 @@ def replace_draft(invoice_id: str, body: InvoiceIn, request: Request,
     inv = _get_invoice(db, invoice_id, lock=True)
     if inv.status != "draft":
         raise HTTPException(status.HTTP_409_CONFLICT, "only draft invoices can be edited")
+    if order_has_invoice_links(db, inv):
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "this draft was created from a sales order; change the order or delete the draft and re-invoice")
     _apply_header(db, inv, body)
     new_lines = _build_lines(db, body)
     for old in svc.lines_of(db, inv):

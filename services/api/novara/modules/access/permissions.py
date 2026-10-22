@@ -34,6 +34,10 @@ INVOICES_POST = "invoices.post"
 INVOICES_CANCEL = "invoices.cancel"
 PAYMENTS_WRITE = "payments.write"
 ACCOUNTING_READ = "accounting.read"
+SALES_READ = "sales.read"
+SALES_WRITE = "sales.write"
+INVENTORY_READ = "inventory.read"
+INVENTORY_WRITE = "inventory.write"
 
 CATALOG: dict[str, str] = {
     ORG_MANAGE: "Edit organization settings",
@@ -55,21 +59,28 @@ CATALOG: dict[str, str] = {
     INVOICES_CANCEL: "Cancel posted invoices with a reversing entry",
     PAYMENTS_WRITE: "Register customer payments",
     ACCOUNTING_READ: "View the chart of accounts, journal and financial reports",
+    SALES_READ: "View quotations and sales orders",
+    SALES_WRITE: "Create, confirm and cancel quotations and sales orders",
+    INVENTORY_READ: "View stock levels, moves and valuation",
+    INVENTORY_WRITE: "Receive, deliver and adjust stock",
 }
 
 OWNER_ROLE = "owner"
 
-_SALES = [CUSTOMERS_READ, CUSTOMERS_WRITE, PRODUCTS_READ, INVOICES_READ, INVOICES_WRITE]
+_SALES = [CUSTOMERS_READ, CUSTOMERS_WRITE, PRODUCTS_READ, INVOICES_READ, INVOICES_WRITE,
+          SALES_READ, SALES_WRITE, INVENTORY_READ]
 _ACCOUNTING = [
     CUSTOMERS_READ, PRODUCTS_READ, INVOICES_READ, INVOICES_POST, INVOICES_CANCEL,
-    PAYMENTS_WRITE, ACCOUNTING_READ, TAXES_MANAGE,
+    PAYMENTS_WRITE, ACCOUNTING_READ, TAXES_MANAGE, SALES_READ, INVENTORY_READ,
 ]
+_WAREHOUSE = [PRODUCTS_READ, SALES_READ, INVENTORY_READ, INVENTORY_WRITE]
 
 SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     OWNER_ROLE: ("Owner", sorted(CATALOG)),
     "admin": ("Administrator", sorted(set(CATALOG) - {ORG_MANAGE})),
     "accountant": ("Accountant", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, *_ACCOUNTING})),
     "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, *_SALES})),
+    "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, *_WAREHOUSE})),
     "member": ("Member", [MEMBERS_READ, FILES_READ, FILES_WRITE, CUSTOMERS_READ, PRODUCTS_READ]),
     "viewer": ("Viewer", [FILES_READ]),
 }

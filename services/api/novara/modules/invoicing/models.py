@@ -52,6 +52,7 @@ class InvoiceLine(IdMixin, TenantScoped, Base):
         same_org_fk("invoice_id", "invoices", ondelete="CASCADE"),
         same_org_fk("product_id", "products"),
         same_org_fk("tax_id", "taxes"),
+        same_org_fk("sales_order_line_id", "sales_order_lines"),
         CheckConstraint("CAST(quantity AS NUMERIC) > 0", name="ck_invoice_line_qty_positive"),
         CheckConstraint("CAST(unit_price AS NUMERIC) >= 0", name="ck_invoice_line_price_nonnegative"),
         CheckConstraint("CAST(discount_percent AS NUMERIC) >= 0 AND CAST(discount_percent AS NUMERIC) <= 100", name="ck_invoice_line_discount"),
@@ -68,6 +69,8 @@ class InvoiceLine(IdMixin, TenantScoped, Base):
     # Snapshot of the tax rate used, so later reporting never depends on a mutable record.
     tax_rate: Mapped[Decimal] = mapped_column(ExactDecimal(7, 4), default=Decimal(0), nullable=False)
     net_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    # Set when the line was invoiced from a sales order line.
+    sales_order_line_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
 
 class Payment(IdMixin, TimestampMixin, TenantScoped, Base):

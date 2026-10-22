@@ -26,9 +26,10 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     ("1400", "Inventory", "asset", "inventory"),
     ("2100", "Accounts Payable", "liability", "payable"),
     ("2200", "Output VAT Payable", "liability", "vat_output"),
-    ("3000", "Owner's Equity", "equity", None),
+    ("3000", "Owner's Equity", "equity", "equity"),
     ("4000", "Sales Revenue", "income", "sales"),
     ("5000", "Cost of Goods Sold", "expense", "cogs"),
+    ("5100", "Inventory Adjustments", "expense", "inventory_adjustment"),
     ("6000", "General Expenses", "expense", None),
 ]
 
@@ -55,8 +56,15 @@ def ensure_chart(db: Session) -> dict[str, Account]:
     accounts = list(db.scalars(select(Account)))
     codes = {a.code for a in accounts}
     keys = {a.system_key for a in accounts if a.system_key}
+    by_code = {a.code: a for a in accounts}
     for code, name, type_, key in DEFAULT_CHART:
-        if code in codes or (key is not None and key in keys):
+        if key is not None and key in keys:
+            continue
+        if code in codes:
+            # Account exists from an older chart version; give it its system role if it has none yet.
+            if key is not None and by_code[code].system_key is None and by_code[code].type == type_:
+                by_code[code].system_key = key
+                keys.add(key)
             continue
         account = Account(code=code, name=name, type=type_, system_key=key)
         db.add(account)
@@ -68,7 +76,10 @@ def ensure_chart(db: Session) -> dict[str, Account]:
 def system_account(db: Session, key: str) -> Account:
     account = db.scalar(select(Account).where(Account.system_key == key))
     if account is None:
-        account = ensure_chart(db)[key]
+        accounts = ensure_chart(db)
+        if key not in accounts:
+            raise LedgerError(f"no account is configured for '{key}'")
+        account = accounts[key]
     return account
 
 
