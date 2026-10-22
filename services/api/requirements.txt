@@ -5,3 +5,4 @@ argon2-cffi==23.1.0
 pyjwt==2.10.1
 uvicorn==0.34.0
 psycopg[binary]==3.2.3
+anthropic==2.1.0

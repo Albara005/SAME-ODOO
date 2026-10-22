@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from novara.ai.provider import AnthropicProvider, ModelProvider
+from novara.ai.router import router as assistant_router
 from novara.config import Settings, load_settings
 from novara.db import Base, make_engine, make_sessionmaker
 from novara.modules.access.router import router as access_router
@@ -31,6 +33,7 @@ from novara.modules.invoicing import models as _invoicing_models  # noqa: F401
 from novara.modules.partners import models as _partner_models  # noqa: F401
 from novara.modules.sales import models as _sales_models  # noqa: F401
 from novara import idempotency as _idempotency_models  # noqa: F401
+from novara.ai import models as _ai_models  # noqa: F401
 from novara.modules.audit import models as _audit_models  # noqa: F401
 from novara.modules.files import models as _files_models  # noqa: F401
 from novara.modules.identity import models as _identity_models  # noqa: F401
@@ -38,7 +41,7 @@ from novara.modules.organizations import models as _org_models  # noqa: F401
 
 
 def create_app(settings: Settings | None = None, storage: ObjectStorage | None = None,
-               create_schema: bool | None = None) -> FastAPI:
+               create_schema: bool | None = None, ai_provider: ModelProvider | None = None) -> FastAPI:
     settings = settings or load_settings()
     settings.validate()
     engine = make_engine(settings.database_url)
@@ -53,6 +56,8 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
     app.state.storage = storage or LocalObjectStorage(settings.storage_root)
+    # Claude via the Anthropic SDK; credentials come from the environment when first used.
+    app.state.ai_provider = ai_provider or AnthropicProvider()
 
     if settings.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
@@ -67,6 +72,6 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     for r in (identity_router, organizations_router, access_router, audit_router, files_router,
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router,
-              inventory_router, sales_router):
+              inventory_router, sales_router, assistant_router):
         app.include_router(r, prefix="/api/v1")
     return app

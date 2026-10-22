@@ -218,6 +218,13 @@ def list_invoices(
 @router.post("/orgs/{org_id}/invoices", response_model=InvoiceOut, status_code=status.HTTP_201_CREATED)
 def create_invoice(body: InvoiceIn, request: Request, ctx: OrgContext = Depends(require(P.INVOICES_WRITE)),
                    db: Session = Depends(get_db)):
+    inv = add_draft_invoice(db, ctx, body, ip=client_ip(request))
+    db.commit()
+    return invoice_out(db, inv)
+
+
+def add_draft_invoice(db: Session, ctx: OrgContext, body: InvoiceIn, *, ip: str = "", via: str | None = None) -> Invoice:
+    """Create a draft invoice and its audit entry in the current transaction (no commit)."""
     inv = Invoice(currency=ctx.organization.default_currency, created_by=ctx.user.id)
     _apply_header(db, inv, body)
     lines = _build_lines(db, body)
@@ -227,11 +234,10 @@ def create_invoice(body: InvoiceIn, request: Request, ctx: OrgContext = Depends(
     for line in lines:
         line.invoice_id = inv.id
     db.add_all(lines)
+    details = {"customer_id": inv.customer_id, "total": _money(inv.total_minor, inv.currency)}
     audit.record(db, actor_user_id=ctx.user.id, action="invoice.created", target_type="invoice", target_id=inv.id,
-                 details={"customer_id": inv.customer_id, "total": _money(inv.total_minor, inv.currency)},
-                 ip_address=client_ip(request))
-    db.commit()
-    return invoice_out(db, inv)
+                 details=details | ({"via": via} if via else {}), ip_address=ip)
+    return inv
 
 
 @router.get("/orgs/{org_id}/invoices/{invoice_id}", response_model=InvoiceOut)
@@ -302,18 +308,9 @@ def add_payment(
     db: Session = Depends(get_db),
 ):
     """Register a customer payment. Send an Idempotency-Key header so a retried request can't pay twice."""
-    inv = _get_invoice(db, invoice_id, lock=True)
-    amount_minor = to_minor(body.amount, inv.currency)
-    if from_minor(amount_minor, inv.currency) != body.amount:
-        raise _unprocessable(f"amount has more decimals than {inv.currency} allows")
-    payment, created = _domain_errors(lambda: svc.register_payment(
-        db, inv, amount_minor=amount_minor, payment_date=body.payment_date, method=body.method,
-        reference=body.reference, user_id=ctx.user.id, idempotency_key=idempotency_key,
-    ))
+    payment, created, inv = add_payment_record(db, ctx, invoice_id, body, ip=client_ip(request),
+                                               idempotency_key=idempotency_key)
     if created:
-        audit.record(db, actor_user_id=ctx.user.id, action="invoice.payment_registered", target_type="invoice",
-                     target_id=inv.id, details={"payment_id": payment.id, "amount": str(body.amount),
-                                                "method": body.method}, ip_address=client_ip(request))
         try:
             db.commit()
         except IntegrityError:
@@ -328,6 +325,24 @@ def add_payment(
     else:
         response.status_code = status.HTTP_200_OK
     return payment_out(payment, inv.currency)
+
+
+def add_payment_record(db: Session, ctx: OrgContext, invoice_id: str, body: PaymentIn, *, ip: str = "",
+                       idempotency_key: str | None = None, via: str | None = None) -> tuple[Payment, bool, Invoice]:
+    """Register a payment and its audit entry in the current transaction (no commit)."""
+    inv = _get_invoice(db, invoice_id, lock=True)
+    amount_minor = to_minor(body.amount, inv.currency)
+    if from_minor(amount_minor, inv.currency) != body.amount:
+        raise _unprocessable(f"amount has more decimals than {inv.currency} allows")
+    payment, created = _domain_errors(lambda: svc.register_payment(
+        db, inv, amount_minor=amount_minor, payment_date=body.payment_date, method=body.method,
+        reference=body.reference, user_id=ctx.user.id, idempotency_key=idempotency_key,
+    ))
+    if created:
+        details = {"payment_id": payment.id, "amount": str(body.amount), "method": body.method}
+        audit.record(db, actor_user_id=ctx.user.id, action="invoice.payment_registered", target_type="invoice",
+                     target_id=inv.id, details=details | ({"via": via} if via else {}), ip_address=ip)
+    return payment, created, inv
 
 
 @router.get("/orgs/{org_id}/invoices/{invoice_id}/payments", response_model=list[PaymentOut])

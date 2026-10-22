@@ -185,6 +185,13 @@ def list_orders(status_filter: str | None = Query(default=None, alias="status"),
 @router.post("/orgs/{org_id}/sales-orders", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
 def create_quotation(body: OrderIn, request: Request, ctx: OrgContext = Depends(require(P.SALES_WRITE)),
                      db: Session = Depends(get_db)):
+    order = add_quotation(db, ctx, body, ip=client_ip(request))
+    db.commit()
+    return order_out(db, order)
+
+
+def add_quotation(db: Session, ctx: OrgContext, body: OrderIn, *, ip: str = "", via: str | None = None) -> SalesOrder:
+    """Create a quotation and its audit entry in the current transaction (no commit)."""
     order = SalesOrder(currency=ctx.organization.default_currency, created_by=ctx.user.id, status="quotation")
     lines = _apply(db, order, body)
     order.number = next_number(db, f"sales_order:{body.order_date.year}", f"SO-{body.order_date.year}-")
@@ -193,11 +200,10 @@ def create_quotation(body: OrderIn, request: Request, ctx: OrgContext = Depends(
     for line in lines:
         line.order_id = order.id
     db.add_all(lines)
+    details = {"number": order.number, "total": _money(order.total_minor, order.currency)}
     audit.record(db, actor_user_id=ctx.user.id, action="sales_order.created", target_type="sales_order",
-                 target_id=order.id, details={"number": order.number, "total": _money(order.total_minor, order.currency)},
-                 ip_address=client_ip(request))
-    db.commit()
-    return order_out(db, order)
+                 target_id=order.id, details=details | ({"via": via} if via else {}), ip_address=ip)
+    return order
 
 
 @router.get("/orgs/{org_id}/sales-orders/{order_id}", response_model=OrderOut)

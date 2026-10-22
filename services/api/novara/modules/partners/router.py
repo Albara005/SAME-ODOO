@@ -96,14 +96,21 @@ def list_customers(
 @router.post("/orgs/{org_id}/customers", response_model=CustomerOut, status_code=status.HTTP_201_CREATED)
 def create_customer(body: CustomerIn, request: Request, ctx: OrgContext = Depends(require(P.CUSTOMERS_WRITE)),
                     db: Session = Depends(get_db)):
+    customer = add_customer(db, ctx, body, ip=client_ip(request))
+    db.commit()
+    return customer
+
+
+def add_customer(db: Session, ctx: OrgContext, body: CustomerIn, *, ip: str = "", via: str | None = None) -> Customer:
+    """Create a customer and its audit entry in the current transaction (no commit)."""
     data = body.model_dump()
     data["email"] = (data["email"] or "").lower()
     customer = Customer(**data, created_by=ctx.user.id)
     db.add(customer)
     db.flush()
+    details = {"name": customer.name} | ({"via": via} if via else {})
     audit.record(db, actor_user_id=ctx.user.id, action="customer.created", target_type="customer",
-                 target_id=customer.id, details={"name": customer.name}, ip_address=client_ip(request))
-    db.commit()
+                 target_id=customer.id, details=details, ip_address=ip)
     return customer
 
 

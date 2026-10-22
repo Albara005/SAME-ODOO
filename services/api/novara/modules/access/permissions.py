@@ -38,6 +38,8 @@ SALES_READ = "sales.read"
 SALES_WRITE = "sales.write"
 INVENTORY_READ = "inventory.read"
 INVENTORY_WRITE = "inventory.write"
+AI_USE = "ai.use"
+AI_MANAGE = "ai.manage"
 
 CATALOG: dict[str, str] = {
     ORG_MANAGE: "Edit organization settings",
@@ -63,6 +65,8 @@ CATALOG: dict[str, str] = {
     SALES_WRITE: "Create, confirm and cancel quotations and sales orders",
     INVENTORY_READ: "View stock levels, moves and valuation",
     INVENTORY_WRITE: "Receive, deliver and adjust stock",
+    AI_USE: "Use the AI assistant (it can only do what the user is allowed to do)",
+    AI_MANAGE: "Enable or disable the AI assistant, set its budget and models, view AI usage",
 }
 
 OWNER_ROLE = "owner"
@@ -78,10 +82,10 @@ _WAREHOUSE = [PRODUCTS_READ, SALES_READ, INVENTORY_READ, INVENTORY_WRITE]
 SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     OWNER_ROLE: ("Owner", sorted(CATALOG)),
     "admin": ("Administrator", sorted(set(CATALOG) - {ORG_MANAGE})),
-    "accountant": ("Accountant", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, *_ACCOUNTING})),
-    "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, *_SALES})),
-    "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, *_WAREHOUSE})),
-    "member": ("Member", [MEMBERS_READ, FILES_READ, FILES_WRITE, CUSTOMERS_READ, PRODUCTS_READ]),
+    "accountant": ("Accountant", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, *_ACCOUNTING})),
+    "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, *_SALES})),
+    "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, AI_USE, *_WAREHOUSE})),
+    "member": ("Member", [AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ]),
     "viewer": ("Viewer", [FILES_READ]),
 }
 
