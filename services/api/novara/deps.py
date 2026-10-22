@@ -94,13 +94,22 @@ def org_context(
 
     Non-members get 404 rather than 403 so organization ids can't be probed.
     """
+    ctx = member_context(db, org_id, user)
+    if ctx is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+    return ctx
+
+
+def member_context(db: Session, org_id: str, user: User) -> OrgContext | None:
+    """The user's context in an organization, or None if they aren't an active member.
+    Binds the session to that organization. Also used outside requests (workflow worker)."""
     org = db.get(Organization, org_id)
     if org is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+        return None
     bind_tenant(db, org.id)
     membership = db.scalar(select(Membership).where(Membership.user_id == user.id))
-    if membership is None or membership.status != "active":
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+    if membership is None or membership.status != "active" or user.status != "active":
+        return None
     role = db.get(Role, membership.role_id)
     return OrgContext(organization=org, membership=membership, role=role, user=user)
 

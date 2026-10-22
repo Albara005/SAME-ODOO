@@ -8,6 +8,8 @@ from sqlalchemy import text
 
 from novara.ai.provider import AnthropicProvider, ModelProvider
 from novara.ai.router import router as assistant_router
+from novara.agents.router import router as agents_router
+from novara.automation.router import router as automation_router
 from novara.config import Settings, load_settings
 from novara.studio.router import router as studio_router, sites_router
 from novara.db import Base, make_engine, make_sessionmaker
@@ -36,6 +38,9 @@ from novara.modules.sales import models as _sales_models  # noqa: F401
 from novara import idempotency as _idempotency_models  # noqa: F401
 from novara.ai import models as _ai_models  # noqa: F401
 from novara.studio import models as _studio_models  # noqa: F401
+from novara.agents import models as _agent_models  # noqa: F401
+from novara.automation import events as _automation_events  # noqa: F401  (subscribes to the audit trail)
+from novara.automation import models as _automation_models  # noqa: F401
 from novara.modules.audit import models as _audit_models  # noqa: F401
 from novara.modules.files import models as _files_models  # noqa: F401
 from novara.modules.identity import models as _identity_models  # noqa: F401
@@ -74,7 +79,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     for r in (identity_router, organizations_router, access_router, audit_router, files_router,
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router,
-              inventory_router, sales_router, assistant_router, studio_router):
+              inventory_router, sales_router, assistant_router, studio_router, agents_router, automation_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(sites_router)  # public, unauthenticated: published App Studio sites
     return app

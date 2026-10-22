@@ -43,6 +43,9 @@ AI_MANAGE = "ai.manage"
 APPS_READ = "apps.read"
 APPS_WRITE = "apps.write"
 APPS_DEPLOY = "apps.deploy"
+AGENTS_RUN = "agents.run"
+AGENTS_MANAGE = "agents.manage"
+WORKFLOWS_MANAGE = "workflows.manage"
 
 CATALOG: dict[str, str] = {
     ORG_MANAGE: "Edit organization settings",
@@ -73,6 +76,9 @@ CATALOG: dict[str, str] = {
     APPS_READ: "View App Studio projects, versions and deployments",
     APPS_WRITE: "Create and edit App Studio projects, cut versions, publish previews",
     APPS_DEPLOY: "Approve production deployments and roll them back",
+    AGENTS_RUN: "Run published agents (with your own permissions)",
+    AGENTS_MANAGE: "Create, configure, test and publish agents; switch them off",
+    WORKFLOWS_MANAGE: "Create and manage automation workflows, see all tasks",
 }
 
 OWNER_ROLE = "owner"
@@ -88,12 +94,12 @@ _WAREHOUSE = [PRODUCTS_READ, SALES_READ, INVENTORY_READ, INVENTORY_WRITE]
 SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     OWNER_ROLE: ("Owner", sorted(CATALOG)),
     "admin": ("Administrator", sorted(set(CATALOG) - {ORG_MANAGE})),
-    "accountant": ("Accountant", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, *_ACCOUNTING})),
-    "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, *_SALES})),
-    "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, AI_USE, *_WAREHOUSE})),
+    "accountant": ("Accountant", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, *_ACCOUNTING})),
+    "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, *_SALES})),
+    "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, AI_USE, AGENTS_RUN, *_WAREHOUSE})),
     # Builds apps and publishes previews; production needs someone with apps.deploy.
-    "developer": ("Developer", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, APPS_READ, APPS_WRITE})),
-    "member": ("Member", [AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ]),
+    "developer": ("Developer", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, APPS_READ, APPS_WRITE})),
+    "member": ("Member", [AGENTS_RUN, AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ]),
     "viewer": ("Viewer", [FILES_READ]),
 }
 

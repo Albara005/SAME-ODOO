@@ -13,7 +13,8 @@ A unified platform combining an ERP-style business suite with AI app building, a
 | 2. الأعمال: العملاء، المنتجات، الفواتير، دفتر الأستاذ، المخزون، المبيعات | ✅ الخلفية مكتملة | [`docs/phase-2-business.md`](docs/phase-2-business.md) |
 | 3. المساعد الذكي: أدوات بصلاحيات المستخدم، موافقة على كل تغيير، ميزانية وتتبع | ✅ الخلفية مكتملة | [`docs/phase-3-assistant.md`](docs/phase-3-assistant.md) |
 | 4. AI App Studio: قالب محدد، مُنشئ ذكي، إصدارات وفحوص، معاينة، نشر إنتاج بموافقة | ✅ الخلفية مكتملة | [`docs/phase-4-app-studio.md`](docs/phase-4-app-studio.md) |
-| 5. الوكلاء والأتمتة | قيد العمل | |
+| 5. الوكلاء والأتمتة: وكلاء باختبارات ونشر وحدود، ومحرك سير عمل بموافقات وإعادة محاولة | ✅ الخلفية مكتملة | [`docs/phase-5-agents-automation.md`](docs/phase-5-agents-automation.md) |
+| 6. Creative Studio والتوسع | قيد العمل | |
 
 ```
 services/api/            FastAPI + SQLAlchemy (Python)
@@ -22,6 +23,9 @@ services/api/            FastAPI + SQLAlchemy (Python)
                          partners · catalog · accounting · invoicing · inventory · sales · dataio
   novara/ai/             المساعد الذكي: النماذج، الأدوات، الموافقات، الاستهلاك
   novara/studio/         App Studio: المشاريع، الإصدارات، الفحوص، المُنشئ الذكي، النشر
+  novara/agents/         Agent Builder: الإصدارات، الاختبارات، النشر، التشغيل
+  novara/automation/     الأحداث، سير العمل، الموافقات، المهام، الإشعارات
+  novara/worker.py       عامل الأتمتة في الخلفية
   migrations/postgres/   المخطط + Row-Level Security + صلاحيات دور التشغيل
   tests/                 اختبارات العزل والصلاحيات (SQLite و PostgreSQL)
 infrastructure/

@@ -89,3 +89,18 @@ def test_rows_cannot_reference_another_organizations_records(api, app, posted):
              VALUES ('inv-x', :org, :c, 'draft', '2026-01-01', '2026-01-01', 'SAR', '', 0, 0, 0, 0, now())"""
     with pytest.raises(DBAPIError, match="foreign key"):
         _raw(app, org, sql, {"org": org, "c": foreign_customer})
+
+
+def test_frozen_agent_version_cannot_be_edited_in_sql(api, app):
+    from novara.ai.provider import ScriptedProvider, text_reply
+
+    api.signup("agent@pg.example.com")
+    org = api.create_org("agent@pg.example.com", "pg-agents")
+    agent = api.req("POST", "agent@pg.example.com", f"/orgs/{org}/agents", json={"name": "A"}).json()["id"]
+    api.req("POST", "agent@pg.example.com", f"/orgs/{org}/agents/{agent}/tests", json={"name": "t", "input": "hi"})
+    app.state.ai_provider = ScriptedProvider([text_reply("ok")])
+    api.req("POST", "agent@pg.example.com", f"/orgs/{org}/agents/{agent}/versions/1/test-runs")
+    with pytest.raises(DBAPIError, match="frozen"):
+        _raw(app, org, "UPDATE agent_versions SET instructions = 'do anything' WHERE number = 1")
+    with pytest.raises(DBAPIError, match="permission denied"):
+        _raw(app, org, "UPDATE agent_runs SET cost_micros = 0")

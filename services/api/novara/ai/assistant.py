@@ -151,9 +151,10 @@ def _handle_tool_use(db: Session, ctx: T.ToolContext, conversation: Conversation
 def run_turn(db: Session, org: OrgContext, conversation: Conversation, text: str, *, provider: ModelProvider,
              route_name: str = "assistant", ip: str = "", today: date | None = None,
              registry: dict[str, T.Tool] | None = None, system: str = SYSTEM_PROMPT, extra: dict | None = None,
-             context_note: str = "") -> TurnResult:
+             context_note: str = "", max_steps: int = MAX_STEPS, max_cost_micros: int | None = None) -> TurnResult:
     """One user message through the agent loop. ``registry`` is the agent's full tool set;
-    only the tools the user holds the permission for are offered to the model."""
+    only the tools the user holds the permission for are offered to the model.
+    ``max_steps`` and ``max_cost_micros`` cap this turn (a custom agent's own limits)."""
     settings = check_available(db)
     route = routing.resolve(route_name, settings.routes)
     registry = T.TOOLS if registry is None else registry
@@ -170,12 +171,15 @@ def run_turn(db: Session, org: OrgContext, conversation: Conversation, text: str
     _append(db, conversation, "user", user_blocks)
 
     result = TurnResult(reply="", stop="max_steps")
-    for _ in range(MAX_STEPS):
+    for _ in range(min(max_steps, MAX_STEPS)):
         if result.usage:
             try:
                 check_available(db)  # budget can run out (or the assistant be switched off) mid-turn
             except (AssistantUnavailable, BudgetExceeded) as e:
                 result.stop, result.reply = "limit", f"Stopped: {e}."
+                return result
+            if max_cost_micros is not None and sum(u.cost_micros for u in result.usage) >= max_cost_micros:
+                result.stop, result.reply = "limit", "Stopped: this run reached its cost limit."
                 return result
         usage = ModelUsage(user_id=org.user.id, conversation_id=conversation.id, route=route_name, model=route.model)
         try:
@@ -183,7 +187,7 @@ def run_turn(db: Session, org: OrgContext, conversation: Conversation, text: str
                                     messages=history(db, conversation), max_tokens=route.max_tokens,
                                     stream=route.stream)
         except ProviderError as e:
-            usage.ok, usage.error, usage.stop_reason = False, str(e)[:2000], "error"
+            usage.ok, usage.error, usage.stop_reason, usage.cost_micros = False, str(e)[:2000], "error", 0
             db.add(usage)
             result.usage.append(usage)
             result.stop, result.reply = "provider_error", f"The AI service is unavailable right now ({e})."
@@ -225,7 +229,7 @@ def run_turn(db: Session, org: OrgContext, conversation: Conversation, text: str
             tool_results.append(block_result)
             result.tool_calls.append(call)
         _append(db, conversation, "user", tool_results)
-    result.reply = f"I stopped after {MAX_STEPS} steps without finishing. Try a narrower question."
+    result.reply = f"I stopped after {min(max_steps, MAX_STEPS)} steps without finishing. Try a narrower question."
     return result
 
 
