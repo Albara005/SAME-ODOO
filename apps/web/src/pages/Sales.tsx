@@ -5,11 +5,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import {
-  LinesEditor, newLine, StatusBadge, toLineIn, TotalsBox, useCustomers, useIdempotencyKey, useWarehouses, type LineDraft,
+  Journey, journeySteps, LinesEditor, newLine, StatusBadge, toLineIn, TotalsBox, useCustomers, useIdempotencyKey, useWarehouses,
+  type LineDraft,
 } from "../components/business";
 import {
   Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
 } from "../components/ui";
+import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
 import { isPositive } from "../lib/decimal";
 import { today } from "../lib/format";
@@ -296,6 +298,11 @@ function OrderDetail({ order: o }: { order: Order }) {
           </div>
         }
       />
+      {o.status !== "cancelled" && (
+        <Card tight>
+          <Journey label={t("common.progress")} steps={orderJourney(o, t)} />
+        </Card>
+      )}
       <Card>
         <div className="grid-2">
           <dl className="kv">
@@ -373,6 +380,14 @@ function OrderDetail({ order: o }: { order: Order }) {
       )}
     </div>
   );
+}
+
+function orderJourney(o: Order, t: (k: MessageKey) => string) {
+  const labels = [t("sales.stepQuote"), t("sales.stepConfirm"), t("sales.stepDeliver"), t("sales.stepInvoice")];
+  if (o.status === "quotation") return journeySteps(labels, 0);
+  if (o.invoice_status === "invoiced") return journeySteps(labels, 3, true);
+  const shipped = o.delivery_status === "delivered" || o.delivery_status === "not_applicable";
+  return journeySteps(labels, shipped ? 3 : 2);
 }
 
 function DeliveryDialog({ order, onClose, onDone }: { order: Order; onClose: () => void; onDone: (reference: string) => void }) {

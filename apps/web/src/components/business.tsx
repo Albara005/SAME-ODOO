@@ -6,6 +6,7 @@ import { useOrg } from "../auth/Org";
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
 import { computeTotals, formatUnits } from "../lib/decimal";
+import { StepStar } from "./Art";
 import { Badge, Button, IconButton, Input, Select, type Tone } from "./ui";
 
 // ---------------------------------------------------------------- status
@@ -26,26 +27,38 @@ export function StatusBadge({ status }: { status: string }) {
 
 export function Tabs<K extends string>({ tabs, value, onChange }: { tabs: { key: K; label: string }[]; value: K; onChange: (k: K) => void }) {
   return (
-    <div role="tablist" className="row" style={{ borderBlockEnd: "1px solid var(--color-border)", gap: 0 }}>
+    <div role="tablist" className="tabs">
       {tabs.map((tab) => (
-        <button
-          key={tab.key}
-          role="tab"
-          type="button"
-          aria-selected={value === tab.key}
-          className="btn btn-ghost"
-          style={{
-            borderRadius: 0,
-            borderBlockEnd: value === tab.key ? "2px solid var(--color-primary)" : "2px solid transparent",
-            fontWeight: value === tab.key ? 600 : 400,
-          }}
-          onClick={() => onChange(tab.key)}
-        >
+        <button key={tab.key} role="tab" type="button" aria-selected={value === tab.key} className="tab" onClick={() => onChange(tab.key)}>
           {tab.label}
         </button>
       ))}
     </div>
   );
+}
+
+// ---------------------------------------------------------------- journey
+
+/** Where a document is in its life: each step a star, gold once reached. */
+export function Journey({ steps, label }: { steps: { label: string; state: "done" | "current" | "todo" }[]; label: string }) {
+  return (
+    <ol className="journey" aria-label={label}>
+      {steps.map((s, i) => (
+        <li key={i} className={`journey-step ${s.state} ${s.state !== "todo" ? "reached" : ""}`} aria-current={s.state === "current" ? "step" : undefined}>
+          <StepStar state={s.state} />
+          <span className="journey-label">{s.label}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Steps up to `reached` are done; `reached` itself is current unless the document is complete. */
+export function journeySteps(labels: string[], reached: number, complete = false) {
+  return labels.map((label, i) => ({
+    label,
+    state: (i < reached || (complete && i === reached) ? "done" : i === reached ? "current" : "todo") as "done" | "current" | "todo",
+  }));
 }
 
 // ---------------------------------------------------------------- downloads

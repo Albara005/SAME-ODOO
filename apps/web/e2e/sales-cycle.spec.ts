@@ -90,6 +90,15 @@ test("full sales cycle: stock, quotation, delivery, invoice, payment, reports", 
   await page.screenshot({ path: "test-results/screens/reports-sales-ar.png", fullPage: true });
   await page.getByRole("tab", { name: "ميزان المراجعة" }).click();
   await expect(page.getByText("متوازن", { exact: true })).toBeVisible();
+
+  // The same screens in the dark theme
+  await nav(page, "الرئيسية");
+  await page.screenshot({ path: "test-results/screens/home-ar.png", fullPage: true });
+  await page.getByRole("button", { name: "تبديل الوضع الفاتح/الداكن" }).click();
+  await page.screenshot({ path: "test-results/screens/home-dark-ar.png", fullPage: true });
+  await nav(page, "أوامر البيع");
+  await page.getByRole("link", { name: /^SO-\d{4}-/ }).first().click();
+  await page.screenshot({ path: "test-results/screens/sales-order-dark-ar.png", fullPage: true });
 });
 
 test("CSV import checks the file first and reports bad rows", async ({ page }) => {

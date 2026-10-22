@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import type { MessageKey } from "../i18n/en";
 
-export type NavItem = { to: string; label: MessageKey; icon: LucideIcon; anyOf?: string[] };
+export type NavItem = { to: string; label: MessageKey; icon: LucideIcon; anyOf?: string[]; hue?: string; desc?: MessageKey };
 export type NavGroup = { title?: MessageKey; items: NavItem[] };
 
 /** Menu from the plan (section 13.1). Items show only to users holding one of `anyOf`. */
@@ -33,22 +33,22 @@ export const NAV: NavGroup[] = [
   {
     title: "nav.business",
     items: [
-      { to: "customers", label: "nav.customers", icon: UsersRound, anyOf: ["customers.read"] },
-      { to: "products", label: "nav.products", icon: Package, anyOf: ["products.read"] },
-      { to: "sales", label: "nav.sales", icon: ShoppingCart, anyOf: ["sales.read"] },
-      { to: "invoices", label: "nav.invoices", icon: FileText, anyOf: ["invoices.read"] },
-      { to: "inventory", label: "nav.inventory", icon: Boxes, anyOf: ["inventory.read"] },
-      { to: "reports", label: "nav.reports", icon: BarChart3, anyOf: ["invoices.read", "accounting.read"] },
+      { to: "customers", label: "nav.customers", icon: UsersRound, anyOf: ["customers.read"], hue: "lapis", desc: "app.customers" },
+      { to: "products", label: "nav.products", icon: Package, anyOf: ["products.read"], hue: "teal", desc: "app.products" },
+      { to: "sales", label: "nav.sales", icon: ShoppingCart, anyOf: ["sales.read"], hue: "amber", desc: "app.sales" },
+      { to: "invoices", label: "nav.invoices", icon: FileText, anyOf: ["invoices.read"], hue: "emerald", desc: "app.invoices" },
+      { to: "inventory", label: "nav.inventory", icon: Boxes, anyOf: ["inventory.read"], hue: "terracotta", desc: "app.inventory" },
+      { to: "reports", label: "nav.reports", icon: BarChart3, anyOf: ["invoices.read", "accounting.read"], hue: "violet", desc: "app.reports" },
     ],
   },
   {
     title: "nav.ai",
     items: [
-      { to: "assistant", label: "nav.assistant", icon: Sparkles, anyOf: ["ai.use"] },
-      { to: "studio", label: "nav.studio", icon: LayoutTemplate, anyOf: ["apps.read"] },
-      { to: "agents", label: "nav.agents", icon: Bot, anyOf: ["agents.run"] },
-      { to: "creative", label: "nav.creative", icon: Palette, anyOf: ["brand.read"] },
-      { to: "automation", label: "nav.automation", icon: Workflow, anyOf: ["workflows.manage"] },
+      { to: "assistant", label: "nav.assistant", icon: Sparkles, anyOf: ["ai.use"], hue: "gold", desc: "app.assistant" },
+      { to: "studio", label: "nav.studio", icon: LayoutTemplate, anyOf: ["apps.read"], hue: "cyan", desc: "app.studio" },
+      { to: "agents", label: "nav.agents", icon: Bot, anyOf: ["agents.run"], hue: "slate", desc: "app.agents" },
+      { to: "creative", label: "nav.creative", icon: Palette, anyOf: ["brand.read"], hue: "rose", desc: "app.creative" },
+      { to: "automation", label: "nav.automation", icon: Workflow, anyOf: ["workflows.manage"], hue: "lapis", desc: "app.automation" },
     ],
   },
   {

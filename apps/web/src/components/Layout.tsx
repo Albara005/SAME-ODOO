@@ -3,8 +3,9 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/Auth";
 import { useOrg } from "../auth/Org";
-import { useI18n } from "../i18n/I18n";
+import { useI18n, useRoleLabel } from "../i18n/I18n";
 import { useTheme } from "../lib/theme";
+import { StarLattice, StarMark } from "./Art";
 import { visibleNav } from "./nav";
 import { IconButton } from "./ui";
 
@@ -12,13 +13,14 @@ export function BrandMark() {
   const { t } = useI18n();
   return (
     <div className="brand">
-      <span className="brand-mark" aria-hidden>
-        N
-      </span>
+      <StarMark />
       <span>{t("app.name")}</span>
     </div>
   );
 }
+
+const initials = (name: string) =>
+  name.trim().split(/\s+/).slice(0, 2).map((w) => w.replace(/^ال/, "")[0] ?? "").join("").toUpperCase() || "•";
 
 export function TopActions() {
   const { t, lang, setLang } = useI18n();
@@ -37,6 +39,7 @@ export function TopActions() {
 
 export function Layout() {
   const { t } = useI18n();
+  const roleLabel = useRoleLabel();
   const { org, can, path } = useOrg();
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
@@ -47,10 +50,14 @@ export function Layout() {
     <div className="shell">
       {open && <div className="scrim" onClick={() => setOpen(false)} aria-hidden />}
       <aside className={`sidebar ${open ? "open" : ""}`} aria-label={t("nav.menu")}>
+        <StarLattice />
         <BrandMark />
         <NavLink to="/orgs" className="org-switch" title={t("orgs.switch")}>
-          <strong>{org.name}</strong>
-          <span className="muted small">{org.role}</span>
+          <span className="org-avatar" aria-hidden>{initials(org.name)}</span>
+          <span className="org-text">
+            <strong>{org.name}</strong>
+            <span className="muted small">{roleLabel(org.role)}</span>
+          </span>
         </NavLink>
         <nav className="stack-sm">
           {visibleNav(can).map((group, i) => (
@@ -77,7 +84,10 @@ export function Layout() {
             <Menu size={20} />
           </IconButton>
           <span className="grow" />
-          <span className="muted small">{user?.full_name || user?.email}</span>
+          <span className="user-chip">
+            <span className="user-avatar" aria-hidden>{initials(user?.full_name || user?.email || "")}</span>
+            <span className="small">{user?.full_name || user?.email}</span>
+          </span>
           <TopActions />
           <IconButton label={t("auth.logout")} onClick={() => void logout()}>
             <LogOut size={18} />

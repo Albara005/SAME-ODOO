@@ -5,7 +5,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import {
-  LinesEditor, newLine, StatusBadge, toLineIn, TotalsBox, useCustomers, useIdempotencyKey, type LineDraft,
+  Journey, journeySteps, LinesEditor, newLine, StatusBadge, toLineIn, TotalsBox, useCustomers, useIdempotencyKey,
+  type LineDraft,
 } from "../components/business";
 import {
   Button, Card, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
@@ -293,6 +294,20 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
           </div>
         }
       />
+      {inv.status !== "cancelled" && (
+        <div className="no-print">
+          <Card tight>
+            <Journey
+            label={t("common.progress")}
+            steps={journeySteps(
+              [t("invoices.stepDraft"), t("invoices.stepPost"), t("invoices.stepPaid")],
+              isDraft ? 0 : 2,
+              inv.status === "paid",
+            )}
+            />
+          </Card>
+        </div>
+      )}
       {isDraft && inv.sales_order_id && <div className="notice notice-info no-print">{t("invoices.fromOrder")}</div>}
       <Card>
         <div className="grid-2">

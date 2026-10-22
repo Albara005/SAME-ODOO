@@ -5,7 +5,7 @@ test("sign up, create an organization, manage customers and products in Arabic",
   await signUpAndIn(page, uniqueEmail("owner"));
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await createOrg(page, "شركة النخبة");
-  await expect(page.getByRole("heading", { name: "نظرة عامة" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^(صباح|مساء) الخير/ })).toBeVisible();
   await page.screenshot({ path: "test-results/screens/home-ar.png", fullPage: true });
 
   // Customers
@@ -73,7 +73,7 @@ test("a member only sees what their role allows", async ({ page, browser }) => {
   await page.getByRole("button", { name: "إضافة عضو" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("البريد الإلكتروني").fill(viewer);
-  await dialog.getByLabel("الدور").selectOption({ label: "Viewer" });
+  await dialog.getByLabel("الدور").selectOption({ label: "مشاهد" });
   await dialog.getByRole("button", { name: "إضافة" }).click();
   await expect(page.getByRole("cell", { name: viewer, exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/screens/members-ar.png", fullPage: true });
@@ -86,7 +86,7 @@ test("a member only sees what their role allows", async ({ page, browser }) => {
   await page.getByRole("button", { name: "تسجيل الدخول" }).click();
   // A single organization: the app goes straight to it.
   await expect(page).toHaveURL(/\/o\/[0-9a-f-]+$/);
-  await expect(page.getByRole("heading", { name: "نظرة عامة" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^(صباح|مساء) الخير/ })).toBeVisible();
   const nav = page.getByRole("complementary");
   await expect(nav.getByRole("link", { name: "العملاء" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "الأعضاء" })).toHaveCount(0);
@@ -97,6 +97,7 @@ test("a member only sees what their role allows", async ({ page, browser }) => {
 
 test("wrong password shows the server's message", async ({ page }) => {
   await page.goto("/login");
+  await page.screenshot({ path: "test-results/screens/login-ar.png" });
   await page.getByLabel("البريد الإلكتروني").fill("nobody@example.com");
   await page.getByLabel("كلمة المرور").fill("wrong-password-1");
   await page.getByRole("button", { name: "تسجيل الدخول" }).click();

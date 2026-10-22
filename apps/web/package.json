@@ -10,7 +10,8 @@
     "typecheck": "tsc -b --pretty",
     "test": "vitest run",
     "e2e": "playwright test",
-    "gen:api": "node scripts/gen-api.mjs"
+    "gen:api": "node scripts/gen-api.mjs",
+    "gen:tokens": "node scripts/gen-tokens.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans-arabic": "5.1.0",

@@ -71,3 +71,11 @@ export function useI18n(): I18n {
   if (!ctx) throw new Error("useI18n outside I18nProvider");
   return ctx;
 }
+
+const SYSTEM_ROLES = ["owner", "admin", "accountant", "sales", "warehouse", "developer", "member", "viewer"];
+
+/** System roles have translated names; custom roles show the name their organization gave them. */
+export function useRoleLabel() {
+  const { t } = useI18n();
+  return (key: string, name?: string) => (SYSTEM_ROLES.includes(key) ? t(`role.${key}` as MessageKey) : (name ?? key));
+}

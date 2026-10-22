@@ -6,7 +6,7 @@ import { useOrg } from "../auth/Org";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, useToast,
 } from "../components/ui";
-import { useI18n } from "../i18n/I18n";
+import { useI18n, useRoleLabel } from "../i18n/I18n";
 import { useDebounced } from "../lib/useDebounced";
 
 function useRoles() {
@@ -21,6 +21,7 @@ function useRoles() {
 
 export function MembersPage() {
   const { t, date } = useI18n();
+  const roleLabel = useRoleLabel();
   const { org, can } = useOrg();
   const qc = useQueryClient();
   const toast = useToast();
@@ -87,12 +88,12 @@ export function MembersPage() {
                         >
                           {(roles.data ?? []).map((r) => (
                             <option key={r.id} value={r.key}>
-                              {r.name}
+                              {roleLabel(r.key, r.name)}
                             </option>
                           ))}
                         </Select>
                       ) : (
-                        m.role
+                        roleLabel(m.role)
                       )}
                     </td>
                     <td>
@@ -130,7 +131,7 @@ export function MembersPage() {
           </div>
         )}
       </QueryView>
-      {adding && <AddMemberDialog roles={(roles.data ?? []).map((r) => ({ key: r.key, name: r.name }))} onClose={() => setAdding(false)} />}
+      {adding && <AddMemberDialog roles={(roles.data ?? []).map((r) => ({ key: r.key, name: roleLabel(r.key, r.name) }))} onClose={() => setAdding(false)} />}
     </div>
   );
 }
@@ -183,6 +184,7 @@ function AddMemberDialog({ roles, onClose }: { roles: { key: string; name: strin
 
 export function RolesPage() {
   const { t } = useI18n();
+  const roleLabel = useRoleLabel();
   const { can } = useOrg();
   const roles = useRoles();
   const [creating, setCreating] = useState(false);
@@ -206,7 +208,7 @@ export function RolesPage() {
               <Card key={r.id} tight>
                 <div className="row-between">
                   <h3>
-                    {r.name} <span className="muted mono">{r.key}</span>
+                    {r.is_system ? roleLabel(r.key) : r.name} <span className="muted mono">{r.key}</span>
                   </h3>
                   <Badge tone={r.is_system ? "info" : "primary"}>{r.is_system ? t("roles.system") : t("roles.custom")}</Badge>
                 </div>

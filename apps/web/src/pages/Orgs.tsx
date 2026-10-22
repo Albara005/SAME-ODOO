@@ -6,7 +6,7 @@ import { api, ApiError, unwrap } from "../api/client";
 import { rememberOrg } from "../auth/Org";
 import { BrandMark, TopActions } from "../components/Layout";
 import { Button, Card, Dialog, Empty, ErrorNotice, Field, Input, QueryView, Select } from "../components/ui";
-import { useI18n } from "../i18n/I18n";
+import { useI18n, useRoleLabel } from "../i18n/I18n";
 
 const CURRENCIES = ["SAR", "AED", "KWD", "BHD", "OMR", "QAR", "EGP", "JOD", "USD", "EUR"];
 
@@ -16,6 +16,7 @@ export function useMyOrgs() {
 
 export function OrgsPage() {
   const { t } = useI18n();
+  const roleLabel = useRoleLabel();
   const orgs = useMyOrgs();
   const [creating, setCreating] = useState(false);
   return (
@@ -41,12 +42,12 @@ export function OrgsPage() {
             ) : (
               <div className="stack-sm">
                 {list.map((o) => (
-                  <Link key={o.id} to={`/o/${o.id}`} className="org-switch row" onClick={() => rememberOrg(o.id)}>
+                  <Link key={o.id} to={`/o/${o.id}`} className="org-row" onClick={() => rememberOrg(o.id)}>
                     <Building2 size={20} aria-hidden />
                     <span className="grow">
                       <strong>{o.name}</strong>
                       <span className="muted small">
-                        {t("orgs.role")}: {o.role} · {o.default_currency}
+                        {t("orgs.role")}: {roleLabel(o.role)} · {o.default_currency}
                       </span>
                     </span>
                   </Link>

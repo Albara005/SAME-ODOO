@@ -2,19 +2,42 @@ import { useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api, ApiError, unwrap } from "../api/client";
 import { useAuth } from "../auth/Auth";
-import { BrandMark, TopActions } from "../components/Layout";
+import { Sparkle } from "lucide-react";
+import { StarLattice, StarMark } from "../components/Art";
+import { TopActions } from "../components/Layout";
 import { Button, Card, ErrorNotice, Field, Input } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
 
 function AuthFrame({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   return (
-    <div className="auth-page">
-      <div className="auth-top">
-        <TopActions />
-      </div>
-      <div className="auth-card">
-        <BrandMark />
-        <Card>{children}</Card>
+    <div className="auth-split">
+      <section className="auth-art">
+        <StarLattice />
+        <div className="brand">
+          <StarMark size={34} />
+          <span>{t("app.name")}</span>
+        </div>
+        <div>
+          <h2>{t("auth.artTitle")}</h2>
+          <p>{t("auth.artBody")}</p>
+          <div className="auth-points">
+            {(["auth.point1", "auth.point2", "auth.point3"] as const).map((k) => (
+              <span key={k}>
+                <Sparkle size={16} /> {t(k)}
+              </span>
+            ))}
+          </div>
+        </div>
+        <span />
+      </section>
+      <div className="auth-form">
+        <div className="auth-top">
+          <TopActions />
+        </div>
+        <div className="auth-card">
+          <Card>{children}</Card>
+        </div>
       </div>
     </div>
   );
