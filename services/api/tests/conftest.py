@@ -50,9 +50,10 @@ def database_url(tmp_path, pg_owner_engine):
     if not USING_PG:
         return f"sqlite:///{tmp_path / 'test.db'}", True
     with pg_owner_engine.begin() as conn:
-        conn.execute(text(
-            "TRUNCATE users, user_sessions, organizations, roles, memberships, audit_logs, files CASCADE"
-        ))
+        tables = conn.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations'"
+        )).scalars().all()
+        conn.execute(text(f"TRUNCATE {', '.join(tables)} CASCADE"))
     return PG_APP_URL, False
 
 

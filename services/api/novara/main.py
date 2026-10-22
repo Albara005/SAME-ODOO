@@ -9,6 +9,10 @@ from sqlalchemy import text
 from novara.config import Settings, load_settings
 from novara.db import Base, make_engine, make_sessionmaker
 from novara.modules.access.router import router as access_router
+from novara.modules.accounting.router import router as accounting_router
+from novara.modules.catalog.router import router as catalog_router
+from novara.modules.invoicing.router import router as invoicing_router
+from novara.modules.partners.router import router as partners_router
 from novara.modules.audit.router import router as audit_router
 from novara.modules.files.router import router as files_router
 from novara.modules.files.storage import LocalObjectStorage, ObjectStorage
@@ -17,6 +21,10 @@ from novara.modules.organizations.router import router as organizations_router
 
 # Import models so they are registered on Base.metadata.
 from novara.modules.access import models as _access_models  # noqa: F401
+from novara.modules.accounting import models as _accounting_models  # noqa: F401
+from novara.modules.catalog import models as _catalog_models  # noqa: F401
+from novara.modules.invoicing import models as _invoicing_models  # noqa: F401
+from novara.modules.partners import models as _partner_models  # noqa: F401
 from novara.modules.audit import models as _audit_models  # noqa: F401
 from novara.modules.files import models as _files_models  # noqa: F401
 from novara.modules.identity import models as _identity_models  # noqa: F401
@@ -50,6 +58,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
             conn.execute(text("SELECT 1"))
         return {"status": "ok"}
 
-    for r in (identity_router, organizations_router, access_router, audit_router, files_router):
+    for r in (identity_router, organizations_router, access_router, audit_router, files_router,
+              partners_router, catalog_router, accounting_router, invoicing_router):
         app.include_router(r, prefix="/api/v1")
     return app

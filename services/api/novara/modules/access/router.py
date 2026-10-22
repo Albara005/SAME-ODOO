@@ -50,9 +50,14 @@ def permission_catalog() -> dict[str, str]:
     return P.CATALOG
 
 
+def _role_out(role: Role) -> RoleOut:
+    return RoleOut(id=role.id, key=role.key, name=role.name, is_system=role.is_system,
+                   permissions=sorted(P.effective_permissions(role)))
+
+
 @router.get("/orgs/{org_id}/roles", response_model=list[RoleOut])
 def list_roles(_: OrgContext = Depends(require(P.MEMBERS_READ)), db: Session = Depends(get_db)):
-    return db.scalars(select(Role).order_by(Role.is_system.desc(), Role.key)).all()
+    return [_role_out(r) for r in db.scalars(select(Role).order_by(Role.is_system.desc(), Role.key))]
 
 
 @router.post("/orgs/{org_id}/roles", response_model=RoleOut, status_code=status.HTTP_201_CREATED)

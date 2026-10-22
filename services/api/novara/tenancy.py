@@ -26,7 +26,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Iterator
 
-from sqlalchemy import ForeignKey, String, event, inspect, text
+from sqlalchemy import ForeignKey, ForeignKeyConstraint, String, UniqueConstraint, event, inspect, text
 from sqlalchemy.orm import Mapped, ORMExecuteState, Session, declared_attr, mapped_column, with_loader_criteria
 
 _TENANT_KEY = "novara_tenant_org_id"
@@ -149,3 +149,21 @@ def _push_pg_settings(session: Session, connection) -> None:
         if value is not None:
             # is_local=true: the value lives only as long as the current transaction.
             connection.execute(text("SELECT set_config(:name, :value, true)"), {"name": setting, "value": value})
+
+
+def org_unique_id():
+    """Table arg making (organization_id, id) referenceable by same-organization composite foreign keys."""
+    return UniqueConstraint("organization_id", "id")
+
+
+def same_org_fk(column: str, target_table: str, ondelete: str | None = None):
+    """Composite FK so the database itself refuses to link rows of different organizations.
+
+    The default (NO ACTION) still lets deleting a whole organization cascade through its rows.
+    Never use SET NULL here: it would also null organization_id.
+    """
+    return ForeignKeyConstraint(
+        ["organization_id", column],
+        [f"{target_table}.organization_id", f"{target_table}.id"],
+        ondelete=ondelete,
+    )

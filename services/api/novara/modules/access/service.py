@@ -15,6 +15,16 @@ def create_system_roles(db: Session) -> dict[str, Role]:
     return roles
 
 
+def ensure_system_role(db: Session, key: str) -> Role:
+    role = db.scalar(select(Role).where(Role.key == key))
+    if role is None:
+        name, perms = SYSTEM_ROLES[key]
+        role = Role(key=key, name=name, permissions=perms, is_system=True)
+        db.add(role)
+        db.flush()
+    return role
+
+
 def active_owner_count(db: Session) -> int:
     return db.scalar(
         select(func.count())

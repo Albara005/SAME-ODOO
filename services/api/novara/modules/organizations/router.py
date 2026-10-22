@@ -12,10 +12,13 @@ from sqlalchemy.orm import Session
 from novara.deps import OrgContext, client_ip, current_user, get_db, org_context, require
 from novara.modules.access import permissions as P
 from novara.modules.access.models import Role
-from novara.modules.access.service import active_owner_count, create_system_roles
+from novara.modules.access.service import active_owner_count, create_system_roles, ensure_system_role
+from novara.modules.accounting.models import JournalEntry
+from novara.modules.accounting.service import ensure_chart
 from novara.modules.audit import service as audit
 from novara.modules.identity.models import User
 from novara.modules.organizations.models import Membership, Organization
+from novara.money import CURRENCY_DIGITS
 from novara.tenancy import bind_tenant, system_scope
 
 router = APIRouter(tags=["organizations"])
@@ -85,6 +88,7 @@ def create_org(body: OrgIn, request: Request, user: User = Depends(current_user)
     slug = body.slug.lower()
     if not _SLUG.match(slug):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "slug must be lowercase letters, digits and dashes")
+    _check_currency(body.default_currency)
     org = Organization(name=body.name, slug=slug, default_locale=body.default_locale, default_currency=body.default_currency)
     db.add(org)
     try:
@@ -94,6 +98,7 @@ def create_org(body: OrgIn, request: Request, user: User = Depends(current_user)
         raise HTTPException(status.HTTP_409_CONFLICT, "slug already taken")
     bind_tenant(db, org.id)
     roles = create_system_roles(db)
+    ensure_chart(db)
     db.add(Membership(user_id=user.id, role_id=roles[P.OWNER_ROLE].id))
     audit.record(db, actor_user_id=user.id, action="org.created", target_type="organization",
                  target_id=org.id, details={"slug": slug}, ip_address=client_ip(request))
@@ -113,7 +118,7 @@ def my_orgs(user: User = Depends(current_user), db: Session = Depends(get_db)):
             .order_by(Organization.name)
         ).all()
     return [
-        MyOrgOut(**OrgOut.model_validate(org).model_dump(), role=role.key, permissions=sorted(role.permissions))
+        MyOrgOut(**OrgOut.model_validate(org).model_dump(), role=role.key, permissions=sorted(P.effective_permissions(role)))
         for org, role in rows
     ]
 
@@ -128,6 +133,10 @@ def get_org(ctx: OrgContext = Depends(org_context)):
 def update_org(body: OrgUpdate, request: Request, ctx: OrgContext = Depends(require(P.ORG_MANAGE)),
                db: Session = Depends(get_db)):
     changes = body.model_dump(exclude_none=True)
+    if "default_currency" in changes and changes["default_currency"] != ctx.organization.default_currency:
+        _check_currency(changes["default_currency"])
+        if db.scalar(select(JournalEntry.id).limit(1)):
+            raise HTTPException(status.HTTP_409_CONFLICT, "currency cannot change once the ledger has entries")
     for field, value in changes.items():
         setattr(ctx.organization, field, value)
     audit.record(db, actor_user_id=ctx.user.id, action="org.updated", target_type="organization",
@@ -136,11 +145,19 @@ def update_org(body: OrgUpdate, request: Request, ctx: OrgContext = Depends(requ
     return ctx.organization
 
 
+def _check_currency(code: str) -> None:
+    if code not in CURRENCY_DIGITS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"unsupported currency: {code}")
+
+
 # ---------------------------------------------------------------- members
 
 
 def _role_by_key(db: Session, key: str) -> Role:
     role = db.scalar(select(Role).where(Role.key == key))
+    if role is None and key in P.SYSTEM_ROLES:
+        # System roles added to the catalog after this organization was created.
+        role = ensure_system_role(db, key)
     if role is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"unknown role: {key}")
     return role
@@ -148,7 +165,7 @@ def _role_by_key(db: Session, key: str) -> Role:
 
 def _ensure_can_grant(ctx: OrgContext, role: Role) -> None:
     """Nobody can hand out (or take away) permissions they don't hold themselves."""
-    missing = set(role.permissions) - ctx.permissions
+    missing = P.effective_permissions(role) - ctx.permissions
     if missing:
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"cannot manage role with permissions you lack: {sorted(missing)}")
 

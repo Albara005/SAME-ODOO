@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from novara.db import utcnow
 from novara.modules.access.models import Role
+from novara.modules.access.permissions import effective_permissions
 from novara.modules.identity.models import User, UserSession
 from novara.modules.organizations.models import Membership, Organization
 from novara.security import decode_token
@@ -78,7 +79,7 @@ class OrgContext:
 
     @property
     def permissions(self) -> set[str]:
-        return set(self.role.permissions)
+        return effective_permissions(self.role)
 
     def has(self, permission: str) -> bool:
         return permission in self.permissions
@@ -108,6 +109,15 @@ def require(permission: str):
     def checker(ctx: OrgContext = Depends(org_context)) -> OrgContext:
         if not ctx.has(permission):
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"missing permission: {permission}")
+        return ctx
+
+    return checker
+
+
+def require_any(*permissions: str):
+    def checker(ctx: OrgContext = Depends(org_context)) -> OrgContext:
+        if not ctx.permissions.intersection(permissions):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"missing one of: {', '.join(permissions)}")
         return ctx
 
     return checker
