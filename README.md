@@ -5,16 +5,19 @@
 
 A unified platform combining an ERP-style business suite with AI app building, agents, automation and design.
 
-## الحالة الحالية: المرحلة 1، الأساس
+## الحالة الحالية
 
-النواة التي ستُبنى عليها كل الوحدات: الحسابات، المؤسسات، الأدوار والصلاحيات، العزل التام بين المؤسسات،
-سجل التدقيق، الملفات، الترحيلات، والنسخ الاحتياطي مع اختبار الاستعادة.
-التفاصيل وما بقي من المرحلة: [`docs/phase-1-foundation.md`](docs/phase-1-foundation.md).
+| المرحلة | الحالة | التفاصيل |
+|---|---|---|
+| 1. الأساس: الحسابات، المؤسسات، الصلاحيات، العزل، التدقيق، النسخ الاحتياطي | ✅ الخلفية مكتملة | [`docs/phase-1-foundation.md`](docs/phase-1-foundation.md) |
+| 2. الأعمال: العملاء، المنتجات، الفواتير، دفتر الأستاذ، المخزون، المبيعات | ✅ الخلفية مكتملة | [`docs/phase-2-business.md`](docs/phase-2-business.md) |
+| 3. المساعد الذكي | قيد العمل | |
 
 ```
 services/api/            FastAPI + SQLAlchemy (Python)
   novara/tenancy.py      عزل المؤسسات التلقائي في طبقة البيانات
   novara/modules/        identity · organizations · access · audit · files
+                         partners · catalog · accounting · invoicing · inventory · sales · dataio
   migrations/postgres/   المخطط + Row-Level Security + صلاحيات دور التشغيل
   tests/                 اختبارات العزل والصلاحيات (SQLite و PostgreSQL)
 infrastructure/

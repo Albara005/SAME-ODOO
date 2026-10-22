@@ -31,6 +31,19 @@ USING_PG = bool(PG_OWNER_URL and PG_APP_URL)
 requires_pg = pytest.mark.skipif(not USING_PG, reason="PostgreSQL test database not configured")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def fast_password_hashing():
+    """Argon2 is deliberately slow; tests use minimal cost. Production keeps the library defaults."""
+    from argon2 import PasswordHasher
+
+    from novara import security
+
+    original = security._hasher
+    security._hasher = PasswordHasher(time_cost=1, memory_cost=1024, parallelism=1)
+    yield
+    security._hasher = original
+
+
 @pytest.fixture(scope="session")
 def pg_owner_engine():
     if not USING_PG:
