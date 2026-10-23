@@ -385,11 +385,32 @@ export interface paths {
         /** List Accounts */
         get: operations["list_accounts_api_v1_orgs__org_id__accounting_accounts_get"];
         put?: never;
-        post?: never;
+        /** Create Account */
+        post: operations["create_account_api_v1_orgs__org_id__accounting_accounts_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/accounting/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Account
+         * @description Rename or archive an account. Codes and types are fixed once created: reports depend on them.
+         */
+        patch: operations["update_account_api_v1_orgs__org_id__accounting_accounts__account_id__patch"];
         trace?: never;
     };
     "/api/v1/orgs/{org_id}/accounting/balance-sheet": {
@@ -419,7 +440,32 @@ export interface paths {
         /** List Journal Entries */
         get: operations["list_journal_entries_api_v1_orgs__org_id__accounting_journal_entries_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Manual Entry
+         * @description A manual journal entry: accruals, depreciation, owner contributions, corrections between accounts.
+         *     It must balance; accounts kept by documents (receivable, payable, inventory) are refused.
+         */
+        post: operations["create_manual_entry_api_v1_orgs__org_id__accounting_journal_entries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/accounting/journal-entries/{entry_id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse Journal Entry
+         * @description Undo a manual entry or a year-end close with a mirror entry (entries are never edited or deleted).
+         */
+        post: operations["reverse_journal_entry_api_v1_orgs__org_id__accounting_journal_entries__entry_id__reverse_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -495,6 +541,28 @@ export interface paths {
         get: operations["get_trial_balance_api_v1_orgs__org_id__accounting_trial_balance_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/accounting/year-end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Year End */
+        get: operations["get_year_end_api_v1_orgs__org_id__accounting_year_end_get"];
+        put?: never;
+        /**
+         * Post Year End
+         * @description Close the year: income and expenses go to zero and the result moves into retained earnings.
+         *     By default the books are closed up to the same day, so the closed year can't change afterwards.
+         */
+        post: operations["post_year_end_api_v1_orgs__org_id__accounting_year_end_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -973,6 +1041,26 @@ export interface paths {
         put?: never;
         /** Cancel Bill */
         post: operations["cancel_bill_api_v1_orgs__org_id__bills__bill_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bills/{bill_id}/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Vendor Credit
+         * @description Record a vendor's credit against a posted bill; optionally send received goods back.
+         */
+        post: operations["create_vendor_credit_api_v1_orgs__org_id__bills__bill_id__credits_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2614,6 +2702,61 @@ export interface paths {
         patch: operations["update_tax_api_v1_orgs__org_id__taxes__tax_id__patch"];
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/vendor-credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vendor Credits */
+        get: operations["list_vendor_credits_api_v1_orgs__org_id__vendor_credits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/vendor-credits/{credit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Vendor Credit */
+        get: operations["read_vendor_credit_api_v1_orgs__org_id__vendor_credits__credit_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/vendor-credits/{credit_id}/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vendor Refunds */
+        get: operations["list_vendor_refunds_api_v1_orgs__org_id__vendor_credits__credit_id__refunds_get"];
+        put?: never;
+        /**
+         * Record Vendor Refund
+         * @description Record money the vendor paid back (the part of a credit that didn't reduce an open bill).
+         */
+        post: operations["record_vendor_refund_api_v1_orgs__org_id__vendor_credits__credit_id__refunds_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/vendors": {
         parameters: {
             query?: never;
@@ -2847,12 +2990,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountIn */
+        AccountIn: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+        };
         /** AccountOut */
         AccountOut: {
             /** Active */
             active: boolean;
             /** Code */
             code: string;
+            /**
+             * Control
+             * @default false
+             */
+            control: boolean;
             /** Id */
             id: string;
             /** Name */
@@ -2861,6 +3018,13 @@ export interface components {
             system_key: string | null;
             /** Type */
             type: string;
+        };
+        /** AccountUpdate */
+        AccountUpdate: {
+            /** Active */
+            active?: boolean | null;
+            /** Name */
+            name?: string | null;
         };
         /** ActionOut */
         ActionOut: {
@@ -3089,6 +3253,16 @@ export interface components {
             product_id: string | null;
             /** Purchase Order Line Id */
             purchase_order_line_id: string | null;
+            /**
+             * Qty Credited
+             * @default 0
+             */
+            qty_credited: string;
+            /**
+             * Qty Returned
+             * @default 0
+             */
+            qty_returned: string;
             /** Quantity */
             quantity: string;
             /** Tax Id */
@@ -3100,6 +3274,11 @@ export interface components {
         };
         /** BillOut */
         BillOut: {
+            /**
+             * Amount Credited
+             * @default 0
+             */
+            amount_credited: string;
             /** Amount Due */
             amount_due: string;
             /** Amount Paid */
@@ -3889,6 +4068,8 @@ export interface components {
             number: string;
             /** Reversal Of Id */
             reversal_of_id: string | null;
+            /** Reversed By Id */
+            reversed_by_id?: string | null;
             /** Source Id */
             source_id: string;
             /** Source Type */
@@ -3900,6 +4081,11 @@ export interface components {
             account_code: string;
             /** Account Id */
             account_id: string;
+            /**
+             * Account Name
+             * @default
+             */
+            account_name: string;
             /** Credit */
             credit: string;
             /** Customer Id */
@@ -3908,6 +4094,8 @@ export interface components {
             debit: string;
             /** Label */
             label: string;
+            /** Vendor Id */
+            vendor_id?: string | null;
         };
         /** KitIn */
         KitIn: {
@@ -4134,6 +4322,38 @@ export interface components {
              * @enum {integer}
              */
             weight: 400 | 700;
+        };
+        /** ManualEntryIn */
+        ManualEntryIn: {
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Lines */
+            lines: components["schemas"]["ManualLineIn"][];
+            /** Memo */
+            memo: string;
+        };
+        /** ManualLineIn */
+        ManualLineIn: {
+            /** Account Id */
+            account_id: string;
+            /**
+             * Credit
+             * @default 0
+             */
+            credit: number | string;
+            /**
+             * Debit
+             * @default 0
+             */
+            debit: number | string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
         };
         /** MemberIn */
         MemberIn: {
@@ -5033,6 +5253,19 @@ export interface components {
              */
             email: string;
         };
+        /** ReverseIn */
+        ReverseIn: {
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /**
+             * Memo
+             * @default
+             */
+            memo: string;
+        };
         /** RoleIn */
         RoleIn: {
             /** Key */
@@ -5439,6 +5672,140 @@ export interface components {
             /** Stock Value */
             stock_value: string;
         };
+        /** VendorCreditIn */
+        VendorCreditIn: {
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Lines */
+            lines: components["schemas"]["VendorCreditLineIn"][];
+            /** Reason */
+            reason: string;
+            /**
+             * Vendor Reference
+             * @default
+             */
+            vendor_reference: string;
+        };
+        /** VendorCreditLineIn */
+        VendorCreditLineIn: {
+            /** Bill Line Id */
+            bill_line_id: string;
+            /** Quantity */
+            quantity: number | string;
+            /**
+             * Returned Quantity
+             * @default 0
+             */
+            returned_quantity: number | string;
+        };
+        /** VendorCreditLineOut */
+        VendorCreditLineOut: {
+            /** Bill Line Id */
+            bill_line_id: string;
+            /** Description */
+            description: string;
+            /** Net Amount */
+            net_amount: string;
+            /** Quantity */
+            quantity: string;
+            /** Returned Quantity */
+            returned_quantity: string;
+            /** Tax Rate */
+            tax_rate: string;
+            /** Unit Cost */
+            unit_cost: string;
+        };
+        /** VendorCreditOut */
+        VendorCreditOut: {
+            /** Applied */
+            applied: string;
+            /** Bill Id */
+            bill_id: string;
+            /** Bill Number */
+            bill_number: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Id */
+            id: string;
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Journal Entry Id */
+            journal_entry_id: string;
+            /** Lines */
+            lines: components["schemas"]["VendorCreditLineOut"][];
+            /** Number */
+            number: string;
+            /** Reason */
+            reason: string;
+            /** Refundable */
+            refundable: string;
+            /** Refunded */
+            refunded: string;
+            /** Stock Reference */
+            stock_reference: string;
+            /** Subtotal */
+            subtotal: string;
+            /** Tax */
+            tax: string;
+            /** Taxes */
+            taxes: components["schemas"]["VendorCreditTaxOut"][];
+            /** Total */
+            total: string;
+            /** Vendor Id */
+            vendor_id: string;
+            /** Vendor Name */
+            vendor_name: string;
+            /** Vendor Reference */
+            vendor_reference: string;
+        };
+        /** VendorCreditSummary */
+        VendorCreditSummary: {
+            /** Bill Id */
+            bill_id: string;
+            /** Bill Number */
+            bill_number: string;
+            /** Id */
+            id: string;
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Number */
+            number: string;
+            /** Refundable */
+            refundable: string;
+            /** Total */
+            total: string;
+            /** Vendor Id */
+            vendor_id: string;
+            /** Vendor Name */
+            vendor_name: string;
+        };
+        /** VendorCreditTaxOut */
+        VendorCreditTaxOut: {
+            /** Amount */
+            amount: string;
+            /** Base */
+            base: string;
+            /** Name */
+            name: string;
+            /** Rate */
+            rate: string;
+            /** Tax Id */
+            tax_id: string;
+        };
         /** VendorIn */
         VendorIn: {
             /**
@@ -5524,6 +5891,48 @@ export interface components {
             postal_code: string;
             /** Tax Number */
             tax_number: string;
+        };
+        /** VendorRefundIn */
+        VendorRefundIn: {
+            /** Amount */
+            amount: number | string;
+            /** Method */
+            method: string;
+            /**
+             * Reference
+             * @default
+             */
+            reference: string;
+            /**
+             * Refund Date
+             * Format: date
+             */
+            refund_date: string;
+        };
+        /** VendorRefundOut */
+        VendorRefundOut: {
+            /** Amount */
+            amount: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Credit Id */
+            credit_id: string;
+            /** Id */
+            id: string;
+            /** Journal Entry Id */
+            journal_entry_id: string;
+            /** Method */
+            method: string;
+            /** Reference */
+            reference: string;
+            /**
+             * Refund Date
+             * Format: date
+             */
+            refund_date: string;
         };
         /** VersionIn */
         VersionIn: {
@@ -5615,6 +6024,27 @@ export interface components {
             name?: string | null;
             /** Schedule */
             schedule?: Record<string, unknown> | null;
+        };
+        /** YearEndIn */
+        YearEndIn: {
+            /**
+             * Lock
+             * @default true
+             */
+            lock: boolean;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+        };
+        /** YearEndOut */
+        YearEndOut: {
+            entry?: components["schemas"]["JournalEntryOut"] | null;
+            /** Last Closed */
+            last_closed: string | null;
+            /** Locked Until */
+            locked_until: string | null;
         };
         /** RunOut */
         novara__agents__router__RunOut: {
@@ -6419,6 +6849,77 @@ export interface operations {
             };
         };
     };
+    create_account_api_v1_orgs__org_id__accounting_accounts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_account_api_v1_orgs__org_id__accounting_accounts__account_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_balance_sheet_api_v1_orgs__org_id__accounting_balance_sheet_get: {
         parameters: {
             query?: {
@@ -6457,6 +6958,8 @@ export interface operations {
             query?: {
                 source_type?: string | null;
                 source_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
                 limit?: number;
             };
             header?: never;
@@ -6474,6 +6977,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JournalEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_manual_entry_api_v1_orgs__org_id__accounting_journal_entries_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualEntryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reverse_journal_entry_api_v1_orgs__org_id__accounting_journal_entries__entry_id__reverse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalEntryOut"];
                 };
             };
             /** @description Validation Error */
@@ -6641,6 +7217,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrialBalanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_year_end_api_v1_orgs__org_id__accounting_year_end_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearEndOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_year_end_api_v1_orgs__org_id__accounting_year_end_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["YearEndIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YearEndOut"];
                 };
             };
             /** @description Validation Error */
@@ -7769,6 +8411,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_vendor_credit_api_v1_orgs__org_id__bills__bill_id__credits_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                bill_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorCreditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorCreditOut"];
                 };
             };
             /** @description Validation Error */
@@ -11813,6 +12493,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_vendor_credits_api_v1_orgs__org_id__vendor_credits_get: {
+        parameters: {
+            query?: {
+                bill_id?: string | null;
+                vendor_id?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorCreditSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_vendor_credit_api_v1_orgs__org_id__vendor_credits__credit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credit_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorCreditOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_vendor_refunds_api_v1_orgs__org_id__vendor_credits__credit_id__refunds_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credit_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorRefundOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_vendor_refund_api_v1_orgs__org_id__vendor_credits__credit_id__refunds_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                credit_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorRefundIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorRefundOut"];
                 };
             };
             /** @description Validation Error */

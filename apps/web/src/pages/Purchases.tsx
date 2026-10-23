@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, CheckCircle2, CreditCard, FileText, PackageCheck, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ban, CheckCircle2, CreditCard, FileText, PackageCheck, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
@@ -13,8 +13,9 @@ import {
 } from "../components/ui";
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
-import { isPositive } from "../lib/decimal";
+import { isPositive, subtractDec } from "../lib/decimal";
 import { today } from "../lib/format";
+import { VendorCreditDialog } from "./VendorCredits";
 
 type Order = Schemas["PurchaseOrderOut"];
 type Bill = Schemas["BillOut"];
@@ -728,6 +729,7 @@ function BillDetail({ bill: b }: { bill: Bill }) {
   const toast = useToast();
   const [paying, setPaying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [crediting, setCrediting] = useState(false);
   const ids = { org_id: org.id, bill_id: b.id };
   const refresh = (updated?: Bill) => {
     if (updated) qc.setQueryData(["bill", org.id, b.id], updated);
@@ -754,8 +756,15 @@ function BillDetail({ bill: b }: { bill: Bill }) {
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/bills/{bill_id}/payments", { params: { path: ids } })),
     enabled: b.status !== "draft",
   });
+  const credits = useQuery({
+    queryKey: ["vendor-credits", org.id, b.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/vendor-credits", { params: { path: { org_id: org.id }, query: { bill_id: b.id } } })),
+    enabled: b.status !== "draft",
+  });
   const isDraft = b.status === "draft";
   const canPay = can("payments.write") && (b.status === "posted" || b.status === "partially_paid");
+  const canCredit = can("bills.post") && ["posted", "partially_paid", "paid", "credited"].includes(b.status)
+    && b.lines.some((l) => isPositive(subtractDec(l.quantity, l.qty_credited ?? "0")));
   return (
     <div className="stack">
       <PageHeader
@@ -785,7 +794,10 @@ function BillDetail({ bill: b }: { bill: Bill }) {
             {canPay && (
               <Button variant="primary" icon={<CreditCard size={16} />} onClick={() => setPaying(true)}>{t("bills.pay")}</Button>
             )}
-            {b.status === "posted" && can("bills.post") && (
+            {canCredit && (
+              <Button icon={<Undo2 size={16} />} onClick={() => setCrediting(true)}>{t("vcredit.new")}</Button>
+            )}
+            {b.status === "posted" && can("bills.post") && !isPositive(b.amount_credited ?? "0") && (
               <Button variant="danger" icon={<Ban size={16} />} onClick={() => setCancelling(true)}>{t("bills.cancel")}</Button>
             )}
           </div>
@@ -818,6 +830,12 @@ function BillDetail({ bill: b }: { bill: Bill }) {
               <>
                 <dt>{t("invoices.paid")}</dt>
                 <dd className="num" style={{ textAlign: "end" }}>{money(b.amount_paid, b.currency)}</dd>
+                {isPositive(b.amount_credited ?? "0") && (
+                  <>
+                    <dt>{t("vcredit.credited")}</dt>
+                    <dd className="num" style={{ textAlign: "end" }}>{money(b.amount_credited ?? "0", b.currency)}</dd>
+                  </>
+                )}
                 <dt>{t("invoices.due")}</dt>
                 <dd className="num" style={{ textAlign: "end" }}><strong>{money(b.amount_due, b.currency)}</strong></dd>
               </>
@@ -877,6 +895,38 @@ function BillDetail({ bill: b }: { bill: Bill }) {
             )}
           </QueryView>
         </Card>
+      )}
+      {(credits.data?.length ?? 0) > 0 && (
+        <Card title={t("vcredit.title")}>
+          <table>
+            <thead>
+              <tr>
+                <th>{t("invoices.number")}</th>
+                <th>{t("credit.date")}</th>
+                <th className="end">{t("invoices.total")}</th>
+                <th className="end">{t("vcredit.owed")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {credits.data!.map((c) => (
+                <tr key={c.id}>
+                  <td><Link className="mono" to={path(`purchases/credits/${c.id}`)}>{c.number}</Link></td>
+                  <td className="num">{date(c.issue_date)}</td>
+                  <td className="end num">{money(c.total, b.currency)}</td>
+                  <td className="end num">{isPositive(c.refundable) ? money(c.refundable, b.currency) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+      {crediting && (
+        <VendorCreditDialog bill={b} onClose={() => setCrediting(false)} onDone={(creditId) => {
+          setCrediting(false);
+          refresh();
+          void qc.invalidateQueries({ queryKey: ["vendor-credits", org.id, b.id] });
+          navigate(path(`purchases/credits/${creditId}`));
+        }} />
       )}
       {paying && (
         <BillPaymentDialog bill={b} onClose={() => setPaying(false)} onDone={() => {

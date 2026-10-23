@@ -129,3 +129,97 @@ test("credit note, refund, statements, e-invoice QR and closed books", async ({ 
   });
   expect(late.status()).toBe(409);
 });
+
+test("vendor credit: goods sent back reduce the bill, the vendor pays back the rest", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("vcredit"));
+  await createOrg(page, "متجر المرتجعات");
+  const call = await apiFor(page);
+  const tax = await call("POST", "/taxes", { name: "ضريبة القيمة المضافة", rate: "15" });
+  const chair = await call("POST", "/products", { name: "كرسي مكتب", sku: "CH-1", kind: "goods", sale_price: "500", default_tax_id: tax.id });
+  const vendor = await call("POST", "/vendors", { name: "مؤسسة الخليج للتوريد" });
+  const po = await call("POST", "/purchase-orders", {
+    vendor_id: vendor.id, order_date: "2026-05-01",
+    lines: [{ product_id: chair.id, quantity: "10", unit_cost: "200", tax_id: tax.id }],
+  });
+  await call("POST", `/purchase-orders/${po.id}/confirm`);
+  await call("POST", `/purchase-orders/${po.id}/receipts`, { move_date: "2026-05-03" });
+  const bill = await call("POST", `/purchase-orders/${po.id}/bill`, { bill_date: "2026-05-04", vendor_reference: "GS-881" });
+  await call("POST", `/bills/${bill.id}/post`);
+
+  const orgPath = page.url().match(/\/o\/[0-9a-f-]+/)![0];
+  await page.goto(`${orgPath}/purchases/bills/${bill.id}`);
+  await page.getByRole("button", { name: "إشعار دائن من المورد" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("رقم إشعار المورد").fill("GS-CN-12");
+  await dialog.getByLabel("السبب").fill("تلف أثناء الشحن");
+  await dialog.getByLabel("الكمية المخصومة كرسي مكتب").fill("2");
+  await dialog.getByLabel("أعيد للمورد كرسي مكتب").fill("2");
+  await dialog.getByRole("button", { name: "تسجيل الإشعار" }).click();
+
+  await expect(page.getByRole("heading", { name: /^VC-2026-00001$/ })).toBeVisible();
+  await expect(page.getByText(/^VRT-2026-/)).toBeVisible();
+  await expect(page.getByRole("definition").filter({ hasText: "460.00" }).first()).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/vendor-credit-ar.png", fullPage: true });
+  await page.getByRole("link", { name: /^BILL-2026-/ }).click();
+  await expect(page.getByText("خصمه المورد")).toBeVisible();
+  await expect(page.getByRole("link", { name: "VC-2026-00001" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "إلغاء الفاتورة" })).toHaveCount(0);
+});
+
+test("accounting: a manual entry, a new account, closing the year and reversing", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("ledger"));
+  await createOrg(page, "شركة الدفاتر");
+  const call = await apiFor(page);
+  const customer = await call("POST", "/customers", { name: "مؤسسة الضياء" });
+  const inv = await call("POST", "/invoices", {
+    customer_id: customer.id, issue_date: "2026-02-01",
+    lines: [{ description: "استشارة", quantity: "4", unit_price: "250" }],
+  });
+  await call("POST", `/invoices/${inv.id}/post`);
+
+  await nav(page, "المحاسبة");
+  await page.getByRole("button", { name: "قيد يدوي" }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByLabel("التاريخ").fill("2026-03-15");
+  await dialog.getByLabel("البيان").fill("إيجار مارس");
+  await dialog.getByLabel("الحساب 1").selectOption({ label: "6000 · مصروفات عامة" });
+  await dialog.getByLabel("مدين 1").fill("300");
+  await dialog.getByLabel("الحساب 2").selectOption({ label: "1200 · البنك" });
+  await expect(dialog.getByRole("button", { name: "ترحيل القيد" })).toBeDisabled();
+  await dialog.getByLabel("دائن 2").fill("300");
+  await expect(dialog.getByText("متوازن")).toBeVisible();
+  await expect(dialog.getByLabel("الحساب 1").locator("option", { hasText: "ذمم العملاء" })).toHaveCount(0);
+  await page.screenshot({ path: "test-results/screens/manual-entry-ar.png" });
+  await dialog.getByRole("button", { name: "ترحيل القيد" }).click();
+  await expect(page.getByText(/رُحِّل القيد JE-2026-/)).toBeVisible();
+  const entry = page.locator(".card").filter({ hasText: "إيجار مارس" });
+  await expect(entry.getByText("يدوي", { exact: true })).toBeVisible();
+
+  await page.getByRole("tab", { name: "دليل الحسابات" }).click();
+  await page.getByRole("button", { name: "حساب جديد" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("الرمز").fill("6100");
+  await dialog.getByLabel("الاسم").fill("إيجار المكتب");
+  await dialog.getByRole("button", { name: "إنشاء" }).click();
+  await expect(page.getByRole("cell", { name: "إيجار المكتب" })).toBeVisible();
+  await expect(page.getByRole("row", { name: /1300/ }).getByText("تتبع المستندات")).toBeVisible();
+
+  await page.getByRole("tab", { name: "إقفال السنة" }).click();
+  await expect(page.getByText("لم تُقفل سنة بعد")).toBeVisible();
+  await page.getByRole("button", { name: "إقفال السنة" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("آخر يوم في السنة").fill("2026-03-31");
+  await dialog.getByRole("button", { name: "إقفال السنة" }).click();
+  await expect(page.getByText(/أُقفلت السنة حتى/)).toBeVisible();
+  await expect(page.getByText(/الدفاتر مقفلة حتى/).first()).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/year-end-ar.png", fullPage: true });
+
+  await page.getByRole("tab", { name: "دفتر اليومية" }).click();
+  await page.getByLabel("المصدر").selectOption({ label: "إقفال السنة" });
+  await expect(page.getByText("الأرباح المحتجزة")).toBeVisible();
+  await page.getByLabel("المصدر").selectOption({ label: "يدوي" });
+  await entry.getByRole("button", { name: "عكس" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "عكس" }).click();
+  await expect(page.getByText(/عُكس JE-2026-/)).toBeVisible();
+  await expect(entry.getByText("معكوس", { exact: true })).toBeVisible();
+});

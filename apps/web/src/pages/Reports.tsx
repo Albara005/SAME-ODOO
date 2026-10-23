@@ -13,11 +13,11 @@ import { useI18n } from "../i18n/I18n";
 import { isZero } from "../lib/decimal";
 import { locale, today } from "../lib/format";
 
-type Tab = "receivables" | "payables" | "sales" | "pnl" | "balance" | "trial" | "journal";
+type Tab = "receivables" | "payables" | "sales" | "pnl" | "balance" | "trial";
 
 /** The default chart's accounts in the reader's language; accounts an organization adds keep their own name. */
-const DEFAULT_ACCOUNTS = ["1100", "1200", "1300", "1400", "1500", "2100", "2150", "2200", "3000", "4000", "5000", "5100", "6000"];
-function useAccountName() {
+const DEFAULT_ACCOUNTS = ["1100", "1200", "1300", "1400", "1500", "2100", "2150", "2200", "3000", "3100", "4000", "5000", "5100", "6000"];
+export function useAccountName() {
   const { t } = useI18n();
   return (code: string, name: string) => (DEFAULT_ACCOUNTS.includes(code) ? t(`acct.${code}` as MessageKey) : name);
 }
@@ -37,7 +37,6 @@ export function ReportsPage() {
     can("purchases.read") && { key: "payables" as const, label: t("reports.payables") },
     can("invoices.read") && { key: "sales" as const, label: t("reports.sales") },
     can("accounting.read") && { key: "trial" as const, label: t("reports.trialBalance") },
-    can("accounting.read") && { key: "journal" as const, label: t("reports.journal") },
   ].filter((x): x is { key: Tab; label: string } => Boolean(x));
   const [tab, setTab] = useState<Tab>(tabs[0]?.key ?? "receivables");
   return (
@@ -50,13 +49,12 @@ export function ReportsPage() {
       {tab === "payables" && <Payables />}
       {tab === "sales" && <Sales />}
       {tab === "trial" && <TrialBalance />}
-      {tab === "journal" && <Journal />}
     </div>
   );
 }
 
 /** Closed books: nothing can be dated on or before the lock date. Shown to accountants, changed by accounting.close. */
-function BooksLock() {
+export function BooksLock() {
   const { t, date } = useI18n();
   const { org, can } = useOrg();
   const qc = useQueryClient();
@@ -113,7 +111,7 @@ function yesterday(): string {
   return d.toISOString().slice(0, 10);
 }
 
-function ExportButton({ path, filename }: { path: string; filename: string }) {
+export function ExportButton({ path, filename }: { path: string; filename: string }) {
   const { t } = useI18n();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -137,7 +135,7 @@ function ExportButton({ path, filename }: { path: string; filename: string }) {
   );
 }
 
-const qs = (params: Record<string, string>) => {
+export const qs = (params: Record<string, string>) => {
   const s = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
   return s ? `?${s}` : "";
 };
@@ -572,75 +570,6 @@ function Payables() {
                   </tr>
                 </tfoot>
               </table>
-            </div>
-          )
-        }
-      </QueryView>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------- journal
-
-function Journal() {
-  const { t, amount, date } = useI18n();
-  const { org } = useOrg();
-  const [range, setRange] = useState({ date_from: "", date_to: "" });
-  const entries = useQuery({
-    queryKey: ["report", org.id, "journal"],
-    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/accounting/journal-entries", { params: { path: { org_id: org.id }, query: { limit: 100 } } })),
-  });
-  return (
-    <div className="stack">
-      <div className="row filters">
-        <Field label={t("reports.from")} optional>
-          <Input type="date" value={range.date_from} onChange={(e) => setRange({ ...range, date_from: e.target.value })} ltr />
-        </Field>
-        <Field label={t("reports.to")} optional>
-          <Input type="date" value={range.date_to} onChange={(e) => setRange({ ...range, date_to: e.target.value })} ltr />
-        </Field>
-        <div className="grow" />
-        <ExportButton path={`/api/v1/orgs/${org.id}/accounting/journal.csv${qs(range)}`} filename="journal.csv" />
-      </div>
-      <p className="muted small">{t("reports.journalHint")}</p>
-      <QueryView query={entries}>
-        {(list) =>
-          list.length === 0 ? (
-            <Empty />
-          ) : (
-            <div className="stack-sm">
-              {list.map((e) => (
-                <Card key={e.id} tight>
-                  <div className="row-between" style={{ marginBlockEnd: "var(--space-2)" }}>
-                    <span className="row">
-                      <strong className="mono">{e.number}</strong>
-                      <span className="num small muted">{date(e.entry_date)}</span>
-                      {e.reversal_of_id && <Badge tone="warning">{t("reports.reversal")}</Badge>}
-                    </span>
-                    <span className="muted small">{e.memo}</span>
-                  </div>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>{t("reports.account")}</th>
-                        <th>{t("common.description")}</th>
-                        <th className="end">{t("reports.debit")}</th>
-                        <th className="end">{t("reports.credit")}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {e.lines.map((l, i) => (
-                        <tr key={i}>
-                          <td className="mono">{l.account_code}</td>
-                          <td>{l.label}</td>
-                          <td className="end num">{isZero(l.debit) ? "" : amount(l.debit)}</td>
-                          <td className="end num">{isZero(l.credit) ? "" : amount(l.credit)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </Card>
-              ))}
             </div>
           )
         }

@@ -11,6 +11,7 @@
   is derived from bill lines (cancelled bills excluded), like invoiced quantity on sales.
 * Bill lines from an order keep the order's unit cost, so the clearing account
   empties exactly; a different price means editing the order first.
+* Vendor credits (goods sent back, allowances) are in ``credit.py``.
 """
 
 from __future__ import annotations
@@ -255,15 +256,25 @@ def pay_bill(db: Session, bill: VendorBill, *, amount_minor: int, payment_date: 
                           created_by=user_id)
     db.add(payment)
     bill.amount_paid_minor += amount_minor
-    bill.status = "paid" if bill.amount_paid_minor == bill.total_minor else "partially_paid"
+    settle(bill)
     db.flush()
     return payment, True
+
+
+def settle(bill: VendorBill) -> None:
+    """Status after a payment or a vendor credit: paid/credited when nothing is due, else (partially) paid."""
+    if bill.amount_due_minor == 0:
+        bill.status = "paid" if bill.amount_paid_minor > 0 else "credited"
+    else:
+        bill.status = "partially_paid" if bill.amount_paid_minor > 0 else "posted"
 
 
 def cancel_bill(db: Session, bill: VendorBill, *, user_id: str, cancel_date: date) -> JournalEntry:
     if bill.status != "posted":
         raise PurchaseStateError("only posted bills without payments can be cancelled" if bill.status != "draft"
                                  else "draft bills are deleted, not cancelled")
+    if bill.amount_credited_minor:
+        raise PurchaseStateError("bills with vendor credits cannot be cancelled; credit the rest instead")
     if cancel_date < bill.bill_date:
         raise PurchaseValidationError("cancellation date cannot be before the bill date")
     reversal = reverse_entry(db, db.get(JournalEntry, bill.journal_entry_id), entry_date=cancel_date,
@@ -278,7 +289,7 @@ class BillLocked(RuntimeError):
     pass
 
 
-_MUTABLE_AFTER_POST = {"status", "amount_paid_minor", "reversal_entry_id", "cancelled_at",
+_MUTABLE_AFTER_POST = {"status", "amount_paid_minor", "amount_credited_minor", "reversal_entry_id", "cancelled_at",
                        "number", "journal_entry_id", "posted_at", "posted_by"}
 
 

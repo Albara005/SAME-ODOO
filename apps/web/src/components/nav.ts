@@ -21,6 +21,7 @@ import {
   UsersRound,
   Workflow,
   BarChart3,
+  Landmark,
   type LucideIcon,
 } from "lucide-react";
 import type { MessageKey } from "../i18n/en";
@@ -40,6 +41,7 @@ export const NAV: NavGroup[] = [
       { to: "invoices", label: "nav.invoices", icon: FileText, anyOf: ["invoices.read"], hue: "emerald", desc: "app.invoices" },
       { to: "purchases", label: "nav.purchases", icon: ShoppingBag, anyOf: ["purchases.read"], hue: "cyan", desc: "app.purchases" },
       { to: "inventory", label: "nav.inventory", icon: Boxes, anyOf: ["inventory.read"], hue: "terracotta", desc: "app.inventory" },
+      { to: "accounting", label: "nav.accounting", icon: Landmark, anyOf: ["accounting.read"], hue: "gold", desc: "app.accounting" },
       { to: "reports", label: "nav.reports", icon: BarChart3, anyOf: ["invoices.read", "accounting.read"], hue: "violet", desc: "app.reports" },
     ],
   },

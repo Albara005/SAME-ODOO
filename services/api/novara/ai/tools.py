@@ -89,7 +89,7 @@ def _search_products(t: ToolContext, a: SearchArgs):
 
 
 class InvoiceQuery(BaseModel):
-    status: Literal["draft", "posted", "partially_paid", "paid", "cancelled"] | None = None
+    status: Literal["draft", "posted", "partially_paid", "paid", "credited", "cancelled"] | None = None
     customer_id: str | None = None
     overdue_only: bool = Field(default=False, description="Only posted invoices past their due date with money owed")
     limit: int = Field(default=20, ge=1, le=100)

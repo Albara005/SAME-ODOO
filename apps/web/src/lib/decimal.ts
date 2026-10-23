@@ -105,3 +105,14 @@ export function subtractDec(a: string, b: string): string {
   const s = formatUnits(n, scale);
   return scale ? s.replace(/\.?0+$/, "") : s;
 }
+
+/** Exact sum of decimal strings, formatted with `digits` decimals; blank or invalid entries count as zero. */
+export function sumDec(values: string[], digits: number): string {
+  let total = 0n;
+  for (const v of values) {
+    const d = parseDec(v);
+    if (!d) continue;
+    total += d.scale <= digits ? d.n * pow10(digits - d.scale) : roundRational(d.n, pow10(d.scale), digits);
+  }
+  return formatUnits(total, digits);
+}

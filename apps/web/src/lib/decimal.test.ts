@@ -1,4 +1,4 @@
-import { computeTotals, formatUnits, parseDec, subtractDec } from "./decimal";
+import { computeTotals, formatUnits, parseDec, subtractDec, sumDec } from "./decimal";
 
 const line = (quantity: string, unitPrice: string, taxRate = "0", discount = "0", taxKey: string | null = taxRate !== "0" ? "vat" : null) =>
   ({ quantity, unitPrice, discount, taxKey, taxRate });
@@ -38,4 +38,13 @@ it("subtracts quantities exactly", () => {
   expect(subtractDec("3.0000", "3")).toBe("0");
   expect(subtractDec("1", "1.25")).toBe("-0.25");
   expect(subtractDec("5", "x")).toBe("0");
+});
+
+describe("sumDec", () => {
+  it("adds exactly, ignoring blanks", () => {
+    expect(sumDec(["0.1", "0.2", "", "abc"], 2)).toBe("0.30");
+    expect(sumDec(["1200", "33.335"], 2)).toBe("1233.34");
+    expect(sumDec(["-5", "2.5"], 3)).toBe("-2.500");
+    expect(sumDec([], 2)).toBe("0.00");
+  });
 });

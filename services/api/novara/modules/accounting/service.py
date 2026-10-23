@@ -32,6 +32,7 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     ("2150", "Goods Received Not Invoiced", "liability", "grni"),
     ("2200", "Output VAT Payable", "liability", "vat_output"),
     ("3000", "Owner's Equity", "equity", "equity"),
+    ("3100", "Retained Earnings", "equity", "retained_earnings"),
     ("4000", "Sales Revenue", "income", "sales"),
     ("5000", "Cost of Goods Sold", "expense", "cogs"),
     ("5100", "Inventory Adjustments", "expense", "inventory_adjustment"),
@@ -49,6 +50,12 @@ class LedgerImmutable(RuntimeError):
 
 class PeriodLocked(LedgerError):
     """The date falls in closed books (HTTP 409)."""
+
+
+# Accounts with a subledger behind them (customer and vendor balances, stock value, goods awaiting a
+# bill). Only documents post to them, so the subledgers always agree with the ledger.
+CONTROL_ACCOUNTS = ("receivable", "payable", "inventory", "grni")
+YEAR_END = "year_end_close"
 
 
 @dataclass(frozen=True)
@@ -200,12 +207,15 @@ class TrialBalanceRow:
         return self.debit_minor - self.credit_minor
 
 
-def trial_balance(db: Session, *, as_of: date | None = None, date_from: date | None = None) -> list[TrialBalanceRow]:
+def trial_balance(db: Session, *, as_of: date | None = None, date_from: date | None = None,
+                  exclude_sources: tuple[str, ...] = ()) -> list[TrialBalanceRow]:
     stmt = (
         select(JournalLine.account_id, func.sum(JournalLine.debit_minor), func.sum(JournalLine.credit_minor))
         .join(JournalEntry, JournalEntry.id == JournalLine.entry_id)
         .group_by(JournalLine.account_id)
     )
+    if exclude_sources:
+        stmt = stmt.where(JournalEntry.source_type.not_in(exclude_sources))
     if as_of is not None:
         stmt = stmt.where(JournalEntry.entry_date <= as_of)
     if date_from is not None:
@@ -242,7 +252,8 @@ class ProfitAndLoss:
 
 
 def profit_and_loss(db: Session, *, date_from: date | None, date_to: date | None) -> ProfitAndLoss:
-    rows = trial_balance(db, as_of=date_to, date_from=date_from)
+    # Year-end closing entries move the result into retained earnings; they are not income or expenses.
+    rows = trial_balance(db, as_of=date_to, date_from=date_from, exclude_sources=(YEAR_END,))
     return ProfitAndLoss(income=[r for r in rows if r.account.type == "income"],
                          expenses=[r for r in rows if r.account.type == "expense"])
 
@@ -275,6 +286,77 @@ def balance_sheet(db: Session, *, as_of: date | None) -> BalanceSheet:
     return BalanceSheet(assets=[r for r in rows if r.account.type == "asset"],
                         liabilities=[r for r in rows if r.account.type == "liability"],
                         equity=[r for r in rows if r.account.type == "equity"], earnings_minor=pnl.net_profit)
+
+
+# ---------------------------------------------------------------- manual entries and closing the year
+
+
+def post_manual_entry(db: Session, *, entry_date: date, currency: str, memo: str,
+                      lines: list[tuple[str, int, int, str]], created_by: str) -> JournalEntry:
+    """An accountant's own entry. ``lines`` are (account id, debit, credit, label)."""
+    accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_({l[0] for l in lines})))}
+    specs = []
+    for n, (account_id, debit, credit, label) in enumerate(lines, start=1):
+        account = accounts.get(account_id)
+        if account is None:
+            raise LedgerError(f"line {n}: unknown account")
+        if not account.active:
+            raise LedgerError(f"line {n}: account {account.code} is archived")
+        if account.system_key in CONTROL_ACCOUNTS:
+            raise LedgerError(f"line {n}: {account.code} {account.name} is kept by documents "
+                              "(invoices, bills, payments, stock); post to it through them")
+        if (debit > 0) == (credit > 0):
+            raise LedgerError(f"line {n}: enter either a debit or a credit")
+        specs.append(LineSpec(account, debit_minor=debit, credit_minor=credit, label=label))
+    return post_entry(db, entry_date=entry_date, currency=currency, lines=specs, memo=memo,
+                      source_type="manual", created_by=created_by)
+
+
+REVERSIBLE_SOURCES = ("manual", YEAR_END)
+
+
+def reverse_manual(db: Session, entry: JournalEntry, *, entry_date: date, memo: str,
+                   created_by: str) -> JournalEntry:
+    """Reverse an accountant's own entry or a year-end close. Document entries are reversed by
+    cancelling or crediting the document, so the document and the ledger never disagree."""
+    if entry.source_type not in REVERSIBLE_SOURCES:
+        raise LedgerError("this entry belongs to a document; cancel or credit the document instead")
+    if entry.reversal_of_id is not None:
+        raise LedgerError("this entry is itself a reversal")
+    if db.scalar(select(JournalEntry.id).where(JournalEntry.reversal_of_id == entry.id)) is not None:
+        raise LedgerError("this entry has already been reversed")
+    if entry_date < entry.entry_date:
+        raise LedgerError("the reversal cannot be dated before the entry")
+    return reverse_entry(db, entry, entry_date=entry_date, memo=memo, created_by=created_by)
+
+
+def last_year_end(db: Session) -> date | None:
+    """The date of the latest year-end close still in force (not reversed)."""
+    reversed_ids = select(JournalEntry.reversal_of_id).where(JournalEntry.reversal_of_id.is_not(None))
+    return db.scalar(select(func.max(JournalEntry.entry_date)).where(
+        JournalEntry.source_type == YEAR_END, JournalEntry.reversal_of_id.is_(None),
+        JournalEntry.id.not_in(reversed_ids)))
+
+
+def close_year(db: Session, *, period_end: date, currency: str, created_by: str) -> JournalEntry:
+    """Move the result of the period into retained earnings: every income and expense account
+    goes to zero as of ``period_end``, and the difference (profit or loss) lands in retained earnings."""
+    previous = last_year_end(db)
+    if previous is not None and period_end <= previous:
+        raise LedgerError(f"the year is already closed up to {previous.isoformat()}")
+    rows = [r for r in trial_balance(db, as_of=period_end)
+            if r.account.type in ("income", "expense") and r.balance_minor]
+    if not rows:
+        raise LedgerError("nothing to close: no income or expenses in the period")
+    label = f"Year-end close {period_end.isoformat()}"
+    specs = [LineSpec(r.account, credit_minor=r.balance_minor, label=label) if r.balance_minor > 0
+             else LineSpec(r.account, debit_minor=-r.balance_minor, label=label) for r in rows]
+    result = -sum(r.balance_minor for r in rows)  # credits exceed debits: a profit
+    retained = system_account(db, "retained_earnings")
+    specs.append(LineSpec(retained, credit_minor=result, label=label) if result > 0
+                 else LineSpec(retained, debit_minor=-result, label=label))
+    return post_entry(db, entry_date=period_end, currency=currency, lines=specs, memo=label,
+                      source_type=YEAR_END, source_id=period_end.isoformat(), created_by=created_by)
 
 
 @event.listens_for(Session, "before_flush")

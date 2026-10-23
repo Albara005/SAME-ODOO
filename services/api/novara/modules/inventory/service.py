@@ -3,6 +3,8 @@
     receipt      Dr Inventory              Cr payable / equity / bank / cash / goods received not invoiced
     delivery     Dr Cost of Goods Sold     Cr Inventory
     return       Dr Inventory              Cr Cost of Goods Sold   (goods a customer sent back)
+    vendor return                          Cr Inventory            (goods sent back to a vendor; the
+                                                                    vendor credit posts the entry)
     adjustment   Dr/Cr Inventory           Cr/Dr Inventory Adjustments
 
 Costing is weighted average per warehouse. A delivery takes value
@@ -187,6 +189,33 @@ def return_in(db: Session, *, warehouse: Warehouse, move_date: date, currency: s
                            memo=f"Customer return {reference}", source_type="stock", source_id=reference,
                            lines=[LineSpec(system_account(db, "inventory"), debit_minor=total, label=reference),
                                   LineSpec(system_account(db, "cogs"), credit_minor=total, label=reference)])
+    return _save(db, reference, moves, entry)
+
+
+def send_back(db: Session, *, warehouse: Warehouse, move_date: date,
+              lines: list[tuple[Product, Decimal, str | None]], source_type: str, source_id: str,
+              user_id: str) -> tuple[str, list[StockMove]]:
+    """Take goods out of stock at average cost to return them to a vendor. ``lines`` are
+    (product, quantity, source line id). The caller posts one journal entry for the whole
+    vendor credit (stock value included) and then calls ``attach``."""
+    reference = next_number(db, f"vendor_return:{move_date.year}", f"VRT-{move_date.year}-")
+    moves = []
+    for product, qty, source_line_id in lines:
+        _stockable(product)
+        if qty <= 0:
+            raise InventoryError("returned quantity must be positive")
+        level = stock_level(db, product.id, warehouse.id)
+        if level.quantity < qty:
+            raise InsufficientStock(f"only {level.quantity.normalize():f} of '{product.name}' left in {warehouse.code}")
+        value = _outgoing_value(level, qty)
+        moves.append(_move(db, level, reference=reference, kind="vendor_return", qty=-qty, value_minor=-value,
+                           move_date=move_date, user_id=user_id, source_type=source_type, source_id=source_id,
+                           source_line_id=source_line_id))
+    return reference, moves
+
+
+def attach(db: Session, reference: str, moves: list[StockMove], entry: JournalEntry | None) -> StockResult:
+    """Save moves prepared by ``send_back`` with the journal entry that values them."""
     return _save(db, reference, moves, entry)
 
 

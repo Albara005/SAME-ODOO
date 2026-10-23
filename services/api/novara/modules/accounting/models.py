@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -65,6 +65,9 @@ class JournalEntry(IdMixin, TimestampMixin, TenantScoped, Base):
         org_unique_id(),
         UniqueConstraint("organization_id", "number", name="uq_journal_org_number"),
         same_org_fk("reversal_of_id", "journal_entries"),
+        # An entry is reversed at most once, however many requests try at the same moment.
+        Index("uq_journal_entry_reversed_once", "organization_id", "reversal_of_id", unique=True,
+              postgresql_where=text("reversal_of_id IS NOT NULL"), sqlite_where=text("reversal_of_id IS NOT NULL")),
     )
 
     number: Mapped[str] = mapped_column(String(40), nullable=False)

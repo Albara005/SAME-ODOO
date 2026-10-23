@@ -1,6 +1,35 @@
 {
  "components": {
   "schemas": {
+   "AccountIn": {
+    "properties": {
+     "code": {
+      "maxLength": 20,
+      "minLength": 1,
+      "pattern": "^[0-9A-Za-z.\\-]+$",
+      "title": "Code",
+      "type": "string"
+     },
+     "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "type": {
+      "pattern": "^(asset|liability|equity|income|expense)$",
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code",
+     "name",
+     "type"
+    ],
+    "title": "AccountIn",
+    "type": "object"
+   },
    "AccountOut": {
     "properties": {
      "active": {
@@ -10,6 +39,11 @@
      "code": {
       "title": "Code",
       "type": "string"
+     },
+     "control": {
+      "default": false,
+      "title": "Control",
+      "type": "boolean"
      },
      "id": {
       "title": "Id",
@@ -44,6 +78,36 @@
      "active"
     ],
     "title": "AccountOut",
+    "type": "object"
+   },
+   "AccountUpdate": {
+    "properties": {
+     "active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Active"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     }
+    },
+    "title": "AccountUpdate",
     "type": "object"
    },
    "ActionOut": {
@@ -699,6 +763,16 @@
       ],
       "title": "Purchase Order Line Id"
      },
+     "qty_credited": {
+      "default": "0",
+      "title": "Qty Credited",
+      "type": "string"
+     },
+     "qty_returned": {
+      "default": "0",
+      "title": "Qty Returned",
+      "type": "string"
+     },
      "quantity": {
       "title": "Quantity",
       "type": "string"
@@ -741,6 +815,11 @@
    },
    "BillOut": {
     "properties": {
+     "amount_credited": {
+      "default": "0",
+      "title": "Amount Credited",
+      "type": "string"
+     },
      "amount_due": {
       "title": "Amount Due",
       "type": "string"
@@ -2769,6 +2848,17 @@
       ],
       "title": "Reversal Of Id"
      },
+     "reversed_by_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reversed By Id"
+     },
      "source_id": {
       "title": "Source Id",
       "type": "string"
@@ -2802,6 +2892,11 @@
       "title": "Account Id",
       "type": "string"
      },
+     "account_name": {
+      "default": "",
+      "title": "Account Name",
+      "type": "string"
+     },
      "credit": {
       "title": "Credit",
       "type": "string"
@@ -2824,6 +2919,17 @@
      "label": {
       "title": "Label",
       "type": "string"
+     },
+     "vendor_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vendor Id"
      }
     },
     "required": [
@@ -3465,6 +3571,82 @@
      "name"
     ],
     "title": "LogoSpec",
+    "type": "object"
+   },
+   "ManualEntryIn": {
+    "properties": {
+     "entry_date": {
+      "format": "date",
+      "title": "Entry Date",
+      "type": "string"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/ManualLineIn"
+      },
+      "maxItems": 100,
+      "minItems": 2,
+      "title": "Lines",
+      "type": "array"
+     },
+     "memo": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Memo",
+      "type": "string"
+     }
+    },
+    "required": [
+     "entry_date",
+     "memo",
+     "lines"
+    ],
+    "title": "ManualEntryIn",
+    "type": "object"
+   },
+   "ManualLineIn": {
+    "properties": {
+     "account_id": {
+      "title": "Account Id",
+      "type": "string"
+     },
+     "credit": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "default": "0",
+      "title": "Credit"
+     },
+     "debit": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "default": "0",
+      "title": "Debit"
+     },
+     "label": {
+      "default": "",
+      "maxLength": 300,
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "account_id"
+    ],
+    "title": "ManualLineIn",
     "type": "object"
    },
    "MemberIn": {
@@ -5880,6 +6062,26 @@
     "title": "ResetRequestIn",
     "type": "object"
    },
+   "ReverseIn": {
+    "properties": {
+     "entry_date": {
+      "format": "date",
+      "title": "Entry Date",
+      "type": "string"
+     },
+     "memo": {
+      "default": "",
+      "maxLength": 300,
+      "title": "Memo",
+      "type": "string"
+     }
+    },
+    "required": [
+     "entry_date"
+    ],
+    "title": "ReverseIn",
+    "type": "object"
+   },
    "RoleIn": {
     "properties": {
      "key": {
@@ -7055,6 +7257,333 @@
     "title": "ValuationOut",
     "type": "object"
    },
+   "VendorCreditIn": {
+    "properties": {
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/VendorCreditLineIn"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Lines",
+      "type": "array"
+     },
+     "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+     },
+     "vendor_reference": {
+      "default": "",
+      "maxLength": 60,
+      "title": "Vendor Reference",
+      "type": "string"
+     }
+    },
+    "required": [
+     "issue_date",
+     "reason",
+     "lines"
+    ],
+    "title": "VendorCreditIn",
+    "type": "object"
+   },
+   "VendorCreditLineIn": {
+    "properties": {
+     "bill_line_id": {
+      "title": "Bill Line Id",
+      "type": "string"
+     },
+     "quantity": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Quantity"
+     },
+     "returned_quantity": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "default": "0",
+      "title": "Returned Quantity"
+     }
+    },
+    "required": [
+     "bill_line_id",
+     "quantity"
+    ],
+    "title": "VendorCreditLineIn",
+    "type": "object"
+   },
+   "VendorCreditLineOut": {
+    "properties": {
+     "bill_line_id": {
+      "title": "Bill Line Id",
+      "type": "string"
+     },
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "net_amount": {
+      "title": "Net Amount",
+      "type": "string"
+     },
+     "quantity": {
+      "title": "Quantity",
+      "type": "string"
+     },
+     "returned_quantity": {
+      "title": "Returned Quantity",
+      "type": "string"
+     },
+     "tax_rate": {
+      "title": "Tax Rate",
+      "type": "string"
+     },
+     "unit_cost": {
+      "title": "Unit Cost",
+      "type": "string"
+     }
+    },
+    "required": [
+     "bill_line_id",
+     "description",
+     "quantity",
+     "unit_cost",
+     "tax_rate",
+     "net_amount",
+     "returned_quantity"
+    ],
+    "title": "VendorCreditLineOut",
+    "type": "object"
+   },
+   "VendorCreditOut": {
+    "properties": {
+     "applied": {
+      "title": "Applied",
+      "type": "string"
+     },
+     "bill_id": {
+      "title": "Bill Id",
+      "type": "string"
+     },
+     "bill_number": {
+      "title": "Bill Number",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "journal_entry_id": {
+      "title": "Journal Entry Id",
+      "type": "string"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/VendorCreditLineOut"
+      },
+      "title": "Lines",
+      "type": "array"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "refundable": {
+      "title": "Refundable",
+      "type": "string"
+     },
+     "refunded": {
+      "title": "Refunded",
+      "type": "string"
+     },
+     "stock_reference": {
+      "title": "Stock Reference",
+      "type": "string"
+     },
+     "subtotal": {
+      "title": "Subtotal",
+      "type": "string"
+     },
+     "tax": {
+      "title": "Tax",
+      "type": "string"
+     },
+     "taxes": {
+      "items": {
+       "$ref": "#/components/schemas/VendorCreditTaxOut"
+      },
+      "title": "Taxes",
+      "type": "array"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     },
+     "vendor_id": {
+      "title": "Vendor Id",
+      "type": "string"
+     },
+     "vendor_name": {
+      "title": "Vendor Name",
+      "type": "string"
+     },
+     "vendor_reference": {
+      "title": "Vendor Reference",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "bill_id",
+     "bill_number",
+     "vendor_id",
+     "vendor_name",
+     "vendor_reference",
+     "issue_date",
+     "currency",
+     "reason",
+     "subtotal",
+     "tax",
+     "total",
+     "applied",
+     "refunded",
+     "refundable",
+     "stock_reference",
+     "journal_entry_id",
+     "created_at",
+     "lines",
+     "taxes"
+    ],
+    "title": "VendorCreditOut",
+    "type": "object"
+   },
+   "VendorCreditSummary": {
+    "properties": {
+     "bill_id": {
+      "title": "Bill Id",
+      "type": "string"
+     },
+     "bill_number": {
+      "title": "Bill Number",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "refundable": {
+      "title": "Refundable",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     },
+     "vendor_id": {
+      "title": "Vendor Id",
+      "type": "string"
+     },
+     "vendor_name": {
+      "title": "Vendor Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "bill_id",
+     "bill_number",
+     "vendor_id",
+     "vendor_name",
+     "issue_date",
+     "total",
+     "refundable"
+    ],
+    "title": "VendorCreditSummary",
+    "type": "object"
+   },
+   "VendorCreditTaxOut": {
+    "properties": {
+     "amount": {
+      "title": "Amount",
+      "type": "string"
+     },
+     "base": {
+      "title": "Base",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "rate": {
+      "title": "Rate",
+      "type": "string"
+     },
+     "tax_id": {
+      "title": "Tax Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "tax_id",
+     "name",
+     "rate",
+     "base",
+     "amount"
+    ],
+    "title": "VendorCreditTaxOut",
+    "type": "object"
+   },
    "VendorIn": {
     "properties": {
      "address_line": {
@@ -7213,6 +7742,95 @@
      "created_at"
     ],
     "title": "VendorOut",
+    "type": "object"
+   },
+   "VendorRefundIn": {
+    "properties": {
+     "amount": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Amount"
+     },
+     "method": {
+      "pattern": "^(bank|cash)$",
+      "title": "Method",
+      "type": "string"
+     },
+     "reference": {
+      "default": "",
+      "maxLength": 120,
+      "title": "Reference",
+      "type": "string"
+     },
+     "refund_date": {
+      "format": "date",
+      "title": "Refund Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "amount",
+     "refund_date",
+     "method"
+    ],
+    "title": "VendorRefundIn",
+    "type": "object"
+   },
+   "VendorRefundOut": {
+    "properties": {
+     "amount": {
+      "title": "Amount",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "credit_id": {
+      "title": "Credit Id",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "journal_entry_id": {
+      "title": "Journal Entry Id",
+      "type": "string"
+     },
+     "method": {
+      "title": "Method",
+      "type": "string"
+     },
+     "reference": {
+      "title": "Reference",
+      "type": "string"
+     },
+     "refund_date": {
+      "format": "date",
+      "title": "Refund Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "credit_id",
+     "refund_date",
+     "amount",
+     "method",
+     "reference",
+     "journal_entry_id",
+     "created_at"
+    ],
+    "title": "VendorRefundOut",
     "type": "object"
    },
    "VersionIn": {
@@ -7481,6 +8099,69 @@
      }
     },
     "title": "WorkflowUpdate",
+    "type": "object"
+   },
+   "YearEndIn": {
+    "properties": {
+     "lock": {
+      "default": true,
+      "title": "Lock",
+      "type": "boolean"
+     },
+     "period_end": {
+      "format": "date",
+      "title": "Period End",
+      "type": "string"
+     }
+    },
+    "required": [
+     "period_end"
+    ],
+    "title": "YearEndIn",
+    "type": "object"
+   },
+   "YearEndOut": {
+    "properties": {
+     "entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/JournalEntryOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "last_closed": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Closed"
+     },
+     "locked_until": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Locked Until"
+     }
+    },
+    "required": [
+     "last_closed",
+     "locked_until"
+    ],
+    "title": "YearEndOut",
     "type": "object"
    },
    "novara__agents__router__RunOut": {
@@ -8687,6 +9368,128 @@
     "tags": [
      "accounting"
     ]
+   },
+   "post": {
+    "operationId": "create_account_api_v1_orgs__org_id__accounting_accounts_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AccountIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AccountOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Account",
+    "tags": [
+     "accounting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/accounting/accounts/{account_id}": {
+   "patch": {
+    "description": "Rename or archive an account. Codes and types are fixed once created: reports depend on them.",
+    "operationId": "update_account_api_v1_orgs__org_id__accounting_accounts__account_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "account_id",
+      "required": true,
+      "schema": {
+       "title": "Account Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AccountUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AccountOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Account",
+    "tags": [
+     "accounting"
+    ]
    }
   },
   "/api/v1/orgs/{org_id}/accounting/balance-sheet": {
@@ -8800,6 +9603,40 @@
      },
      {
       "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
       "name": "limit",
       "required": false,
       "schema": {
@@ -8843,6 +9680,146 @@
      }
     ],
     "summary": "List Journal Entries",
+    "tags": [
+     "accounting"
+    ]
+   },
+   "post": {
+    "description": "A manual journal entry: accruals, depreciation, owner contributions, corrections between accounts.\nIt must balance; accounts kept by documents (receivable, payable, inventory) are refused.",
+    "operationId": "create_manual_entry_api_v1_orgs__org_id__accounting_journal_entries_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ManualEntryIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JournalEntryOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Manual Entry",
+    "tags": [
+     "accounting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/accounting/journal-entries/{entry_id}/reverse": {
+   "post": {
+    "description": "Undo a manual entry or a year-end close with a mirror entry (entries are never edited or deleted).",
+    "operationId": "reverse_journal_entry_api_v1_orgs__org_id__accounting_journal_entries__entry_id__reverse_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "entry_id",
+      "required": true,
+      "schema": {
+       "title": "Entry Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReverseIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JournalEntryOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reverse Journal Entry",
     "tags": [
      "accounting"
     ]
@@ -9171,6 +10148,109 @@
      }
     ],
     "summary": "Get Trial Balance",
+    "tags": [
+     "accounting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/accounting/year-end": {
+   "get": {
+    "operationId": "get_year_end_api_v1_orgs__org_id__accounting_year_end_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/YearEndOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Year End",
+    "tags": [
+     "accounting"
+    ]
+   },
+   "post": {
+    "description": "Close the year: income and expenses go to zero and the result moves into retained earnings.\nBy default the books are closed up to the same day, so the closed year can't change afterwards.",
+    "operationId": "post_year_end_api_v1_orgs__org_id__accounting_year_end_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/YearEndIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/YearEndOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Post Year End",
     "tags": [
      "accounting"
     ]
@@ -11178,6 +12258,90 @@
     "summary": "Cancel Bill",
     "tags": [
      "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bills/{bill_id}/credits": {
+   "post": {
+    "description": "Record a vendor's credit against a posted bill; optionally send received goods back.",
+    "operationId": "create_vendor_credit_api_v1_orgs__org_id__bills__bill_id__credits_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "bill_id",
+      "required": true,
+      "schema": {
+       "title": "Bill Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VendorCreditIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VendorCreditOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Vendor Credit",
+    "tags": [
+     "vendor credits"
     ]
    }
   },
@@ -18780,6 +19944,310 @@
     "summary": "Update Tax",
     "tags": [
      "accounting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/vendor-credits": {
+   "get": {
+    "operationId": "list_vendor_credits_api_v1_orgs__org_id__vendor_credits_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "bill_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Bill Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "vendor_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Vendor Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/VendorCreditSummary"
+         },
+         "title": "Response List Vendor Credits Api V1 Orgs  Org Id  Vendor Credits Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Vendor Credits",
+    "tags": [
+     "vendor credits"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/vendor-credits/{credit_id}": {
+   "get": {
+    "operationId": "read_vendor_credit_api_v1_orgs__org_id__vendor_credits__credit_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "credit_id",
+      "required": true,
+      "schema": {
+       "title": "Credit Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VendorCreditOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Read Vendor Credit",
+    "tags": [
+     "vendor credits"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/vendor-credits/{credit_id}/refunds": {
+   "get": {
+    "operationId": "list_vendor_refunds_api_v1_orgs__org_id__vendor_credits__credit_id__refunds_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "credit_id",
+      "required": true,
+      "schema": {
+       "title": "Credit Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/VendorRefundOut"
+         },
+         "title": "Response List Vendor Refunds Api V1 Orgs  Org Id  Vendor Credits  Credit Id  Refunds Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Vendor Refunds",
+    "tags": [
+     "vendor credits"
+    ]
+   },
+   "post": {
+    "description": "Record money the vendor paid back (the part of a credit that didn't reduce an open bill).",
+    "operationId": "record_vendor_refund_api_v1_orgs__org_id__vendor_credits__credit_id__refunds_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "credit_id",
+      "required": true,
+      "schema": {
+       "title": "Credit Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VendorRefundIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VendorRefundOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Record Vendor Refund",
+    "tags": [
+     "vendor credits"
     ]
    }
   },

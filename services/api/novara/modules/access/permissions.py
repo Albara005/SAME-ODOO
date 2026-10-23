@@ -36,6 +36,7 @@ INVOICES_CREDIT = "invoices.credit"
 PAYMENTS_WRITE = "payments.write"
 ACCOUNTING_READ = "accounting.read"
 ACCOUNTING_CLOSE = "accounting.close"
+ACCOUNTING_JOURNAL = "accounting.journal"
 PURCHASES_READ = "purchases.read"
 PURCHASES_WRITE = "purchases.write"
 BILLS_POST = "bills.post"
@@ -76,7 +77,8 @@ CATALOG: dict[str, str] = {
     INVOICES_CREDIT: "Issue credit notes (and take back returned goods) against posted invoices",
     PAYMENTS_WRITE: "Register customer payments, refunds and payments to vendors",
     ACCOUNTING_READ: "View the chart of accounts, journal and financial reports",
-    ACCOUNTING_CLOSE: "Close the books up to a date (nothing can be posted on or before it)",
+    ACCOUNTING_CLOSE: "Close the books up to a date, and close the year into retained earnings",
+    ACCOUNTING_JOURNAL: "Post and reverse manual journal entries, add and archive accounts",
     PURCHASES_READ: "View vendors, purchase orders and vendor bills",
     PURCHASES_WRITE: "Create vendors, purchase orders and draft vendor bills",
     BILLS_POST: "Post and cancel vendor bills",
@@ -103,7 +105,7 @@ _SALES = [CUSTOMERS_READ, CUSTOMERS_WRITE, PRODUCTS_READ, INVOICES_READ, INVOICE
           SALES_READ, SALES_WRITE, INVENTORY_READ]
 _ACCOUNTING = [
     CUSTOMERS_READ, PRODUCTS_READ, INVOICES_READ, INVOICES_POST, INVOICES_CANCEL, INVOICES_CREDIT,
-    PAYMENTS_WRITE, ACCOUNTING_READ, ACCOUNTING_CLOSE, TAXES_MANAGE, SALES_READ, INVENTORY_READ,
+    PAYMENTS_WRITE, ACCOUNTING_READ, ACCOUNTING_CLOSE, ACCOUNTING_JOURNAL, TAXES_MANAGE, SALES_READ, INVENTORY_READ,
     PURCHASES_READ, BILLS_POST,
 ]
 # Receiving goods against purchase orders is warehouse work.

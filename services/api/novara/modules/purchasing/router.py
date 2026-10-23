@@ -23,7 +23,8 @@ from novara.modules.invoicing.router import AGING_BUCKETS, _bucket
 from novara.modules.partners.models import Vendor
 from novara.modules.partners.router import CustomerFields, CustomerUpdate
 from novara.modules.purchasing import service as svc
-from novara.modules.purchasing.models import BillPayment, PurchaseOrder, PurchaseOrderLine, VendorBill, VendorBillLine
+from novara.modules.purchasing.models import (BillPayment, PurchaseOrder, PurchaseOrderLine, VendorBill, VendorBillLine,
+                                              VendorCredit, VendorCreditLine)
 from novara.money import fmt_decimal, from_minor, to_minor
 
 router = APIRouter(tags=["purchases"])
@@ -450,6 +451,8 @@ class BillLineOut(BaseModel):
     net_amount: str
     account_id: str | None
     purchase_order_line_id: str | None
+    qty_credited: str = "0"  # by vendor credits
+    qty_returned: str = "0"  # sent back to the vendor
 
 
 class BillOut(BaseModel):
@@ -467,6 +470,7 @@ class BillOut(BaseModel):
     tax: str
     total: str
     amount_paid: str
+    amount_credited: str = "0"
     amount_due: str
     journal_entry_id: str | None
     reversal_entry_id: str | None
@@ -510,18 +514,29 @@ def _order_of_bill(db: Session, bill: VendorBill) -> PurchaseOrder | None:
 def bill_out(db: Session, bill: VendorBill) -> BillOut:
     c = bill.currency
     order = _order_of_bill(db, bill)
+    credited: dict[str, tuple[Decimal, Decimal]] = {}
+    if bill.amount_credited_minor or bill.status in ("paid", "credited"):
+        rows = db.execute(select(VendorCreditLine.bill_line_id, VendorCreditLine.quantity,
+                                 VendorCreditLine.returned_quantity)
+                          .join(VendorCredit, VendorCredit.id == VendorCreditLine.credit_id)
+                          .where(VendorCredit.bill_id == bill.id))
+        for lid, qty, returned in rows:
+            q, r = credited.get(lid, (Decimal(0), Decimal(0)))
+            credited[lid] = (q + qty, r + returned)
     return BillOut(
         id=bill.id, number=bill.number, vendor_reference=bill.vendor_reference, status=bill.status,
         vendor_id=bill.vendor_id, vendor_name=db.get(Vendor, bill.vendor_id).name, bill_date=bill.bill_date,
         due_date=bill.due_date, currency=c, notes=bill.notes, subtotal=_money(bill.subtotal_minor, c),
         tax=_money(bill.tax_minor, c), total=_money(bill.total_minor, c), amount_paid=_money(bill.amount_paid_minor, c),
-        amount_due=_money(bill.amount_due_minor, c), journal_entry_id=bill.journal_entry_id,
+        amount_credited=_money(bill.amount_credited_minor, c), amount_due=_money(bill.amount_due_minor, c), journal_entry_id=bill.journal_entry_id,
         reversal_entry_id=bill.reversal_entry_id, purchase_order_id=order.id if order else None,
         purchase_order_number=order.number if order else None, posted_at=bill.posted_at, created_at=bill.created_at,
         lines=[BillLineOut(id=l.id, position=l.position, product_id=l.product_id, description=l.description,
                            quantity=fmt_decimal(l.quantity), unit_cost=fmt_decimal(l.unit_cost), tax_id=l.tax_id,
                            tax_rate=fmt_decimal(l.tax_rate), net_amount=_money(l.net_minor, c),
-                           account_id=l.account_id, purchase_order_line_id=l.purchase_order_line_id)
+                           account_id=l.account_id, purchase_order_line_id=l.purchase_order_line_id,
+                           qty_credited=fmt_decimal(credited.get(l.id, (Decimal(0), Decimal(0)))[0]),
+                           qty_returned=fmt_decimal(credited.get(l.id, (Decimal(0), Decimal(0)))[1]))
                for l in svc.bill_lines(db, bill)],
     )
 

@@ -113,3 +113,25 @@ def test_api_role_cannot_mark_hosting_delivered(api, app):
                   json={"kind": "dedicated_database", "size": "small", "region": "me-central"}).json()
     with pytest.raises(DBAPIError, match="only platform operators"):
         _raw(app, org, "UPDATE hosting_requests SET status = 'delivered' WHERE id = :i", {"i": req["id"]})
+
+
+def test_an_entry_is_reversed_at_most_once(app, posted):
+    org, _ = posted
+    with app.state.sessionmaker() as db:
+        bind_tenant(db, org)
+        entry = db.execute(text("SELECT id FROM journal_entries ORDER BY number LIMIT 1")).scalar_one()
+        accounts = db.execute(text("SELECT id FROM accounts ORDER BY code LIMIT 2")).scalars().all()
+
+    def reversal(n):
+        return f"""
+            INSERT INTO journal_entries (id, organization_id, number, entry_date, currency, memo, source_type,
+                                         source_id, reversal_of_id, created_at)
+            VALUES ('rev-{n}', :org, 'REV-{n}', '2026-03-02', 'SAR', '', '', '', :entry, now());
+            INSERT INTO journal_lines (id, organization_id, entry_id, account_id, debit_minor, credit_minor, label)
+            VALUES ('r{n}a', :org, 'rev-{n}', :a, 100, 0, ''), ('r{n}b', :org, 'rev-{n}', :b, 0, 100, '')
+        """
+
+    params = {"org": org, "entry": entry, "a": accounts[0], "b": accounts[1]}
+    _raw(app, org, reversal(1), params)
+    with pytest.raises(DBAPIError, match="uq_journal_entry_reversed_once"):
+        _raw(app, org, reversal(2), params)

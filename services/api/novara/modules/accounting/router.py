@@ -3,18 +3,22 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from novara import idempotency
 from novara.deps import OrgContext, client_ip, get_db, require, require_any
 from novara.modules.access import permissions as P
-from novara.modules.accounting.models import Account, JournalEntry, JournalLine, Tax
-from novara.modules.accounting.service import (TrialBalanceRow, balance_sheet, ensure_chart, natural_balance,
-                                              profit_and_loss, system_account, trial_balance)
+from novara.modules.accounting.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Tax
+from novara.modules.accounting.service import (CONTROL_ACCOUNTS, LedgerError, PeriodLocked, TrialBalanceRow, balance_sheet,
+                                              close_year, ensure_chart, last_year_end, natural_balance,
+                                              post_manual_entry, profit_and_loss, reverse_manual, system_account,
+                                              trial_balance)
 from novara.modules.audit import service as audit
-from novara.money import fmt_decimal, from_minor
+from novara.money import fmt_decimal, from_minor, to_minor
 
 router = APIRouter(tags=["accounting"])
 
@@ -45,14 +49,29 @@ class AccountOut(BaseModel):
     type: str
     system_key: str | None
     active: bool
+    # Kept by documents (receivable, payable, inventory, goods received): no manual entries.
+    control: bool = False
+
+
+class AccountIn(BaseModel):
+    code: str = Field(min_length=1, max_length=20, pattern=r"^[0-9A-Za-z.\-]+$")
+    name: str = Field(min_length=1, max_length=200)
+    type: str = Field(pattern="^(" + "|".join(ACCOUNT_TYPES) + ")$")
+
+
+class AccountUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    active: bool | None = None
 
 
 class JournalLineOut(BaseModel):
     account_id: str
     account_code: str
+    account_name: str = ""
     debit: str
     credit: str
     customer_id: str | None
+    vendor_id: str | None = None
     label: str
 
 
@@ -65,7 +84,44 @@ class JournalEntryOut(BaseModel):
     source_type: str
     source_id: str
     reversal_of_id: str | None
+    reversed_by_id: str | None = None
     lines: list[JournalLineOut]
+
+
+class ManualLineIn(BaseModel):
+    account_id: str
+    debit: Decimal = Field(default=Decimal(0), ge=0, max_digits=18, decimal_places=3)
+    credit: Decimal = Field(default=Decimal(0), ge=0, max_digits=18, decimal_places=3)
+    label: str = Field(default="", max_length=300)
+
+
+class ManualEntryIn(BaseModel):
+    entry_date: date
+    memo: str = Field(min_length=1, max_length=300)
+    lines: list[ManualLineIn] = Field(min_length=2, max_length=100)
+
+
+class ReverseIn(BaseModel):
+    entry_date: date
+    memo: str = Field(default="", max_length=300)
+
+
+class YearEndIn(BaseModel):
+    period_end: date
+    # Also close the books up to the same day, so nothing can be dated into the closed year afterwards.
+    lock: bool = True
+
+    @model_validator(mode="after")
+    def _past(self):
+        if self.period_end >= date.today():
+            raise ValueError("only a past day can end the year being closed")
+        return self
+
+
+class YearEndOut(BaseModel):
+    last_closed: date | None
+    locked_until: date | None
+    entry: JournalEntryOut | None = None
 
 
 class TrialBalanceLine(BaseModel):
@@ -92,7 +148,17 @@ def tax_out(t: Tax) -> TaxOut:
 
 
 def account_out(a: Account) -> AccountOut:
-    return AccountOut(id=a.id, code=a.code, name=a.name, type=a.type, system_key=a.system_key, active=a.active)
+    return AccountOut(id=a.id, code=a.code, name=a.name, type=a.type, system_key=a.system_key, active=a.active,
+                      control=a.system_key in CONTROL_ACCOUNTS)
+
+
+def _ledger(fn):
+    try:
+        return fn()
+    except PeriodLocked:
+        raise  # answered with 409 by the app's handler
+    except LedgerError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
 
 
 @router.get("/orgs/{org_id}/taxes", response_model=list[TaxOut])
@@ -150,6 +216,8 @@ def list_accounts(_: OrgContext = Depends(require(P.ACCOUNTING_READ)), db: Sessi
 def list_journal_entries(
     source_type: str | None = None,
     source_id: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     limit: int = Query(default=50, ge=1, le=500),
     _: OrgContext = Depends(require(P.ACCOUNTING_READ)),
     db: Session = Depends(get_db),
@@ -159,9 +227,19 @@ def list_journal_entries(
         stmt = stmt.where(JournalEntry.source_type == source_type)
     if source_id:
         stmt = stmt.where(JournalEntry.source_id == source_id)
-    entries = db.scalars(stmt).all()
-    lines = db.scalars(select(JournalLine).where(JournalLine.entry_id.in_([e.id for e in entries]))).all()
-    codes = {a.id: a.code for a in db.scalars(select(Account))}
+    if date_from:
+        stmt = stmt.where(JournalEntry.entry_date >= date_from)
+    if date_to:
+        stmt = stmt.where(JournalEntry.entry_date <= date_to)
+    return entries_out(db, list(db.scalars(stmt)))
+
+
+def entries_out(db: Session, entries: list[JournalEntry]) -> list[JournalEntryOut]:
+    ids = [e.id for e in entries]
+    lines = db.scalars(select(JournalLine).where(JournalLine.entry_id.in_(ids))).all()
+    accounts = {a.id: a for a in db.scalars(select(Account))}
+    reversed_by = dict(db.execute(select(JournalEntry.reversal_of_id, JournalEntry.id)
+                                  .where(JournalEntry.reversal_of_id.in_(ids))).all())
     by_entry: dict[str, list[JournalLine]] = {}
     for l in lines:
         by_entry.setdefault(l.entry_id, []).append(l)
@@ -169,16 +247,110 @@ def list_journal_entries(
         JournalEntryOut(
             id=e.id, number=e.number, entry_date=e.entry_date, currency=e.currency, memo=e.memo,
             source_type=e.source_type, source_id=e.source_id, reversal_of_id=e.reversal_of_id,
+            reversed_by_id=reversed_by.get(e.id),
             lines=[
-                JournalLineOut(account_id=l.account_id, account_code=codes[l.account_id],
+                JournalLineOut(account_id=l.account_id, account_code=accounts[l.account_id].code,
+                               account_name=accounts[l.account_id].name,
                                debit=str(from_minor(l.debit_minor, e.currency)),
                                credit=str(from_minor(l.credit_minor, e.currency)),
-                               customer_id=l.customer_id, label=l.label)
-                for l in sorted(by_entry.get(e.id, []), key=lambda l: (l.credit_minor > 0, codes[l.account_id]))
+                               customer_id=l.customer_id, vendor_id=l.vendor_id, label=l.label)
+                for l in sorted(by_entry.get(e.id, []),
+                                key=lambda l: (l.credit_minor > 0, accounts[l.account_id].code))
             ],
         )
         for e in entries
     ]
+
+
+@router.post("/orgs/{org_id}/accounting/journal-entries", response_model=JournalEntryOut,
+             status_code=status.HTTP_201_CREATED)
+def create_manual_entry(body: ManualEntryIn, request: Request, response: Response,
+                        idempotency_key: str | None = Header(default=None, max_length=100),
+                        ctx: OrgContext = Depends(require(P.ACCOUNTING_JOURNAL)), db: Session = Depends(get_db)):
+    """A manual journal entry: accruals, depreciation, owner contributions, corrections between accounts.
+    It must balance; accounts kept by documents (receivable, payable, inventory) are refused."""
+    c = ctx.organization.default_currency
+    h = idempotency.request_hash(body.model_dump(mode="json"))
+    try:
+        previous = idempotency.replayed(db, "journal.manual", idempotency_key, h)
+    except idempotency.IdempotencyConflict as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    if previous:
+        response.status_code = status.HTTP_200_OK
+        return entries_out(db, [db.get(JournalEntry, previous)])[0]
+    lines = [(l.account_id, to_minor(l.debit, c), to_minor(l.credit, c), l.label) for l in body.lines]
+    entry = _ledger(lambda: post_manual_entry(db, entry_date=body.entry_date, currency=c, memo=body.memo,
+                                              lines=lines, created_by=ctx.user.id))
+    idempotency.remember(db, "journal.manual", idempotency_key, h, entry.id)
+    audit.record(db, actor_user_id=ctx.user.id, action="journal.posted", target_type="journal_entry",
+                 target_id=entry.id, details={"number": entry.number, "memo": entry.memo,
+                                              "amount": str(from_minor(sum(l[1] for l in lines), c))},
+                 ip_address=client_ip(request))
+    db.commit()
+    return entries_out(db, [entry])[0]
+
+
+@router.post("/orgs/{org_id}/accounting/journal-entries/{entry_id}/reverse", response_model=JournalEntryOut,
+             status_code=status.HTTP_201_CREATED)
+def reverse_journal_entry(entry_id: str, body: ReverseIn, request: Request,
+                          ctx: OrgContext = Depends(require(P.ACCOUNTING_JOURNAL)), db: Session = Depends(get_db)):
+    """Undo a manual entry or a year-end close with a mirror entry (entries are never edited or deleted)."""
+    entry = db.get(JournalEntry, entry_id)
+    if entry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "journal entry not found")
+    if entry.source_type == "year_end_close" and not ctx.has(P.ACCOUNTING_CLOSE):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "reopening a closed year needs accounting.close")
+    try:
+        reversal = _ledger(lambda: reverse_manual(db, entry, entry_date=body.entry_date,
+                                                  memo=body.memo or f"Reversal of {entry.number}",
+                                                  created_by=ctx.user.id))
+    except IntegrityError:  # another request reversed it a moment ago
+        db.rollback()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "this entry has already been reversed")
+    audit.record(db, actor_user_id=ctx.user.id, action="journal.reversed", target_type="journal_entry",
+                 target_id=entry.id, details={"number": entry.number, "reversal": reversal.number},
+                 ip_address=client_ip(request))
+    db.commit()
+    return entries_out(db, [reversal])[0]
+
+
+@router.post("/orgs/{org_id}/accounting/accounts", response_model=AccountOut, status_code=status.HTTP_201_CREATED)
+def create_account(body: AccountIn, request: Request, ctx: OrgContext = Depends(require(P.ACCOUNTING_JOURNAL)),
+                   db: Session = Depends(get_db)):
+    ensure_chart(db)
+    if db.scalar(select(Account.id).where(Account.code == body.code)) is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"account code {body.code} is already used")
+    account = Account(code=body.code, name=body.name, type=body.type)
+    db.add(account)
+    db.flush()
+    audit.record(db, actor_user_id=ctx.user.id, action="account.created", target_type="account",
+                 target_id=account.id, details={"code": account.code, "name": account.name, "type": account.type},
+                 ip_address=client_ip(request))
+    db.commit()
+    return account_out(account)
+
+
+@router.patch("/orgs/{org_id}/accounting/accounts/{account_id}", response_model=AccountOut)
+def update_account(account_id: str, body: AccountUpdate, request: Request,
+                   ctx: OrgContext = Depends(require(P.ACCOUNTING_JOURNAL)), db: Session = Depends(get_db)):
+    """Rename or archive an account. Codes and types are fixed once created: reports depend on them."""
+    account = db.get(Account, account_id)
+    if account is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "account not found")
+    if body.active is False and account.system_key is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "the platform posts to this account; it can't be archived")
+    if body.active is False:
+        balance = db.scalar(select(func.coalesce(func.sum(JournalLine.debit_minor - JournalLine.credit_minor), 0))
+                            .where(JournalLine.account_id == account.id))
+        if balance:
+            raise HTTPException(status.HTTP_409_CONFLICT, "move the balance to another account before archiving")
+    changes = body.model_dump(exclude_none=True)
+    for field, value in changes.items():
+        setattr(account, field, value)
+    audit.record(db, actor_user_id=ctx.user.id, action="account.updated", target_type="account",
+                 target_id=account.id, details={"code": account.code, **changes}, ip_address=client_ip(request))
+    db.commit()
+    return account_out(account)
 
 
 @router.get("/orgs/{org_id}/accounting/trial-balance", response_model=TrialBalanceOut)
@@ -305,3 +477,29 @@ def set_lock(body: LockIn, request: Request, ctx: OrgContext = Depends(require(P
                  ip_address=client_ip(request))
     db.commit()
     return LockOut(locked_until=ctx.organization.books_locked_until)
+
+
+# ---------------------------------------------------------------- closing the year
+
+
+@router.get("/orgs/{org_id}/accounting/year-end", response_model=YearEndOut)
+def get_year_end(ctx: OrgContext = Depends(require(P.ACCOUNTING_READ)), db: Session = Depends(get_db)):
+    return YearEndOut(last_closed=last_year_end(db), locked_until=ctx.organization.books_locked_until)
+
+
+@router.post("/orgs/{org_id}/accounting/year-end", response_model=YearEndOut, status_code=status.HTTP_201_CREATED)
+def post_year_end(body: YearEndIn, request: Request, ctx: OrgContext = Depends(require(P.ACCOUNTING_CLOSE)),
+                  db: Session = Depends(get_db)):
+    """Close the year: income and expenses go to zero and the result moves into retained earnings.
+    By default the books are closed up to the same day, so the closed year can't change afterwards."""
+    org = ctx.organization
+    entry = _ledger(lambda: close_year(db, period_end=body.period_end, currency=org.default_currency,
+                                       created_by=ctx.user.id))
+    if body.lock and (org.books_locked_until is None or org.books_locked_until < body.period_end):
+        org.books_locked_until = body.period_end
+    audit.record(db, actor_user_id=ctx.user.id, action="books.year_closed", target_type="organization",
+                 target_id=org.id, details={"period_end": body.period_end.isoformat(), "entry": entry.number,
+                                            "locked": body.lock}, ip_address=client_ip(request))
+    db.commit()
+    return YearEndOut(last_closed=last_year_end(db), locked_until=org.books_locked_until,
+                      entry=entries_out(db, [entry])[0])
