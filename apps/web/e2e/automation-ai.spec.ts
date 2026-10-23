@@ -12,7 +12,11 @@ test("assistant: the reply streams in, and a note is kept only after approval", 
   await page.getByLabel("الرسالة").press("Enter");
   await expect(page.getByText("وصلتني رسالتك: «مرحبا بك». هذا رد تجريبي للاختبارات.")).toBeVisible();
 
+  // The first reply may still be finishing (saved, then the chat moves to the new conversation's address):
+  // what's typed meanwhile is kept, and it can be sent once the button is ready.
   await page.getByLabel("الرسالة").fill("تذكّر: الفواتير ترسل إلى قسم المالية");
+  await expect(page.getByRole("button", { name: "إرسال" })).toBeEnabled();
+  await expect(page.getByLabel("الرسالة")).toHaveValue("تذكّر: الفواتير ترسل إلى قسم المالية");
   await page.getByLabel("الرسالة").press("Enter");
   const card = page.locator(".action-card").last();
   await expect(card).toContainText("حفظ ملاحظة");

@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError, unwrap } from "../api/client";
 import { useAuth } from "../auth/Auth";
+import { refreshUser } from "../auth/refreshUser";
 import { rememberOrg } from "../auth/Org";
 import { MailCheck, Sparkle } from "lucide-react";
 import { StarLattice, StarMark } from "../components/Art";
@@ -305,7 +306,7 @@ export function VerifyEmailPage() {
     queryKey: ["verify-email", token],
     queryFn: async () => {
       const result = await unwrap(api.POST("/api/v1/auth/verify-email", { body: { token } }));
-      await qc.invalidateQueries({ queryKey: ["me"] });
+      await refreshUser(qc);
       return result;
     },
     enabled: token.length > 0,
@@ -354,7 +355,7 @@ export function InvitePage() {
     onSuccess: async (org) => {
       rememberOrg(org.id);
       await qc.invalidateQueries({ queryKey: ["orgs"] });
-      await qc.invalidateQueries({ queryKey: ["me"] });
+      await refreshUser(qc);
       navigate(`/o/${org.id}`, { replace: true });
     },
   });

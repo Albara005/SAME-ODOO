@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useAuth } from "../auth/Auth";
+import { refreshUser } from "../auth/refreshUser";
 import { BrandMark, SignOutButton, TopActions } from "../components/Layout";
 import { Badge, Button, Card, Dialog, ErrorNotice, Field, Input, QueryView, useToast } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
@@ -195,7 +196,7 @@ function SetupDialog({ onClose }: { onClose: () => void }) {
   const enable = useMutation({ mutationFn: () => unwrap(api.POST("/api/v1/me/mfa/enable", { body: { code: code.trim() } })) });
   const qr = useQrImage(start.data?.otpauth_uri);
   const finish = () => {
-    void qc.invalidateQueries({ queryKey: ["me"] });
+    void refreshUser(qc);
     void qc.invalidateQueries({ queryKey: ["recovery-codes"] });
     onClose();
   };
@@ -267,7 +268,7 @@ function ConfirmDialog({ kind, onClose }: { kind: "disable" | "codes"; onClose: 
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["recovery-codes"] });
       if (kind === "disable") {
-        void qc.invalidateQueries({ queryKey: ["me"] });
+        void refreshUser(qc);
         toast(t("mfa.disabled"));
         onClose();
       }

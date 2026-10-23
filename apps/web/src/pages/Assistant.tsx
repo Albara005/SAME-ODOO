@@ -24,6 +24,9 @@ export function AssistantPage() {
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/assistant/conversations", { params: { path: { org_id: org.id } } })),
   });
   const [notesOpen, setNotesOpen] = useState(false);
+  // The message being typed lives here: the chat below starts afresh for each conversation, and the
+  // first reply in a new one moves it to its own address while the next message may already be typed.
+  const [draft, setDraft] = useState("");
 
   return (
     <div className="assistant">
@@ -57,7 +60,7 @@ export function AssistantPage() {
           {t("memory.title")}
         </Button>
       </aside>
-      <Chat key={conversationId ?? "new"} conversationId={conversationId} />
+      <Chat key={conversationId ?? "new"} conversationId={conversationId} text={draft} setText={setDraft} />
       {notesOpen && <NotesDialog onClose={() => setNotesOpen(false)} />}
     </div>
   );
@@ -101,12 +104,11 @@ function NotesDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Chat({ conversationId }: { conversationId?: string }) {
+function Chat({ conversationId, text, setText }: { conversationId?: string; text: string; setText: (text: string) => void }) {
   const { t } = useI18n();
   const { org, path } = useOrg();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [text, setText] = useState("");
   const [deep, setDeep] = useState(false);
   const [sending, setSending] = useState<string | null>(null); // the message on its way, shown at once
   const [live, setLive] = useState(""); // the reply as it is being written
