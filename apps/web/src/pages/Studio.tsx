@@ -3,17 +3,20 @@ import {
   CheckCircle2, Download, ExternalLink, FileCode2, FilePlus2, GitCommitVertical, LayoutTemplate, Plus, Rocket, RotateCcw, Save, Send,
   ShieldCheck, Trash2, XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, tokenStore, toApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { StarMark } from "../components/Art";
-import { CodeEditor } from "../components/CodeEditor";
 import { StatusBadge, Tabs, download } from "../components/business";
 import {
-  Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, Textarea, errorText, useToast,
+  Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, Loading, PageHeader, QueryView, Select, Textarea, errorText,
+  useToast,
 } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
+
+// The editor (CodeMirror) is the heaviest part of the app: it loads only when a file is opened.
+const CodeEditor = lazy(() => import("../components/CodeEditor").then((m) => ({ default: m.CodeEditor })));
 
 type Project = Schemas["ProjectOut"];
 type Version = Schemas["novara__studio__router__VersionOut"];
@@ -314,6 +317,7 @@ function BuildTab({ project: p, onChanged }: { project: Project; onChanged: () =
         ) : content.isError ? (
           <ErrorNotice error={content.error} />
         ) : (
+          <Suspense fallback={<Loading />}>
           <CodeEditor
             key={current}
             path={current}
@@ -323,6 +327,7 @@ function BuildTab({ project: p, onChanged }: { project: Project; onChanged: () =
             onSave={saveCurrent}
             readOnly={!write}
           />
+          </Suspense>
         )}
       </section>
       {write && can("ai.use") && <BuilderChat project={p} onChanged={onChanged} />}

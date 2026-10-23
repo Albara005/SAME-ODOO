@@ -1,18 +1,15 @@
-import { css } from "@codemirror/lang-css";
-import { html } from "@codemirror/lang-html";
-import { javascript } from "@codemirror/lang-javascript";
-import { json } from "@codemirror/lang-json";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { basicSetup } from "codemirror";
 import { useEffect, useRef } from "react";
 
-function languageFor(path: string): Extension {
+/** Each language loads on first use, so opening a CSS file doesn't fetch the HTML parser. */
+async function languageFor(path: string): Promise<Extension> {
   const ext = path.split(".").pop()?.toLowerCase();
-  if (ext === "html" || ext === "htm") return html();
-  if (ext === "css") return css();
-  if (ext === "js" || ext === "mjs") return javascript();
-  if (ext === "json") return json();
+  if (ext === "html" || ext === "htm") return (await import("@codemirror/lang-html")).html();
+  if (ext === "css") return (await import("@codemirror/lang-css")).css();
+  if (ext === "js" || ext === "mjs") return (await import("@codemirror/lang-javascript")).javascript();
+  if (ext === "json") return (await import("@codemirror/lang-json")).json();
   return [];
 }
 
@@ -54,7 +51,7 @@ export function CodeEditor({ path, value, onChange, onSave, readOnly, label }: {
           theme,
           EditorView.lineWrapping,
           EditorView.contentAttributes.of({ "aria-label": label, dir: "ltr" }),
-          language.current.of(languageFor(path)),
+          language.current.of([]),
           editable.current.of(EditorState.readOnly.of(Boolean(readOnly))),
           keymap.of([{ key: "Mod-s", preventDefault: true, run: () => (callbacks.current.onSave?.(), true) }]),
           EditorView.updateListener.of((u) => {
@@ -70,9 +67,13 @@ export function CodeEditor({ path, value, onChange, onSave, readOnly, label }: {
   }, []);
 
   useEffect(() => {
-    const v = view.current;
-    if (!v) return;
-    v.dispatch({ effects: language.current.reconfigure(languageFor(path)) });
+    let current = true;
+    void languageFor(path).then((lang) => {
+      if (current) view.current?.dispatch({ effects: language.current.reconfigure(lang) });
+    });
+    return () => {
+      current = false;
+    };
   }, [path]);
 
   useEffect(() => {

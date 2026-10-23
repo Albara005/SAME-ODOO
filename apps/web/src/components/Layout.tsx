@@ -45,7 +45,10 @@ function useCounts(): Record<string, number | undefined> {
   const { org } = useOrg();
   const { t } = useI18n();
   const toast = useToast();
-  const live = useLiveCounts(org.id, (title) => toast(t("notifications.new", { title })));
+  const location = useLocation();
+  const onNotificationsPage = location.pathname.endsWith("/notifications");
+  // On the notifications page the list itself shows the new item, so no toast there.
+  const live = useLiveCounts(org.id, (title) => !onNotificationsPage && toast(t("notifications.new", { title })));
   const id = { path: { org_id: org.id } };
   const unread = useQuery({
     queryKey: ["notifications", org.id, "unread"],

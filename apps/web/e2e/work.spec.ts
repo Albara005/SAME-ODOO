@@ -74,7 +74,8 @@ test("workflow approval, tasks and notifications", async ({ page }) => {
   await expect(page.getByText("لا شيء بانتظارك.")).toBeVisible();
 
   await nav(page, "الإشعارات");
-  await expect(page.getByText(/تمت الموافقة على متابعة INV-2026-/)).toBeVisible();
+  // The page's own list (a live toast for the same notification may be on screen too).
+  await expect(page.getByRole("main").getByText(/تمت الموافقة على متابعة INV-2026-/)).toBeVisible();
   await page.getByRole("button", { name: "تحديد كمقروء" }).click();
   await expect(page.getByRole("button", { name: "تحديد كمقروء" })).toHaveCount(0);
 
