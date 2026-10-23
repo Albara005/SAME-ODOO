@@ -85,18 +85,30 @@ class OrgContext:
         return permission in self.permissions
 
 
-def org_context(
+MFA_REQUIRED = "this organization requires two-step sign-in: turn it on in your account to continue"
+
+
+def membership_context(
     org_id: str = Path(...),
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> OrgContext:
-    """Bind the request's DB session to the organization in the URL after checking membership.
-
-    Non-members get 404 rather than 403 so organization ids can't be probed.
-    """
+    """Membership only, without the organization's two-step sign-in requirement. Used just to
+    describe the organization to its member (so the app can explain what is needed)."""
     ctx = member_context(db, org_id, user)
     if ctx is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+    return ctx
+
+
+def org_context(ctx: OrgContext = Depends(membership_context)) -> OrgContext:
+    """Bind the request's DB session to the organization in the URL after checking membership.
+
+    Non-members get 404 rather than 403 so organization ids can't be probed. When the
+    organization requires two-step sign-in, members without it get 403 until they turn it on.
+    """
+    if ctx.organization.require_mfa and not ctx.user.mfa_enabled:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, MFA_REQUIRED)
     return ctx
 
 

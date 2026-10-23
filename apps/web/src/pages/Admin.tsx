@@ -2,6 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { Mail, Plus, RotateCw, UserMinus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, ApiError, unwrap } from "../api/client";
+import { Link } from "react-router-dom";
+import { useAuth } from "../auth/Auth";
 import { useOrg } from "../auth/Org";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, useToast,
@@ -103,11 +105,18 @@ export function MembersPage() {
                       )}
                     </td>
                     <td>
-                      {m.status === "active" ? (
-                        <Badge tone="success">{t("common.active")}</Badge>
-                      ) : (
-                        <Badge tone="warning">{t("members.suspended")}</Badge>
-                      )}
+                      <span className="row" style={{ gap: 4 }}>
+                        {m.status === "active" ? (
+                          <Badge tone="success">{t("common.active")}</Badge>
+                        ) : (
+                          <Badge tone="warning">{t("members.suspended")}</Badge>
+                        )}
+                        {m.mfa_enabled ? (
+                          <Badge tone="info">{t("members.mfaOn")}</Badge>
+                        ) : org.require_mfa ? (
+                          <Badge tone="warning">{t("members.mfaMissing")}</Badge>
+                        ) : null}
+                      </span>
                     </td>
                     <td className="small">{date(m.created_at)}</td>
                     {manage && (
@@ -529,6 +538,43 @@ export function OrgSettingsPage() {
           </div>
         </form>
       </Card>
+      <RequireMfaCard />
     </div>
+  );
+}
+
+/** Two-step sign-in for every member. Turning it on needs it on your own account, or you'd be locked out first. */
+function RequireMfaCard() {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const save = useMutation({
+    mutationFn: (require_mfa: boolean) =>
+      unwrap(api.PATCH("/api/v1/orgs/{org_id}", { params: { path: { org_id: org.id } }, body: { require_mfa } })),
+    onSuccess: (o) => {
+      qc.setQueryData(["org", org.id], { ...org, require_mfa: o.require_mfa });
+      void qc.invalidateQueries({ queryKey: ["orgs"] });
+      void qc.invalidateQueries({ queryKey: ["members", org.id] });
+      toast(o.require_mfa ? t("org.mfaRequiredOn") : t("org.mfaRequiredOff"));
+    },
+  });
+  const required = save.isPending ? save.variables : (org.require_mfa ?? false);
+  const blocked = !org.require_mfa && !user?.mfa_enabled;
+  return (
+    <Card title={t("org.security")}>
+      <div className="stack-sm">
+        <p className="muted small">{t("org.requireMfaHint")}</p>
+        {save.isError && <ErrorNotice error={save.error} />}
+        <Checkbox label={t("org.requireMfa")} checked={required} disabled={blocked || save.isPending}
+          onChange={(e) => save.mutate(e.target.checked)} />
+        {blocked && (
+          <p className="small">
+            {t("org.requireMfaFirst")} <Link to="/account">{t("account.title")}</Link>
+          </p>
+        )}
+      </div>
+    </Card>
   );
 }

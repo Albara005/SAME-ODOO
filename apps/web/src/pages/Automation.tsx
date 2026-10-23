@@ -9,7 +9,8 @@ import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { StatusBadge } from "../components/business";
 import {
-  Badge, Button, Card, Checkbox, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, errorText, useToast,
+  Badge, Button, Card, Checkbox, Empty, ErrorNotice, Field, IconButton, Input, Notice, PageHeader, QueryView, Select, errorText,
+  useToast,
 } from "../components/ui";
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
@@ -451,7 +452,7 @@ export function WorkflowPage() {
   });
   const w = workflows.data?.find((x) => x.id === workflowId);
   if (workflows.isPending) return <QueryView query={workflows}>{() => null}</QueryView>;
-  if (!w) return <ErrorNotice error={new Error(t("error.notFound"))} />;
+  if (!w) return <ErrorNotice error={new Notice(t("error.notFound"))} />;
   return (
     <div className="stack">
       <PageHeader

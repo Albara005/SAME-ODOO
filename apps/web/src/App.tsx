@@ -3,9 +3,11 @@ import { Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-r
 import { useAuth } from "./auth/Auth";
 import { lastOrg, OrgProvider, rememberOrg, useOrgQuery } from "./auth/Org";
 import { Layout } from "./components/Layout";
-import { ErrorNotice, Loading } from "./components/ui";
+import { ErrorNotice, Loading, Notice } from "./components/ui";
 import { useI18n } from "./i18n/I18n";
-import { ForgotPasswordPage, InvitePage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from "./pages/Auth";
+import {
+  ForgotPasswordPage, InvitePage, LoginPage, MfaRequiredPage, RegisterPage, ResetPasswordPage, VerifyEmailPage,
+} from "./pages/Auth";
 import { HomePage } from "./pages/Home";
 import { OrgsPage, useMyOrgs } from "./pages/Orgs";
 
@@ -98,9 +100,11 @@ function RootRedirect() {
 
 function OrgRoute() {
   const { orgId = "" } = useParams();
+  const { user } = useAuth();
   const org = useOrgQuery(orgId);
   if (org.isPending) return <Loading />;
   if (org.isError) return <Navigate to="/orgs" replace />;
+  if (org.data.require_mfa && !user?.mfa_enabled) return <MfaRequiredPage orgName={org.data.name} />;
   rememberOrg(org.data.id);
   return (
     <OrgProvider org={org.data}>
@@ -111,13 +115,13 @@ function OrgRoute() {
 
 function NotFound() {
   const { t } = useI18n();
-  return <ErrorNotice error={new Error(t("error.notFound"))} />;
+  return <ErrorNotice error={new Notice(t("error.notFound"))} />;
 }
 
 export function App() {
   const { t } = useI18n();
   return (
-    <ErrorBoundary fallback={<div className="content"><ErrorNotice error={new Error(t("error.boundary"))} /></div>}>
+    <ErrorBoundary fallback={<div className="content"><ErrorNotice error={new Notice(t("error.boundary"))} /></div>}>
       <Routes>
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />

@@ -7,7 +7,7 @@ import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useAuth } from "../auth/Auth";
 import { refreshUser } from "../auth/refreshUser";
 import { BrandMark, SignOutButton, TopActions } from "../components/Layout";
-import { Badge, Button, Card, Dialog, ErrorNotice, Field, Input, QueryView, useToast } from "../components/ui";
+import { Badge, Button, Card, Dialog, ErrorNotice, Field, Input, Notice, QueryView, useToast } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
 
 export function AccountPage() {
@@ -93,7 +93,7 @@ function PasswordCard() {
     <Card title={t("account.password")}>
       <form className="stack" onSubmit={submit} noValidate>
         {err && !err.fields["new_password"] && (
-          <ErrorNotice error={err.status === 403 ? new Error(t("account.wrongPassword")) : err} />
+          <ErrorNotice error={err.status === 403 ? new Notice(t("account.wrongPassword")) : err} />
         )}
         <div className="grid-2">
           <Field label={t("account.currentPassword")}>
@@ -285,7 +285,11 @@ function ConfirmDialog({ kind, onClose }: { kind: "disable" | "codes"; onClose: 
     <Dialog open onClose={onClose} title={kind === "disable" ? t("mfa.disable") : t("mfa.newCodes")}>
       <form className="stack" onSubmit={(e) => (e.preventDefault(), run.mutate())}>
         <p className="muted">{kind === "disable" ? t("mfa.disableBody") : t("mfa.newCodesBody")}</p>
-        {run.isError && <ErrorNotice error={wrongPassword(run.error, t("mfa.wrongPasswordOrCode"))} />}
+        {run.isError && (
+          <ErrorNotice error={run.error instanceof ApiError && run.error.status === 409 && kind === "disable"
+            ? new Notice(t("mfa.requiredByOrg", { orgs: run.error.message.split(" requires ")[0] ?? "" }))
+            : wrongPassword(run.error, t("mfa.wrongPasswordOrCode"))} />
+        )}
         <Field label={t("auth.password")}>
           <Input
             type="password"
@@ -318,7 +322,7 @@ function ConfirmDialog({ kind, onClose }: { kind: "disable" | "codes"; onClose: 
 }
 
 function wrongPassword(error: unknown, message: string): unknown {
-  return error instanceof ApiError && error.status === 403 ? new Error(message) : error;
+  return error instanceof ApiError && error.status === 403 ? new Notice(message) : error;
 }
 
 function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {

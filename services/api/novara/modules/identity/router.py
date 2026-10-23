@@ -16,9 +16,11 @@ from novara.deps import AuthContext, client_ip, current_auth, current_user, get_
 from novara.mail import Message, deliver
 from novara.modules.identity import totp
 from novara.modules.identity.models import LoginAttempt, RecoveryCode, User, UserSession, UserToken
+from novara.modules.organizations.models import Membership, Organization
 from novara.security import (
     DUMMY_HASH, MIN_PASSWORD_LENGTH, decode_mfa_token, hash_password, issue_mfa_token, issue_token, verify_password,
 )
+from novara.tenancy import system_scope
 
 router = APIRouter(tags=["identity"])
 
@@ -437,6 +439,16 @@ def mfa_enable(body: MfaCodeIn, request: Request, user: User = Depends(current_u
     return RecoveryCodesOut(recovery_codes=codes)
 
 
+def _orgs_requiring_mfa(db: Session, user: User) -> list[str]:
+    # Deliberate cross-organization read, limited to the caller's own memberships.
+    with system_scope(db):
+        return list(db.scalars(select(Organization.name)
+                               .join(Membership, Membership.organization_id == Organization.id)
+                               .where(Membership.user_id == user.id, Membership.status == "active",
+                                      Organization.require_mfa.is_(True))
+                               .order_by(Organization.name)))
+
+
 @router.post("/me/mfa/disable", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def mfa_disable(body: PasswordAndCodeIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
     _require_password(user, body.password)
@@ -444,6 +456,10 @@ def mfa_disable(body: PasswordAndCodeIn, request: Request, user: User = Depends(
         raise HTTPException(status.HTTP_409_CONFLICT, "two-factor sign-in is off")
     if not _second_factor_ok(db, request, user, body.code):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid code")
+    requiring = _orgs_requiring_mfa(db, user)
+    if requiring:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            f"{', '.join(requiring)} requires two-step sign-in; it can't be turned off while you're a member")
     user.mfa_enabled, user.mfa_secret, user.mfa_pending_secret, user.mfa_last_step = False, None, None, None
     db.execute(delete(RecoveryCode).where(RecoveryCode.user_id == user.id))
     db.commit()

@@ -173,14 +173,19 @@ export function Empty({ children }: { children?: ReactNode }) {
   return <div className="empty">{children ?? t("common.none")}</div>;
 }
 
+/** An error whose message is already written for the reader (and translated): ErrorNotice shows it as is. */
+export class Notice extends Error {}
+
 export function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const { t } = useI18n();
   const message =
-    error instanceof ApiError
-      ? error.status === 403
-        ? t("common.notAllowed")
-        : error.message
-      : t("common.error");
+    error instanceof Notice
+      ? error.message
+      : error instanceof ApiError
+        ? error.status === 403
+          ? t("common.notAllowed")
+          : error.message
+        : t("common.error");
   return (
     <div className="notice notice-error" role="alert">
       <span className="grow">{message}</span>

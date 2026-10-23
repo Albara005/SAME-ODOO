@@ -1158,6 +1158,19 @@ export const en = {
   "audit.a.account.updated": "Account changed",
   "audit.a.books.year_closed": "Year closed",
   "journal.reversalOf": "Reversal of {number}",
+  "org.security": "Security",
+  "org.requireMfa": "Require two-step sign-in from every member",
+  "org.requireMfaHint": "Members without two-step sign-in can't open this organization's data until they turn it on in their account. Their access comes back as soon as they do.",
+  "org.requireMfaFirst": "Turn on two-step sign-in for your own account first:",
+  "org.mfaRequiredOn": "Two-step sign-in is now required",
+  "org.mfaRequiredOff": "Two-step sign-in is no longer required",
+  "members.mfaOn": "Two-step",
+  "members.mfaMissing": "No two-step sign-in",
+  "mfa.requiredByOrg": "{orgs} requires two-step sign-in, so it stays on while you're a member.",
+  "mfaGate.title": "Two-step sign-in needed",
+  "mfaGate.body": "{org} asks every member to use two-step sign-in. Turn it on in your account (it takes a minute with an authenticator app), then come back.",
+  "mfaGate.setUp": "Set it up in my account",
+  "mfaGate.otherOrgs": "My organizations",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -364,7 +364,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Org */
+        /**
+         * Get Org
+         * @description Readable without two-step sign-in even when the organization requires it, so the app can say why.
+         */
         get: operations["get_org_api_v1_orgs__org_id__get"];
         put?: never;
         post?: never;
@@ -4378,6 +4381,11 @@ export interface components {
             full_name: string;
             /** Id */
             id: string;
+            /**
+             * Mfa Enabled
+             * @default false
+             */
+            mfa_enabled: boolean;
             /** Role */
             role: string;
             /** Status */
@@ -4486,6 +4494,11 @@ export interface components {
             name: string;
             /** Permissions */
             permissions: string[];
+            /**
+             * Require Mfa
+             * @default false
+             */
+            require_mfa: boolean;
             /** Role */
             role: string;
             /** Slug */
@@ -4667,6 +4680,11 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /**
+             * Require Mfa
+             * @default false
+             */
+            require_mfa: boolean;
             /** Slug */
             slug: string;
             /** Vat Number */
@@ -4680,6 +4698,8 @@ export interface components {
             default_locale?: string | null;
             /** Name */
             name?: string | null;
+            /** Require Mfa */
+            require_mfa?: boolean | null;
             /** Vat Number */
             vat_number?: string | null;
         };

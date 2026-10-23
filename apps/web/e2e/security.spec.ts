@@ -54,8 +54,10 @@ test("two-step sign-in: set up, sign in with a code or a recovery code, turn off
   await page.screenshot({ path: "test-results/screens/mfa-setup-ar.png" });
   await dialog.getByLabel("الرمز").fill(await totp(secret));
   await dialog.getByRole("button", { name: "تفعيل", exact: true }).click();
-  const codes = await dialog.getByRole("list", { name: "رموز الاسترداد" }).getByRole("listitem").allTextContents();
-  expect(codes).toHaveLength(10);
+  // allTextContents doesn't wait: wait for the codes to be on screen first.
+  const codeItems = dialog.getByRole("list", { name: "رموز الاسترداد" }).getByRole("listitem");
+  await expect(codeItems).toHaveCount(10);
+  const codes = await codeItems.allTextContents();
   await dialog.getByRole("button", { name: "حفظتها" }).click();
   await expect(page.getByText("مفعّل", { exact: true })).toBeVisible();
 
@@ -124,4 +126,61 @@ test("invite by email: someone without an account joins with the invited role", 
   await expect(page.getByRole("complementary")).toContainText("شركة الدعوات");
   await expect(page.getByRole("complementary").getByRole("link", { name: "العملاء" })).toHaveCount(0);
   await expect(page.locator(".verify-banner")).toHaveCount(0); // the invitation email proved the address
+});
+
+test("an organization requires two-step sign-in: members set it up before they get in", async ({ page, browser }) => {
+  const member = uniqueEmail("strict-member");
+  const memberPage = await browser.newPage();
+  await signUpAndIn(memberPage, member, "Omar Ali");
+
+  await signUpAndIn(page, uniqueEmail("strict-owner"));
+  await createOrg(page, "شركة الأمان");
+  const orgId = page.url().match(/\/o\/([0-9a-f-]+)/)![1]!;
+  const headers = { Authorization: `Bearer ${await page.evaluate(() => localStorage.getItem("novara.token"))}` };
+  expect((await page.request.post(`/api/v1/orgs/${orgId}/members`, { headers, data: { email: member, role: "sales" } })).ok()).toBeTruthy();
+
+  // The owner can't require it before having it.
+  await page.getByRole("complementary").getByRole("link", { name: "المؤسسة", exact: true }).click();
+  const requireBox = page.getByLabel("إلزام كل الأعضاء بالتحقق بخطوتين");
+  await expect(requireBox).toBeDisabled();
+  await expect(page.getByText("فعّل التحقق بخطوتين لحسابك أولاً:")).toBeVisible();
+  const setup = await (await page.request.post("/api/v1/me/mfa/setup", { headers, data: { password: PASSWORD } })).json();
+  expect((await page.request.post("/api/v1/me/mfa/enable", { headers, data: { code: await totp(setup.secret) } })).ok()).toBeTruthy();
+  await page.reload();
+  await requireBox.click();
+  await expect(page.getByText("أصبح التحقق بخطوتين إلزامياً")).toBeVisible();
+  await expect(requireBox).toBeChecked();
+  await page.getByRole("complementary").getByRole("link", { name: "الأعضاء", exact: true }).click();
+  await expect(page.getByRole("row", { name: new RegExp(member) }).getByText("بلا تحقق بخطوتين")).toBeVisible();
+
+  // The member is asked to set it up, and gets in once it's on.
+  await memberPage.goto(`/o/${orgId}`);
+  await expect(memberPage.getByRole("heading", { name: "يلزم التحقق بخطوتين" })).toBeVisible();
+  await expect(memberPage.getByText(/تطلب شركة الأمان/)).toBeVisible();
+  await memberPage.screenshot({ path: "test-results/screens/mfa-required-ar.png" });
+  await memberPage.getByRole("link", { name: "التفعيل من حسابي" }).click();
+  await memberPage.getByRole("button", { name: "تفعيل التحقق بخطوتين" }).click();
+  const dialog = memberPage.getByRole("dialog");
+  await dialog.getByLabel("كلمة المرور").fill(PASSWORD);
+  await dialog.getByRole("button", { name: "التالي" }).click();
+  await dialog.getByText("لا يمكنك المسح؟").click();
+  const secret = (await dialog.locator(".mfa-secret").textContent())!;
+  await dialog.getByLabel("الرمز").fill(await totp(secret));
+  await dialog.getByRole("button", { name: "تفعيل", exact: true }).click();
+  const codeItems = dialog.getByRole("list", { name: "رموز الاسترداد" }).getByRole("listitem");
+  await expect(codeItems).toHaveCount(10);
+  const codes = await codeItems.allTextContents();
+  await dialog.getByRole("button", { name: "حفظتها" }).click();
+
+  // While the organization requires it, it can't be switched off.
+  await memberPage.getByRole("button", { name: "إيقاف التحقق" }).click();
+  await dialog.getByLabel("كلمة المرور").fill(PASSWORD);
+  await dialog.getByLabel("الرمز").fill(codes[0]!);
+  await dialog.getByRole("button", { name: "إيقاف التحقق" }).click();
+  await expect(dialog.getByText(/شركة الأمان تلزم أعضاءها بالتحقق بخطوتين/)).toBeVisible();
+  await dialog.getByRole("button", { name: "إلغاء" }).click();
+
+  await memberPage.goto(`/o/${orgId}`);
+  await expect(memberPage.getByRole("heading", { level: 1, name: /^(صباح|مساء) الخير/ })).toBeVisible();
+  await memberPage.close();
 });

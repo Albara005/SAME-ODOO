@@ -217,3 +217,43 @@ def test_invitations_respect_permissions_and_can_be_revoked(api, client, app):
     assert [p["role"] for p in pending] == ["member"] and pending[0]["id"] != inv["id"]
     assert api.req("DELETE", OWNER, f"/orgs/{org}/invitations/{pending[0]['id']}").status_code == 204
     assert client.get(f"/api/v1/invitations/{second}").status_code == 404
+
+
+# ---------------------------------------------------------------- organization requires two-step sign-in
+
+
+def test_an_organization_can_require_two_step_sign_in(api):
+    member, outsider = "member@sec.example.com", "outsider@sec.example.com"
+    for e in (OWNER, member, outsider):
+        api.signup(e)
+    org = api.create_org(OWNER, "strict-co")
+    assert api.add_member(OWNER, org, member, "sales").status_code == 201
+
+    # Turning it on without it on your own account would lock you out first.
+    r = api.req("PATCH", OWNER, f"/orgs/{org}", json={"require_mfa": True})
+    assert r.status_code == 409 and "your own account" in r.text
+    enable_mfa(api, OWNER)
+    r = api.req("PATCH", OWNER, f"/orgs/{org}", json={"require_mfa": True})
+    assert r.status_code == 200 and r.json()["require_mfa"] is True
+    members = {m["email"]: m["mfa_enabled"] for m in api.req("GET", OWNER, f"/orgs/{org}/members").json()}
+    assert members == {OWNER: True, member: False}
+
+    # A member without it can see what the organization asks, and nothing else.
+    described = api.req("GET", member, f"/orgs/{org}")
+    assert described.status_code == 200 and described.json()["require_mfa"] is True
+    assert [o["require_mfa"] for o in api.req("GET", member, "/orgs").json()] == [True]
+    blocked = api.req("GET", member, f"/orgs/{org}/customers")
+    assert blocked.status_code == 403 and "two-step sign-in" in blocked.text
+    assert api.req("GET", member, f"/orgs/{org}/notifications").status_code == 403
+    assert api.req("GET", outsider, f"/orgs/{org}").status_code == 404
+
+    secret, codes = enable_mfa(api, member)
+    assert api.req("GET", member, f"/orgs/{org}/customers").status_code == 200
+    # ...and can't turn it off again while the organization requires it.
+    off = api.req("POST", member, "/me/mfa/disable", json={"password": PASSWORD, "code": codes[0]})
+    assert off.status_code == 409 and "Strict-Co" in off.text
+    assert api.req("GET", member, "/me").json()["mfa_enabled"] is True
+
+    assert api.req("PATCH", OWNER, f"/orgs/{org}", json={"require_mfa": False}).json()["require_mfa"] is False
+    assert api.req("POST", member, "/me/mfa/disable", json={"password": PASSWORD, "code": codes[1]}).status_code == 204
+    assert api.req("GET", member, f"/orgs/{org}/customers").status_code == 200

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from novara import crypto
 from novara.db import utcnow
-from novara.deps import OrgContext, client_ip, current_user, get_db, org_context, require
+from novara.deps import OrgContext, client_ip, current_user, get_db, membership_context, require
 from novara.mail import Message, deliver
 from novara.modules.access import permissions as P
 from novara.modules.access.models import Role
@@ -42,6 +42,7 @@ class OrgUpdate(BaseModel):
     default_locale: str | None = Field(default=None, pattern="^(ar|en)$")
     default_currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
     vat_number: str | None = Field(default=None, max_length=20, pattern="^[0-9A-Z]*$")
+    require_mfa: bool | None = None
 
 
 class OrgOut(BaseModel):
@@ -55,6 +56,7 @@ class OrgOut(BaseModel):
     default_currency: str
     vat_number: str
     books_locked_until: date | None
+    require_mfa: bool = False
     created_at: datetime
 
 
@@ -80,13 +82,14 @@ class MemberOut(BaseModel):
     full_name: str
     role: str
     status: str
+    mfa_enabled: bool = False
     created_at: datetime
 
 
 def _member_out(m: Membership, user: User, role: Role) -> MemberOut:
     return MemberOut(
         id=m.id, user_id=user.id, email=user.email, full_name=user.full_name,
-        role=role.key, status=m.status, created_at=m.created_at,
+        role=role.key, status=m.status, mfa_enabled=user.mfa_enabled, created_at=m.created_at,
     )
 
 
@@ -131,7 +134,8 @@ def my_orgs(user: User = Depends(current_user), db: Session = Depends(get_db)):
 
 
 @router.get("/orgs/{org_id}", response_model=MyOrgOut)
-def get_org(ctx: OrgContext = Depends(org_context)):
+def get_org(ctx: OrgContext = Depends(membership_context)):
+    """Readable without two-step sign-in even when the organization requires it, so the app can say why."""
     return MyOrgOut(**OrgOut.model_validate(ctx.organization).model_dump(),
                     role=ctx.role.key, permissions=sorted(ctx.permissions))
 
@@ -140,6 +144,9 @@ def get_org(ctx: OrgContext = Depends(org_context)):
 def update_org(body: OrgUpdate, request: Request, ctx: OrgContext = Depends(require(P.ORG_MANAGE)),
                db: Session = Depends(get_db)):
     changes = body.model_dump(exclude_none=True)
+    if changes.get("require_mfa") and not ctx.organization.require_mfa and not ctx.user.mfa_enabled:
+        # Otherwise the person turning it on would be locked out first.
+        raise HTTPException(status.HTTP_409_CONFLICT, "turn on two-step sign-in for your own account first")
     if "default_currency" in changes and changes["default_currency"] != ctx.organization.default_currency:
         _check_currency(changes["default_currency"])
         if db.scalar(select(JournalEntry.id).limit(1)):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -27,6 +27,8 @@ class Organization(IdMixin, TimestampMixin, Base):
     vat_number: Mapped[str] = mapped_column(String(20), default="", nullable=False)
     # Closed books: no journal entry may be dated on or before this day (also enforced by the database).
     books_locked_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Every member must have two-step sign-in on to reach this organization's data.
+    require_mfa: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class Membership(IdMixin, TimestampMixin, TenantScoped, Base):

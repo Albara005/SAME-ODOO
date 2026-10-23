@@ -5,10 +5,10 @@ import { api, ApiError, unwrap } from "../api/client";
 import { useAuth } from "../auth/Auth";
 import { refreshUser } from "../auth/refreshUser";
 import { rememberOrg } from "../auth/Org";
-import { MailCheck, Sparkle } from "lucide-react";
+import { MailCheck, ShieldCheck, Sparkle } from "lucide-react";
 import { StarLattice, StarMark } from "../components/Art";
 import { TopActions } from "../components/Layout";
-import { Button, Card, ErrorNotice, Field, Input, Loading } from "../components/ui";
+import { Button, Card, ErrorNotice, Field, Input, Loading, Notice } from "../components/ui";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
 
 /** Where to go after signing in, and the email to prefill (both set by the invitation page). */
@@ -269,11 +269,11 @@ export function ResetPasswordPage() {
       <form className="stack" onSubmit={submit} noValidate>
         <h1>{t("reset.title")}</h1>
         {!token ? (
-          <ErrorNotice error={new Error(t("reset.badLink"))} />
+          <ErrorNotice error={new Notice(t("reset.badLink"))} />
         ) : (
           <>
             {reset.isError && !fieldError && (
-              <ErrorNotice error={reset.error instanceof ApiError && reset.error.status === 400 ? new Error(t("reset.badLink")) : reset.error} />
+              <ErrorNotice error={reset.error instanceof ApiError && reset.error.status === 400 ? new Notice(t("reset.badLink")) : reset.error} />
             )}
             <Field label={t("reset.new")} hint={t("auth.passwordHint")} error={fieldError}>
               <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required ltr />
@@ -319,7 +319,7 @@ export function VerifyEmailPage() {
       <div className="stack">
         <h1>{t("verify.title")}</h1>
         {!token || verify.isError ? (
-          <ErrorNotice error={new Error(t("verify.badLink"))} />
+          <ErrorNotice error={new Notice(t("verify.badLink"))} />
         ) : verify.isPending ? (
           <Loading />
         ) : (
@@ -330,6 +330,23 @@ export function VerifyEmailPage() {
         <Link to={user ? "/" : "/login"} className="btn btn-primary">
           {user ? t("verify.continue") : t("auth.login")}
         </Link>
+      </div>
+    </AuthFrame>
+  );
+}
+
+/** The organization requires two-step sign-in and this account doesn't have it yet. */
+export function MfaRequiredPage({ orgName }: { orgName: string }) {
+  const { t } = useI18n();
+  return (
+    <AuthFrame>
+      <div className="stack">
+        <h1>{t("mfaGate.title")}</h1>
+        <div className="notice notice-info">
+          <ShieldCheck size={18} aria-hidden /> {t("mfaGate.body", { org: orgName })}
+        </div>
+        <Link to="/account" className="btn btn-primary">{t("mfaGate.setUp")}</Link>
+        <Link to="/orgs" className="btn">{t("mfaGate.otherOrgs")}</Link>
       </div>
     </AuthFrame>
   );
@@ -366,7 +383,7 @@ export function InvitePage() {
       <div className="stack">
         <h1>{t("invite.title")}</h1>
         {!token || info.isError ? (
-          <ErrorNotice error={new Error(t("invite.badLink"))} />
+          <ErrorNotice error={new Notice(t("invite.badLink"))} />
         ) : info.isPending ? (
           <Loading />
         ) : (

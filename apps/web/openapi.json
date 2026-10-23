@@ -3687,6 +3687,11 @@
       "title": "Id",
       "type": "string"
      },
+     "mfa_enabled": {
+      "default": false,
+      "title": "Mfa Enabled",
+      "type": "boolean"
+     },
      "role": {
       "title": "Role",
       "type": "string"
@@ -3956,6 +3961,11 @@
       },
       "title": "Permissions",
       "type": "array"
+     },
+     "require_mfa": {
+      "default": false,
+      "title": "Require Mfa",
+      "type": "boolean"
      },
      "role": {
       "title": "Role",
@@ -4418,6 +4428,11 @@
       "title": "Name",
       "type": "string"
      },
+     "require_mfa": {
+      "default": false,
+      "title": "Require Mfa",
+      "type": "boolean"
+     },
      "slug": {
       "title": "Slug",
       "type": "string"
@@ -4479,6 +4494,17 @@
        }
       ],
       "title": "Name"
+     },
+     "require_mfa": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Require Mfa"
      },
      "vat_number": {
       "anyOf": [
@@ -9219,6 +9245,7 @@
   },
   "/api/v1/orgs/{org_id}": {
    "get": {
+    "description": "Readable without two-step sign-in even when the organization requires it, so the app can say why.",
     "operationId": "get_org_api_v1_orgs__org_id__get",
     "parameters": [
      {
