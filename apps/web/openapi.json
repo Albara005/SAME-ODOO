@@ -2356,6 +2356,24 @@
     "title": "HTTPValidationError",
     "type": "object"
    },
+   "HookOut": {
+    "properties": {
+     "path": {
+      "title": "Path",
+      "type": "string"
+     },
+     "token": {
+      "title": "Token",
+      "type": "string"
+     }
+    },
+    "required": [
+     "token",
+     "path"
+    ],
+    "title": "HookOut",
+    "type": "object"
+   },
    "ImportResult": {
     "properties": {
      "created": {
@@ -8708,6 +8726,64 @@
     "summary": "Verify Email",
     "tags": [
      "identity"
+    ]
+   }
+  },
+  "/api/v1/hooks/{token}": {
+   "post": {
+    "description": "Start the workflow behind this address with the JSON object sent (202; 200 for a repeated Idempotency-Key).",
+    "operationId": "receive_api_v1_hooks__token__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "token",
+      "required": true,
+      "schema": {
+       "title": "Token",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Receive",
+    "tags": [
+     "inbound webhooks"
     ]
    }
   },
@@ -20985,6 +21061,120 @@
      }
     ],
     "summary": "Update Workflow",
+    "tags": [
+     "automation"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/workflows/{workflow_id}/hook": {
+   "get": {
+    "description": "The secret address other systems POST to (anyone holding it can start the workflow).",
+    "operationId": "workflow_hook_api_v1_orgs__org_id__workflows__workflow_id__hook_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "workflow_id",
+      "required": true,
+      "schema": {
+       "title": "Workflow Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HookOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Workflow Hook",
+    "tags": [
+     "automation"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/workflows/{workflow_id}/hook/rotate": {
+   "post": {
+    "description": "A new address; the old one stops working at once.",
+    "operationId": "rotate_workflow_hook_api_v1_orgs__org_id__workflows__workflow_id__hook_rotate_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "workflow_id",
+      "required": true,
+      "schema": {
+       "title": "Workflow Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HookOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Rotate Workflow Hook",
     "tags": [
      "automation"
     ]

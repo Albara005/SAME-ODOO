@@ -11,6 +11,7 @@ from novara.ai.provider import AnthropicProvider, ModelProvider
 from novara.mail import Mailer, mailer_from_settings
 from novara.ai.router import router as assistant_router
 from novara.agents.router import router as agents_router
+from novara.automation.inbound import public_router as inbound_hooks_router
 from novara.automation.live import router as live_router
 from novara.automation.router import router as automation_router
 from novara.automation.webhooks import WebhookSender
@@ -104,7 +105,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router, credit_router,
               inventory_router, sales_router, purchasing_router, vendor_credit_router, assistant_router, studio_router, agents_router, automation_router,
-              creative_router, hosting_router, live_router, data_keys_router, public_data_router):
+              creative_router, hosting_router, live_router, data_keys_router, public_data_router, inbound_hooks_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(sites_router)  # public, unauthenticated: published App Studio sites
     return app

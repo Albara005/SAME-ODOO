@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from novara.automation import engine as E
+from novara.automation import inbound
 from novara.automation import webhooks as W
 from novara.automation.events import EVENT_TYPES, scan_overdue, scan_schedules
 from novara.automation.models import Notification, Task, Workflow, WorkflowRun, WorkflowStep
@@ -136,6 +137,8 @@ def create_workflow(body: WorkflowIn, request: Request, ctx: OrgContext = Depend
                  enabled=body.enabled, notify_owner_on_failure=body.notify_owner_on_failure, owner_user_id=ctx.user.id)
     db.add(w)
     db.flush()
+    if w.trigger == inbound.TRIGGER:
+        inbound.hook_token(db, request.app.state.settings, w)
     audit.record(db, actor_user_id=ctx.user.id, action="workflow.created", target_type="workflow", target_id=w.id,
                  details={"name": w.name, "trigger": w.trigger}, ip_address=client_ip(request))
     db.commit()
@@ -306,3 +309,39 @@ def rotate_webhook_secret(request: Request, ctx: OrgContext = Depends(require(P.
                  target_id="", details={}, ip_address=client_ip(request))
     db.commit()
     return WebhookSecretOut(secret=secret)
+
+
+# ---------------------------------------------------------------- inbound webhook address
+
+
+class HookOut(BaseModel):
+    token: str
+    path: str  # POST JSON here, on the API's own origin
+
+
+def _hook_workflow(db: Session, workflow_id: str) -> Workflow:
+    w = _workflow(db, workflow_id)
+    if w.trigger != inbound.TRIGGER:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "this workflow isn't started by a webhook")
+    return w
+
+
+@router.get("/orgs/{org_id}/workflows/{workflow_id}/hook", response_model=HookOut)
+def workflow_hook(workflow_id: str, request: Request, _: OrgContext = Depends(require(P.WORKFLOWS_MANAGE)),
+                  db: Session = Depends(get_db)):
+    """The secret address other systems POST to (anyone holding it can start the workflow)."""
+    token = inbound.hook_token(db, request.app.state.settings, _hook_workflow(db, workflow_id))
+    db.commit()
+    return HookOut(token=token, path=f"/api/v1/hooks/{token}")
+
+
+@router.post("/orgs/{org_id}/workflows/{workflow_id}/hook/rotate", response_model=HookOut)
+def rotate_workflow_hook(workflow_id: str, request: Request, ctx: OrgContext = Depends(require(P.WORKFLOWS_MANAGE)),
+                         db: Session = Depends(get_db)):
+    """A new address; the old one stops working at once."""
+    w = _hook_workflow(db, workflow_id)
+    token = inbound.hook_token(db, request.app.state.settings, w, rotate=True)
+    audit.record(db, actor_user_id=ctx.user.id, action="workflow.hook_rotated", target_type="workflow", target_id=w.id,
+                 details={"name": w.name}, ip_address=client_ip(request))
+    db.commit()
+    return HookOut(token=token, path=f"/api/v1/hooks/{token}")

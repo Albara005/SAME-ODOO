@@ -97,23 +97,28 @@ ACTION_SPECS: dict[str, dict] = {
     # POST the event as signed JSON to an https endpoint on the public internet (see webhooks.py).
     "webhook": {"required": ["url"], "optional": []},
 }
-SCHEDULE_EVERY = ("day", "week", "month")
+SCHEDULE_EVERY = ("hour", "day", "week", "month")
 
 
 def validate_schedule(schedule: dict | None) -> dict:
     if not isinstance(schedule, dict):
         raise WorkflowError("a scheduled workflow needs a schedule")
-    if set(schedule) - {"every", "time", "timezone", "weekday", "day"}:
-        raise WorkflowError("schedule fields are every, time, timezone, weekday and day")
+    if set(schedule) - {"every", "time", "minute", "timezone", "weekday", "day"}:
+        raise WorkflowError("schedule fields are every, time, minute, timezone, weekday and day")
     every, at, tz = schedule.get("every"), schedule.get("time", ""), schedule.get("timezone", "")
     if every not in SCHEDULE_EVERY:
         raise WorkflowError(f"schedule.every must be one of {SCHEDULE_EVERY}")
-    if not (isinstance(at, str) and re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", at)):
-        raise WorkflowError("schedule.time must be HH:MM (24-hour)")
     try:
         ZoneInfo(tz)
     except (ZoneInfoNotFoundError, ValueError, TypeError):
         raise WorkflowError(f"unknown time zone: {tz!r}")
+    if every == "hour":  # minutes past every hour, in the schedule's time zone (some zones are offset by :30)
+        minute = schedule.get("minute")
+        if not (isinstance(minute, int) and not isinstance(minute, bool) and 0 <= minute <= 59):
+            raise WorkflowError("an hourly schedule needs minute 0-59")
+        return {"every": every, "minute": minute, "timezone": tz}
+    if not (isinstance(at, str) and re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", at)):
+        raise WorkflowError("schedule.time must be HH:MM (24-hour)")
     out = {"every": every, "time": at, "timezone": tz}
     if every == "week":
         if not (isinstance(schedule.get("weekday"), int) and 0 <= schedule["weekday"] <= 6):
@@ -273,8 +278,8 @@ def match_events(db: Session, limit: int = 200) -> int:
                         .order_by(OutboxEvent.created_at).limit(limit)).all()
     for ev in events:
         for wf in db.scalars(select(Workflow).where(Workflow.trigger == ev.type, Workflow.enabled.is_(True))):
-            if ev.type == "schedule" and ev.payload.get("workflow_id") != wf.id:
-                continue  # a schedule event belongs to the one workflow whose time came
+            if ev.type in ("schedule", "webhook.received") and ev.payload.get("workflow_id") != wf.id:
+                continue  # belongs to the one workflow whose time came, or whose address was called
             exists = db.scalar(select(WorkflowRun.id).where(WorkflowRun.workflow_id == wf.id,
                                                             WorkflowRun.event_id == ev.id))
             if exists is None:

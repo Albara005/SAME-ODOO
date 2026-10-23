@@ -24,7 +24,8 @@ const ACTION_ICON: Record<string, LucideIcon> = {
   create_task: ListChecks, notify: Bell, require_approval: ClipboardCheck, run_agent: Bot, webhook: Webhook,
 };
 
-type Schedule = { every: "day" | "week" | "month"; time: string; timezone: string; weekday?: number; day?: number };
+type Schedule = { every: "hour" | "day" | "week" | "month"; time?: string; minute?: number; timezone: string; weekday?: number; day?: number };
+const WEBHOOK_TRIGGER = "webhook.received";
 const ZONES = ["Asia/Riyadh", "Asia/Dubai", "Asia/Kuwait", "Asia/Qatar", "Asia/Bahrain", "Asia/Muscat", "Africa/Cairo",
   "Asia/Amman", "Europe/London", "UTC"];
 const localZone = () => {
@@ -39,7 +40,8 @@ const localZone = () => {
 function useScheduleLabel() {
   const { t } = useI18n();
   return (s: Schedule) => {
-    const at = { time: s.time, zone: s.timezone };
+    if (s.every === "hour") return t("wf.sched.hourlyAt", { minute: String(s.minute ?? 0).padStart(2, "0"), zone: s.timezone });
+    const at = { time: s.time ?? "", zone: s.timezone };
     if (s.every === "week") return t("wf.sched.weeklyAt", { ...at, day: t(`wf.weekday.${s.weekday ?? 0}` as MessageKey) });
     if (s.every === "month") return t("wf.sched.monthlyAt", { ...at, day: s.day ?? 1 });
     return t("wf.sched.dailyAt", at);
@@ -241,6 +243,7 @@ function WorkflowEditor({ catalog, workflow }: { catalog: Catalog; workflow?: Wo
               {Object.keys(catalog.triggers).map((k) => <option key={k} value={k}>{triggerLabel(k)}</option>)}
             </Select>
             {trigger === "schedule" && <ScheduleFields value={schedule} onChange={setSchedule} />}
+            {trigger === WEBHOOK_TRIGGER && <p className="muted small">{t("wf.hook.editorHint")}</p>}
           </div>
         </li>
 
@@ -304,7 +307,8 @@ function WorkflowEditor({ catalog, workflow }: { catalog: Catalog; workflow?: Wo
 
 /** Only the fields the chosen frequency uses. */
 function scheduleBody(s: Schedule): Schedule {
-  const base = { every: s.every, time: s.time, timezone: s.timezone };
+  if (s.every === "hour") return { every: "hour", minute: s.minute ?? 0, timezone: s.timezone };
+  const base = { every: s.every, time: s.time ?? "08:00", timezone: s.timezone };
   if (s.every === "week") return { ...base, weekday: s.weekday ?? 0 };
   if (s.every === "month") return { ...base, day: s.day ?? 1 };
   return base;
@@ -318,6 +322,7 @@ function ScheduleFields({ value: s, onChange }: { value: Schedule; onChange: (s:
       <CalendarClock size={16} aria-hidden className="muted" />
       <Field label={t("wf.sched.every")}>
         <Select value={s.every} onChange={(e) => onChange({ ...s, every: e.target.value as Schedule["every"] })}>
+          <option value="hour">{t("wf.sched.hour")}</option>
           <option value="day">{t("wf.sched.day")}</option>
           <option value="week">{t("wf.sched.week")}</option>
           <option value="month">{t("wf.sched.month")}</option>
@@ -335,9 +340,15 @@ function ScheduleFields({ value: s, onChange }: { value: Schedule; onChange: (s:
           <Input type="number" min={1} max={28} value={String(s.day ?? 1)} onChange={(e) => onChange({ ...s, day: Number(e.target.value) })} ltr />
         </Field>
       )}
-      <Field label={t("wf.sched.time")}>
-        <Input type="time" value={s.time} onChange={(e) => onChange({ ...s, time: e.target.value })} required ltr />
-      </Field>
+      {s.every === "hour" ? (
+        <Field label={t("wf.sched.minute")} hint={t("wf.sched.minuteHint")}>
+          <Input type="number" min={0} max={59} value={String(s.minute ?? 0)} onChange={(e) => onChange({ ...s, minute: Number(e.target.value) })} ltr />
+        </Field>
+      ) : (
+        <Field label={t("wf.sched.time")}>
+          <Input type="time" value={s.time ?? "08:00"} onChange={(e) => onChange({ ...s, time: e.target.value })} required ltr />
+        </Field>
+      )}
       <Field label={t("wf.sched.zone")}>
         <Select value={s.timezone} onChange={(e) => onChange({ ...s, timezone: e.target.value })}>
           {zones.map((z) => <option key={z} value={z}>{z}</option>)}
@@ -466,6 +477,7 @@ export function WorkflowPage() {
           </>
         }
       />
+      {w.trigger === WEBHOOK_TRIGGER && <HookCard workflowId={w.id} />}
       <Card title={t("wf.runs")}>
         <QueryView query={runs}>
           {(list) =>
@@ -510,5 +522,57 @@ export function WorkflowPage() {
         </QueryView>
       </Card>
     </div>
+  );
+}
+
+/** The secret address other systems POST JSON to; it starts this workflow with that JSON as {{data.*}}. */
+function HookCard({ workflowId }: { workflowId: string }) {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const ids = { org_id: org.id, workflow_id: workflowId };
+  const hook = useQuery({
+    queryKey: ["wf-hook", org.id, workflowId],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/workflows/{workflow_id}/hook", { params: { path: ids } })),
+  });
+  const rotate = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/workflows/{workflow_id}/hook/rotate", { params: { path: ids } })),
+    onSuccess: (h) => {
+      qc.setQueryData(["wf-hook", org.id, workflowId], h);
+      toast(t("wf.hook.rotated"));
+    },
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const copy = (text: string) => void navigator.clipboard?.writeText(text).then(() => toast(t("common.copied")), () => undefined);
+  return (
+    <Card title={t("wf.hook.title")}>
+      <QueryView query={hook}>
+        {(h) => {
+          const url = `${window.location.origin}${h.path}`;
+          const example = [
+            `curl -X POST "${url}" \\`,
+            `  -H "Content-Type: application/json" \\`,
+            `  -H "Idempotency-Key: order-1001" \\`,
+            `  -d '{"name": "Hala Stores", "budget": 2500}'`,
+          ].join("\n");
+          return (
+            <div className="stack-sm">
+              <p className="muted small">{t("wf.hook.about")}</p>
+              <code className="mfa-secret" dir="ltr" style={{ textAlign: "start" }} aria-label={t("wf.hook.url")}>{url}</code>
+              <pre className="snippet" dir="ltr" aria-label={t("wf.hook.example")}>{example}</pre>
+              <p className="muted small">{t("wf.hook.fields")}</p>
+              <div className="row">
+                <Button size="sm" icon={<Copy size={14} />} onClick={() => copy(url)}>{t("wf.hook.copy")}</Button>
+                <Button size="sm" variant="danger" icon={<RotateCw size={14} />} loading={rotate.isPending}
+                  onClick={() => window.confirm(t("wf.hook.rotateConfirm")) && rotate.mutate()}>
+                  {t("wf.hook.rotate")}
+                </Button>
+              </div>
+            </div>
+          );
+        }}
+      </QueryView>
+    </Card>
   );
 }

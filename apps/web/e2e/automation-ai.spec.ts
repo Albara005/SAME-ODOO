@@ -69,3 +69,46 @@ test("AI settings: a monthly allowance per member", async ({ page }) => {
   await page.reload();
   await expect(page.getByLabel(/حد شهري لكل عضو/)).toHaveValue("5");
 });
+
+test("automation: another system starts a workflow through its webhook address; hourly schedules", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("inbound"));
+  await createOrg(page, "شركة الاستقبال");
+  await nav(page, "الأتمتة");
+  await page.getByRole("link", { name: "سير عمل جديد" }).click();
+  await page.getByLabel("الاسم", { exact: true }).fill("عميل محتمل من الموقع");
+  await page.getByLabel("عندما يحدث").selectOption({ label: "استدعاء عنوانه من نظام آخر (Webhook)" });
+  await expect(page.getByText(/بعد الحفظ يحصل سير العمل على عنوان سري/)).toBeVisible();
+  await page.getByLabel("العنوان").fill("اتصل بـ {{data.name}}");
+  await page.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByRole("heading", { name: "عميل محتمل من الموقع" })).toBeVisible();
+
+  const address = page.getByLabel("العنوان", { exact: true });
+  await expect(address).toContainText("/api/v1/hooks/nvwh_");
+  await expect(page.getByLabel("مثال")).toContainText("Idempotency-Key");
+  await page.screenshot({ path: "test-results/screens/workflow-webhook-ar.png", fullPage: true });
+  const url = (await address.textContent())!.trim();
+  const sent = await page.request.post(url, { data: { name: "متجر هلا" }, headers: { "Idempotency-Key": "lead-1" } });
+  expect(sent.status()).toBe(202);
+  await page.getByRole("button", { name: "تشغيل المعلّق الآن" }).click();
+  await expect(page.getByRole("cell", { name: "مكتمل" }).first()).toBeVisible();  // processed before we look at tasks
+  await nav(page, "المهام");
+  await expect(page.getByText("اتصل بـ متجر هلا")).toBeVisible();
+
+  // A new address replaces the old one at once.
+  page.on("dialog", (d) => d.accept());
+  await page.goBack();
+  await page.getByRole("button", { name: "عنوان جديد" }).click();
+  await expect(page.getByText(/العنوان الجديد جاهز/)).toBeVisible();
+  expect((await page.request.post(url, { data: { name: "x" } })).status()).toBe(404);
+
+  await nav(page, "الأتمتة");
+  await page.getByRole("link", { name: "سير عمل جديد" }).click();
+  await page.getByLabel("الاسم", { exact: true }).fill("فحص كل ساعة");
+  await page.getByLabel("عندما يحدث").selectOption({ label: "حسب جدول زمني" });
+  await page.getByLabel("التكرار").selectOption({ label: "كل ساعة" });
+  await page.getByLabel("الدقيقة من كل ساعة").fill("15");
+  await page.getByLabel("المنطقة الزمنية").selectOption("Asia/Riyadh");
+  await page.getByLabel("العنوان").fill("فحص المخزون");
+  await page.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByText("كل ساعة عند الدقيقة 15 (Asia/Riyadh)")).toBeVisible();
+});

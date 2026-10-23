@@ -25,7 +25,8 @@ EVENT_TYPES: dict[str, str] = {
     "invoice.payment_registered": "A payment was recorded on an invoice (details: amount, method)",
     "invoice.cancelled": "A posted invoice was cancelled",
     "invoice.overdue": "An invoice passed its due date with money still owed (daily scan)",
-    "schedule": "On a schedule: every day, week or month at a set time (details: scheduled_for, date)",
+    "schedule": "On a schedule: every hour, day, week or month at a set time (details: scheduled_for, date)",
+    "webhook.received": "Another system called this workflow's webhook address (details: the JSON it sent, under data)",
     "credit_note.created": "A credit note was issued against an invoice (details: number, invoice, total)",
     "purchase_order.confirmed": "A purchase order was confirmed",
     "purchase_order.received": "Goods were received for a purchase order",
@@ -68,6 +69,11 @@ def last_slot(schedule: dict, now: datetime) -> datetime:
     """The latest scheduled time at or before ``now`` (UTC), in the schedule's own time zone."""
     tz = ZoneInfo(schedule["timezone"])
     local = now.astimezone(tz)
+    if schedule["every"] == "hour":
+        slot = local.replace(minute=schedule["minute"], second=0, microsecond=0)
+        if slot > local:
+            slot -= timedelta(hours=1)
+        return slot.astimezone(timezone.utc)
     hour, minute = (int(x) for x in schedule["time"].split(":"))
     slot = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if schedule["every"] == "day":

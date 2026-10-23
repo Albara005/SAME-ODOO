@@ -42,6 +42,9 @@ class Workflow(IdMixin, TimestampMixin, TenantScoped, Base):
     notify_owner_on_failure: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # Actions that act as a user (run_agent) act as the owner, with the owner's current permissions.
     owner_user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Trigger "webhook.received": the secret in the workflow's address, encrypted, and its SHA-256 to find it by.
+    hook_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hook_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
 
 
 class WorkflowRun(IdMixin, TimestampMixin, TenantScoped, Base):

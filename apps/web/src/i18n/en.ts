@@ -1171,6 +1171,22 @@ export const en = {
   "mfaGate.body": "{org} asks every member to use two-step sign-in. Turn it on in your account (it takes a minute with an authenticator app), then come back.",
   "mfaGate.setUp": "Set it up in my account",
   "mfaGate.otherOrgs": "My organizations",
+  "wf.trigger.webhook.received": "Another system calls its address (webhook)",
+  "wf.sched.hour": "Every hour",
+  "wf.sched.minute": "Minute past the hour",
+  "wf.sched.minuteHint": "0 to 59, in the chosen time zone",
+  "wf.sched.hourlyAt": "every hour at :{minute} ({zone})",
+  "wf.hook.editorHint": "After saving, the workflow gets a secret address. Whatever JSON another system sends there is available to conditions and messages as data.… (for example {{data.name}}).",
+  "wf.hook.title": "Webhook address",
+  "wf.hook.about": "Other systems (a store, a form, a CRM) start this workflow by sending a JSON object to this address with POST. Anyone holding the address can start it, so keep it private.",
+  "wf.hook.url": "Address",
+  "wf.hook.example": "Example",
+  "wf.hook.fields": "Use the fields sent as {{data.name}} in messages and data.budget in conditions. Repeating the same Idempotency-Key never starts it twice; at most 60 calls a minute.",
+  "wf.hook.copy": "Copy address",
+  "wf.hook.rotate": "New address",
+  "wf.hook.rotateConfirm": "Make a new address? The current one stops working at once.",
+  "wf.hook.rotated": "New address ready: update the systems that call it",
+  "audit.a.workflow.hook_rotated": "Workflow webhook address replaced",
 } as const;
 
 export type MessageKey = keyof typeof en;
