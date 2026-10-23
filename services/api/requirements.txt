@@ -5,3 +5,13 @@ argon2-cffi==23.1.0
 pyjwt==2.10.1
 uvicorn==0.34.0
 psycopg[binary]==3.2.3
+anthropic==2.1.0
+uharfbuzz==0.41.0
+fonttools==4.55.3
+cryptography==50.0.2
+# Outgoing webhooks (also used by the Anthropic SDK)
+httpx==0.28.1
+# Time zones for scheduled workflows, even where the OS has no zone database
+tzdata==2025.2
+# Optional: PNG export of logos (needs the system library libcairo2)
+cairosvg==2.7.1
