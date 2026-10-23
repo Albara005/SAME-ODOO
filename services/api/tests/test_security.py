@@ -132,17 +132,18 @@ def test_two_factor_sign_in(api, client, app):
     secret, codes = enable_mfa(api)
     assert len(codes) == 10 and api.req("GET", OWNER, "/me").json()["mfa_enabled"] is True
     with app.state.sessionmaker() as db:
-        stored = db.scalar(select(User.mfa_secret).where(User.email == OWNER))
+        stored, used_step = db.execute(select(User.mfa_secret, User.mfa_last_step).where(User.email == OWNER)).one()
     assert stored.startswith("v1:") and secret not in stored        # encrypted at rest
 
     first = login(client, OWNER).json()
     assert first["mfa_required"] is True and first["access_token"] is None
     # The half-way token is not a session.
     assert client.get("/api/v1/me", headers={"Authorization": f"Bearer {first['mfa_token']}"}).status_code == 401
-    # The code used to switch it on can't be replayed; the next one works.
-    now_code = totp.code_at(secret, time.time())
-    assert client.post("/api/v1/auth/login/mfa", json={"mfa_token": first["mfa_token"], "code": now_code}).status_code == 401
-    next_code = totp.code_at(secret, time.time() + totp.STEP_SECONDS)
+    # The code used to switch it on can't be replayed; the next one works. (Steps, not the clock:
+    # a 30-second boundary between switching it on and here would make "now" a fresh code.)
+    used_code = totp.code_at(secret, used_step * totp.STEP_SECONDS)
+    assert client.post("/api/v1/auth/login/mfa", json={"mfa_token": first["mfa_token"], "code": used_code}).status_code == 401
+    next_code = totp.code_at(secret, (used_step + 1) * totp.STEP_SECONDS)
     r = client.post("/api/v1/auth/login/mfa", json={"mfa_token": first["mfa_token"], "code": next_code})
     assert r.status_code == 200 and r.json()["access_token"]
 
