@@ -35,6 +35,7 @@ class ToolContext:
     org: OrgContext
     ip: str = ""
     extra: dict = field(default_factory=dict)
+    storage: object | None = None  # ObjectStorage, for tools that read file contents
 
 
 @dataclass(frozen=True)
@@ -169,7 +170,70 @@ def _orders(t: ToolContext, a: OrderQuery):
                              _=t.org, db=t.db))
 
 
+class FileQuery(BaseModel):
+    query: str = Field(min_length=2, max_length=100, description="Words to find in file names or text files")
+    limit: int = Field(default=10, ge=1, le=25)
+
+
+TEXT_TYPES = ("text/", "application/json", "application/xml", "application/csv")
+MAX_SEARCH_BYTES = 256 * 1024
+SNIPPET = 160
+
+
+def _snippet(text: str, needle: str) -> str | None:
+    at = text.lower().find(needle)
+    if at < 0:
+        return None
+    start = max(at - SNIPPET // 2, 0)
+    return ("…" if start else "") + text[start:start + SNIPPET].replace("\n", " ") + ("…" if start + SNIPPET < len(text) else "")
+
+
+def _search_files(t: ToolContext, a: FileQuery):
+    """Organization files the user can read (files.read): matching names, and text inside small text files."""
+    from sqlalchemy import select
+
+    from novara.modules.files.models import StoredFile
+
+    needle = a.query.lower()
+    out = []
+    for f in t.db.scalars(select(StoredFile).order_by(StoredFile.created_at.desc()).limit(500)):
+        snippet = None
+        if t.storage is not None and f.size_bytes <= MAX_SEARCH_BYTES and f.content_type.startswith(TEXT_TYPES):
+            try:
+                snippet = _snippet(t.storage.get(f.storage_key).decode("utf-8", errors="replace"), needle)
+            except (OSError, KeyError):
+                snippet = None
+        if snippet is None and needle not in f.filename.lower():
+            continue
+        out.append({"file_id": f.id, "filename": f.filename, "content_type": f.content_type,
+                    "size_bytes": f.size_bytes, "uploaded_at": f.created_at.isoformat(), "match": snippet or ""})
+        if len(out) >= a.limit:
+            break
+    return out
+
+
 # ---------------------------------------------------------------- write tools (approval required)
+
+
+class Note(BaseModel):
+    note: str = Field(min_length=3, max_length=500, description="One short fact or preference, in the user's words")
+
+
+def _remember(t: ToolContext, a: Note):
+    from sqlalchemy import func, select
+
+    from novara.ai.assistant import MAX_MEMORIES
+    from novara.ai.models import AssistantMemory
+
+    user = t.org.user.id
+    if t.db.scalar(select(func.count()).select_from(AssistantMemory).where(AssistantMemory.user_id == user)) >= MAX_MEMORIES:
+        raise ToolRefused(f"you already have {MAX_MEMORIES} saved notes; delete some in the assistant settings first")
+    if t.db.scalar(select(AssistantMemory.id).where(AssistantMemory.user_id == user, AssistantMemory.text == a.note)):
+        return {"saved": False, "reason": "already saved"}
+    memory = AssistantMemory(user_id=user, text=a.note)
+    t.db.add(memory)
+    t.db.flush()
+    return {"saved": True, "memory_id": memory.id}
 
 
 class NewCustomer(BaseModel):
@@ -264,6 +328,11 @@ TOOLS: dict[str, Tool] = {t.name: t for t in [
     Tool("stock_levels", "Quantity, value and average cost of stock per product and warehouse.", P.INVENTORY_READ,
          "read", StockQuery, _stock),
     Tool("list_sales_orders", "Quotations and sales orders.", P.SALES_READ, "read", OrderQuery, _orders),
+    Tool("search_files", "Find the organization's uploaded files by name, and by text inside small text/CSV/JSON "
+         "files. Returns where the words appear.", P.FILES_READ, "read", FileQuery, _search_files),
+    Tool("remember", "Save a note for the user's future conversations (a preference or a fact they want kept). "
+         "Requires the user's approval in the app; only this user's assistant sees it.", P.AI_USE, "write",
+         Note, _remember, lambda a: f"Remember: {a.note}"),
     Tool("create_customer", "Create a customer. Requires the user's approval in the app before it happens.",
          P.CUSTOMERS_WRITE, "write", NewCustomer, _create_customer, lambda a: f"Create customer '{a.name}'"),
     Tool("create_draft_invoice", "Create a DRAFT invoice (not posted). Requires the user's approval in the app.",

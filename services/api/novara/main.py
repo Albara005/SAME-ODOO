@@ -13,6 +13,7 @@ from novara.ai.router import router as assistant_router
 from novara.agents.router import router as agents_router
 from novara.automation.live import router as live_router
 from novara.automation.router import router as automation_router
+from novara.automation.webhooks import WebhookSender
 from novara.config import Settings, load_settings
 from novara.creative.router import router as creative_router
 from novara.hosting.router import router as hosting_router
@@ -79,6 +80,8 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     app.state.ai_provider = ai_provider or AnthropicProvider()
     # SMTP when NOVARA_SMTP_HOST is set; otherwise emails go to the log (development).
     app.state.mailer = mailer or mailer_from_settings(settings)
+    # Workflow webhooks: signed, public internet only (automation/webhooks.py).
+    app.state.webhooks = WebhookSender(settings)
 
     @app.exception_handler(PeriodLocked)
     def closed_books(_request: Request, exc: PeriodLocked) -> JSONResponse:

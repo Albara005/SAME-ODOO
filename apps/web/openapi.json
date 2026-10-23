@@ -3468,6 +3468,30 @@
     "title": "MemberUpdate",
     "type": "object"
    },
+   "MemoryOut": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "text",
+     "created_at"
+    ],
+    "title": "MemoryOut",
+    "type": "object"
+   },
    "MessageIn": {
     "properties": {
      "content": {
@@ -6089,6 +6113,17 @@
       },
       "title": "Routes",
       "type": "object"
+     },
+     "user_monthly_budget_usd": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Monthly Budget Usd"
      }
     },
     "required": [
@@ -6145,6 +6180,22 @@
        }
       ],
       "title": "Routes"
+     },
+     "user_monthly_budget_usd": {
+      "anyOf": [
+       {
+        "maximum": 1000000.0,
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Monthly Budget Usd"
      }
     },
     "title": "SettingsUpdate",
@@ -7134,6 +7185,19 @@
     "title": "WarehouseOut",
     "type": "object"
    },
+   "WebhookSecretOut": {
+    "properties": {
+     "secret": {
+      "title": "Secret",
+      "type": "string"
+     }
+    },
+    "required": [
+     "secret"
+    ],
+    "title": "WebhookSecretOut",
+    "type": "object"
+   },
    "WorkflowIn": {
     "properties": {
      "actions": {
@@ -7168,6 +7232,17 @@
       "default": true,
       "title": "Notify Owner On Failure",
       "type": "boolean"
+     },
+     "schedule": {
+      "anyOf": [
+       {
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Schedule"
      },
      "trigger": {
       "title": "Trigger",
@@ -7218,6 +7293,17 @@
      "owner_user_id": {
       "title": "Owner User Id",
       "type": "string"
+     },
+     "schedule": {
+      "anyOf": [
+       {
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Schedule"
      },
      "trigger": {
       "title": "Trigger",
@@ -7290,6 +7376,17 @@
        }
       ],
       "title": "Name"
+     },
+     "schedule": {
+      "anyOf": [
+       {
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Schedule"
      }
     },
     "title": "WorkflowUpdate",
@@ -10061,6 +10158,173 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/assistant/conversations/{conversation_id}/messages/stream": {
+   "post": {
+    "description": "Like sending a message, but the reply arrives as server-sent events while it is written:\n`delta` {text} pieces, `tool` {name, status} per tool call, then `done` (the same body as the\nnon-streaming endpoint) or `error` {detail}.",
+    "operationId": "stream_message_api_v1_orgs__org_id__assistant_conversations__conversation_id__messages_stream_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "conversation_id",
+      "required": true,
+      "schema": {
+       "title": "Conversation Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MessageIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "text/event-stream": {}
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Stream Message",
+    "tags": [
+     "assistant"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/assistant/memories": {
+   "get": {
+    "description": "Your own saved notes (each was approved by you); nobody else's assistant sees them.",
+    "operationId": "list_memories_api_v1_orgs__org_id__assistant_memories_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/MemoryOut"
+         },
+         "title": "Response List Memories Api V1 Orgs  Org Id  Assistant Memories Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Memories",
+    "tags": [
+     "assistant"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/assistant/memories/{memory_id}": {
+   "delete": {
+    "operationId": "forget_api_v1_orgs__org_id__assistant_memories__memory_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "memory_id",
+      "required": true,
+      "schema": {
+       "title": "Memory Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Forget",
+    "tags": [
+     "assistant"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/assistant/settings": {
    "get": {
     "operationId": "get_settings_api_v1_orgs__org_id__assistant_settings_get",
@@ -10330,6 +10594,102 @@
      }
     ],
     "summary": "Process Now",
+    "tags": [
+     "automation"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/automation/webhook-secret": {
+   "get": {
+    "description": "The secret webhook receivers use to check the X-Novara-Signature header.",
+    "operationId": "webhook_secret_api_v1_orgs__org_id__automation_webhook_secret_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookSecretOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Webhook Secret",
+    "tags": [
+     "automation"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/automation/webhook-secret/rotate": {
+   "post": {
+    "description": "A new secret; deliveries are signed with it from now on (update your receivers).",
+    "operationId": "rotate_webhook_secret_api_v1_orgs__org_id__automation_webhook_secret_rotate_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookSecretOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Rotate Webhook Secret",
     "tags": [
      "automation"
     ]

@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, Bell, ClipboardCheck, Filter, ListChecks, Play, Plus, Bot, Trash2, Zap, type LucideIcon } from "lucide-react";
+import {
+  ArrowDown, Bell, Bot, CalendarClock, ClipboardCheck, Copy, Eye, Filter, ListChecks, Play, Plus, RotateCw, Trash2,
+  Webhook, Zap, type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
@@ -16,7 +19,31 @@ type Catalog = { triggers: Record<string, string>; operators: string[]; actions:
 type Condition = { field: string; op: string; value?: string };
 type Action = Record<string, string | number> & { type: string };
 
-const ACTION_ICON: Record<string, LucideIcon> = { create_task: ListChecks, notify: Bell, require_approval: ClipboardCheck, run_agent: Bot };
+const ACTION_ICON: Record<string, LucideIcon> = {
+  create_task: ListChecks, notify: Bell, require_approval: ClipboardCheck, run_agent: Bot, webhook: Webhook,
+};
+
+type Schedule = { every: "day" | "week" | "month"; time: string; timezone: string; weekday?: number; day?: number };
+const ZONES = ["Asia/Riyadh", "Asia/Dubai", "Asia/Kuwait", "Asia/Qatar", "Asia/Bahrain", "Asia/Muscat", "Africa/Cairo",
+  "Asia/Amman", "Europe/London", "UTC"];
+const localZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+};
+
+/** "every day at 08:00 (Asia/Riyadh)" in the reader's language. */
+function useScheduleLabel() {
+  const { t } = useI18n();
+  return (s: Schedule) => {
+    const at = { time: s.time, zone: s.timezone };
+    if (s.every === "week") return t("wf.sched.weeklyAt", { ...at, day: t(`wf.weekday.${s.weekday ?? 0}` as MessageKey) });
+    if (s.every === "month") return t("wf.sched.monthlyAt", { ...at, day: s.day ?? 1 });
+    return t("wf.sched.dailyAt", at);
+  };
+}
 
 function useCatalog() {
   const { org } = useOrg();
@@ -41,6 +68,7 @@ export function AutomationPage() {
   const { t } = useI18n();
   const { org, path } = useOrg();
   const triggerLabel = useTriggerLabel();
+  const scheduleLabel = useScheduleLabel();
   const workflows = useQuery({
     queryKey: ["workflows", org.id],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/workflows", { params: { path: { org_id: org.id } } })),
@@ -64,7 +92,8 @@ export function AutomationPage() {
                   <span className="grow stack-sm" style={{ gap: 2 }}>
                     <strong>{w.name}</strong>
                     <span className="muted small">
-                      {t("wf.when")} {triggerLabel(w.trigger)} · {t("wf.steps", { n: w.actions.length })}
+                      {t("wf.when")} {w.schedule ? scheduleLabel(w.schedule as Schedule) : triggerLabel(w.trigger)}
+                      {" · "}{t("wf.steps", { n: w.actions.length })}
                     </span>
                   </span>
                   <Badge tone={w.enabled ? "success" : "neutral"}>{w.enabled ? t("common.active") : t("wf.paused")}</Badge>
@@ -74,7 +103,54 @@ export function AutomationPage() {
           )
         }
       </QueryView>
+      <WebhookSecretCard />
     </div>
+  );
+}
+
+/** The secret webhook receivers check signatures with: hidden until asked for, rotatable. */
+function WebhookSecretCard() {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  const toast = useToast();
+  const [secret, setSecret] = useState<string | null>(null);
+  const params = { path: { org_id: org.id } };
+  const reveal = useMutation({
+    mutationFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/automation/webhook-secret", { params })),
+    onSuccess: (r) => setSecret(r.secret),
+  });
+  const rotate = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/automation/webhook-secret/rotate", { params })),
+    onSuccess: (r) => {
+      setSecret(r.secret);
+      toast(t("wf.secret.rotated"));
+    },
+  });
+  return (
+    <Card title={t("wf.secret.title")}>
+      <div className="stack-sm">
+        <p className="muted small">{t("wf.secret.about")}</p>
+        {(reveal.isError || rotate.isError) && <ErrorNotice error={reveal.error ?? rotate.error} />}
+        {secret ? (
+          <code className="mfa-secret" dir="ltr" style={{ textAlign: "start" }}>{secret}</code>
+        ) : (
+          <span className="mono muted" dir="ltr">whsec_••••••••••••••••</span>
+        )}
+        <div className="row">
+          {secret ? (
+            <Button size="sm" icon={<Copy size={14} />} onClick={() => void navigator.clipboard?.writeText(secret).then(() => toast(t("common.copied")), () => undefined)}>
+              {t("common.copy")}
+            </Button>
+          ) : (
+            <Button size="sm" icon={<Eye size={14} />} loading={reveal.isPending} onClick={() => reveal.mutate()}>{t("wf.secret.show")}</Button>
+          )}
+          <Button size="sm" variant="danger" icon={<RotateCw size={14} />} loading={rotate.isPending}
+            onClick={() => window.confirm(t("wf.secret.rotateConfirm")) && rotate.mutate()}>
+            {t("wf.secret.rotate")}
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -96,7 +172,11 @@ export function WorkflowEditorPage() {
 }
 
 function blankAction(type: string): Action {
-  return type === "create_task" ? { type, title: "", assignee: "owner" } : type === "notify" ? { type, title: "", to: "owner" } : type === "require_approval" ? { type, permission: "invoices.post", message: "" } : { type };
+  if (type === "create_task") return { type, title: "", assignee: "owner" };
+  if (type === "notify") return { type, title: "", to: "owner" };
+  if (type === "require_approval") return { type, permission: "invoices.post", message: "" };
+  if (type === "webhook") return { type, url: "https://" };
+  return { type };
 }
 
 function WorkflowEditor({ catalog, workflow }: { catalog: Catalog; workflow?: Workflow }) {
@@ -107,6 +187,8 @@ function WorkflowEditor({ catalog, workflow }: { catalog: Catalog; workflow?: Wo
   const triggerLabel = useTriggerLabel();
   const [name, setName] = useState(workflow?.name ?? "");
   const [trigger, setTrigger] = useState(workflow?.trigger ?? "invoice.posted");
+  const [schedule, setSchedule] = useState<Schedule>(
+    (workflow?.schedule as Schedule | null) ?? { every: "day", time: "08:00", timezone: localZone() });
   const [conditions, setConditions] = useState<Condition[]>((workflow?.conditions as Condition[]) ?? []);
   const [actions, setActions] = useState<Action[]>((workflow?.actions as Action[]) ?? [blankAction("create_task")]);
   const permissions = useQuery({ queryKey: ["permissions"], queryFn: () => unwrap(api.GET("/api/v1/permissions")) as Promise<Record<string, string>>, staleTime: Infinity });
@@ -119,13 +201,16 @@ function WorkflowEditor({ catalog, workflow }: { catalog: Catalog; workflow?: Wo
     mutationFn: () => {
       const cleanActions = actions.map((a) => Object.fromEntries(Object.entries(a).filter(([, v]) => v !== "")));
       const cleanConditions = conditions.filter((c) => c.field).map((c) => (c.op === "exists" ? { field: c.field, op: c.op } : c));
+      const sched = trigger === "schedule" ? scheduleBody(schedule) : null;
       return workflow
         ? unwrap(api.PATCH("/api/v1/orgs/{org_id}/workflows/{workflow_id}", {
-            params: { path: { org_id: org.id, workflow_id: workflow.id } }, body: { name, conditions: cleanConditions, actions: cleanActions },
+            params: { path: { org_id: org.id, workflow_id: workflow.id } },
+            body: { name, conditions: cleanConditions, actions: cleanActions, ...(sched ? { schedule: sched } : {}) },
           }))
         : unwrap(api.POST("/api/v1/orgs/{org_id}/workflows", {
             params: { path: { org_id: org.id } },
-            body: { name, trigger, conditions: cleanConditions, actions: cleanActions, enabled: true, notify_owner_on_failure: true },
+            body: { name, trigger, schedule: sched, conditions: cleanConditions, actions: cleanActions, enabled: true,
+                    notify_owner_on_failure: true },
           }));
     },
     onSuccess: (w) => {
@@ -154,6 +239,7 @@ function WorkflowEditor({ catalog, workflow }: { catalog: Catalog; workflow?: Wo
             <Select aria-label={t("wf.trigger")} value={trigger} onChange={(e) => setTrigger(e.target.value)} disabled={Boolean(workflow)}>
               {Object.keys(catalog.triggers).map((k) => <option key={k} value={k}>{triggerLabel(k)}</option>)}
             </Select>
+            {trigger === "schedule" && <ScheduleFields value={schedule} onChange={setSchedule} />}
           </div>
         </li>
 
@@ -189,7 +275,7 @@ function WorkflowEditor({ catalog, workflow }: { catalog: Catalog; workflow?: Wo
               <span className="flow-icon step"><Icon size={18} aria-hidden /></span>
               <div className="grow stack-sm">
                 <span className="row-between">
-                  <Select aria-label={`${t("wf.action")} ${i + 1}`} value={a.type} onChange={(e) => updateAction(i, blankAction(e.target.value))} style={{ maxWidth: 260 }}>
+                  <Select aria-label={`${t("wf.action")} ${i + 1}`} value={a.type} onChange={(e) => setActions(actions.map((x, j) => (j === i ? blankAction(e.target.value) : x)))} style={{ maxWidth: 260 }}>
                     {Object.keys(catalog.actions).map((k) => <option key={k} value={k}>{t(`wf.action.${k}` as MessageKey)}</option>)}
                   </Select>
                   <IconButton label={`${t("common.delete")} ${t("wf.action")} ${i + 1}`} onClick={() => setActions(actions.filter((_, j) => j !== i))} disabled={actions.length === 1}>
@@ -212,6 +298,51 @@ function WorkflowEditor({ catalog, workflow }: { catalog: Catalog; workflow?: Wo
         <Button type="submit" variant="primary" loading={save.isPending}>{t("common.save")}</Button>
       </div>
     </form>
+  );
+}
+
+/** Only the fields the chosen frequency uses. */
+function scheduleBody(s: Schedule): Schedule {
+  const base = { every: s.every, time: s.time, timezone: s.timezone };
+  if (s.every === "week") return { ...base, weekday: s.weekday ?? 0 };
+  if (s.every === "month") return { ...base, day: s.day ?? 1 };
+  return base;
+}
+
+function ScheduleFields({ value: s, onChange }: { value: Schedule; onChange: (s: Schedule) => void }) {
+  const { t } = useI18n();
+  const zones = ZONES.includes(s.timezone) ? ZONES : [s.timezone, ...ZONES];
+  return (
+    <div className="schedule-fields">
+      <CalendarClock size={16} aria-hidden className="muted" />
+      <Field label={t("wf.sched.every")}>
+        <Select value={s.every} onChange={(e) => onChange({ ...s, every: e.target.value as Schedule["every"] })}>
+          <option value="day">{t("wf.sched.day")}</option>
+          <option value="week">{t("wf.sched.week")}</option>
+          <option value="month">{t("wf.sched.month")}</option>
+        </Select>
+      </Field>
+      {s.every === "week" && (
+        <Field label={t("wf.sched.weekday")}>
+          <Select value={String(s.weekday ?? 0)} onChange={(e) => onChange({ ...s, weekday: Number(e.target.value) })}>
+            {[6, 0, 1, 2, 3, 4, 5].map((d) => <option key={d} value={d}>{t(`wf.weekday.${d}` as MessageKey)}</option>)}
+          </Select>
+        </Field>
+      )}
+      {s.every === "month" && (
+        <Field label={t("wf.sched.dayOfMonth")} hint={t("wf.sched.dayHint")}>
+          <Input type="number" min={1} max={28} value={String(s.day ?? 1)} onChange={(e) => onChange({ ...s, day: Number(e.target.value) })} ltr />
+        </Field>
+      )}
+      <Field label={t("wf.sched.time")}>
+        <Input type="time" value={s.time} onChange={(e) => onChange({ ...s, time: e.target.value })} required ltr />
+      </Field>
+      <Field label={t("wf.sched.zone")}>
+        <Select value={s.timezone} onChange={(e) => onChange({ ...s, timezone: e.target.value })}>
+          {zones.map((z) => <option key={z} value={z}>{z}</option>)}
+        </Select>
+      </Field>
+    </div>
   );
 }
 
@@ -252,6 +383,13 @@ function ActionFields({ action: a, onChange, permissions, agents }: {
         {who("to", "wf.f.to")}
       </div>
     );
+  if (a.type === "webhook")
+    return (
+      <Field label={t("wf.f.url")} hint={t("wf.f.urlHint")}>
+        <Input type="url" value={String(a.url ?? "")} onChange={(e) => onChange({ url: e.target.value })} required ltr
+          placeholder="https://hooks.example.com/novara" />
+      </Field>
+    );
   if (a.type === "require_approval")
     return (
       <div className="grid-2">
@@ -285,6 +423,7 @@ export function WorkflowPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const triggerLabel = useTriggerLabel();
+  const scheduleLabel = useScheduleLabel();
   const workflows = useQuery({
     queryKey: ["workflows", org.id],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/workflows", { params: { path: { org_id: org.id } } })),
@@ -317,7 +456,7 @@ export function WorkflowPage() {
     <div className="stack">
       <PageHeader
         title={w.name}
-        subtitle={`${t("wf.when")} ${triggerLabel(w.trigger)}`}
+        subtitle={`${t("wf.when")} ${w.schedule ? scheduleLabel(w.schedule as Schedule) : triggerLabel(w.trigger)}`}
         actions={
           <>
             <Checkbox label={t("common.active")} checked={w.enabled} onChange={(e) => toggle.mutate(e.target.checked)} />

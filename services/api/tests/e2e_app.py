@@ -7,20 +7,32 @@ Never used outside tests: the stand-in answers from fixed rules and calls no ext
 
 from __future__ import annotations
 
-from novara.ai.provider import ModelReply, text_reply, tool_reply
+import time
+
+from novara.ai.provider import ModelReply, stream_text, text_reply, tool_reply
 from novara.mail import MemoryMailer
 from novara.main import create_app as _create_app
 
 ADD_CUSTOMER = "أضف عميل"
+REMEMBER = "تذكّر"
 
 
 class DemoProvider:
     def create(self, *, model: str, effort: str, system: str, tools: list[dict], messages: list[dict],
-               max_tokens: int, stream: bool = False) -> ModelReply:
+               max_tokens: int, stream: bool = False, on_text=None) -> ModelReply:
+        reply = self._reply(model, tools, messages)
+        if on_text is not None:
+            stream_text(reply, lambda chunk: (on_text(chunk), time.sleep(0.05)))  # visible in the browser tests
+        return reply
+
+    def _reply(self, model: str, tools: list[dict], messages: list[dict]) -> ModelReply:
         last = messages[-1]["content"]
         if any(b.get("type") == "tool_result" for b in last):
             return text_reply("جهّزت الطلب. راجعه ووافق عليه من البطاقة أدناه.", model=model)
         typed = last[-1].get("text", "")  # the last block is what the user typed
+        if typed.startswith(REMEMBER) and any(t["name"] == "remember" for t in tools):
+            return tool_reply("remember", {"note": typed[len(REMEMBER):].strip(" :،")}, tool_use_id=f"toolu_{len(messages)}",
+                              text="سأحفظ هذه الملاحظة بعد موافقتك.", model=model)
         if ADD_CUSTOMER in typed and any(t["name"] == "create_customer" for t in tools):
             name = typed.split(ADD_CUSTOMER, 1)[1].strip(" :،") or "عميل جديد"
             return tool_reply("create_customer", {"name": name}, tool_use_id=f"toolu_{len(messages)}",

@@ -18,8 +18,9 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from novara.automation import engine
-from novara.automation.events import scan_overdue
+from novara.automation.events import scan_overdue, scan_schedules
 from novara.automation.models import Workflow
+from novara.db import utcnow
 from novara.tenancy import bind_tenant, system_scope
 
 log = logging.getLogger("novara.worker")
@@ -33,7 +34,7 @@ def organizations_with_workflows(db: Session) -> list[str]:
         return list(db.scalars(select(Workflow.organization_id).where(Workflow.enabled.is_(True)).distinct()))
 
 
-def run_once(sessionmaker, provider, today: date | None = None) -> dict[str, dict]:
+def run_once(sessionmaker, provider, today: date | None = None, webhooks=None) -> dict[str, dict]:
     with sessionmaker() as db:
         org_ids = organizations_with_workflows(db)
     results = {}
@@ -42,8 +43,10 @@ def run_once(sessionmaker, provider, today: date | None = None) -> dict[str, dic
             bind_tenant(db, org_id)
             try:
                 emitted = scan_overdue(db, today or date.today())
+                scheduled = scan_schedules(db, utcnow())
                 db.commit()
-                results[org_id] = {"overdue_events": emitted, **engine.process(db, provider=provider)}
+                results[org_id] = {"overdue_events": emitted, "scheduled_events": scheduled,
+                                   **engine.process(db, provider=provider, webhooks=webhooks)}
             except Exception:  # noqa: BLE001 - one organization's failure must not stop the others
                 log.exception("automation failed for organization %s", org_id)
                 db.rollback()
@@ -60,7 +63,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     app = create_app()
     while True:
-        log.info("processed: %s", run_once(app.state.sessionmaker, app.state.ai_provider))
+        log.info("processed: %s", run_once(app.state.sessionmaker, app.state.ai_provider,
+                                           webhooks=app.state.webhooks))
         if args.once:
             return
         time.sleep(args.interval)

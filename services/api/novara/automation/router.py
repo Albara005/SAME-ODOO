@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from novara.automation import engine as E
-from novara.automation.events import EVENT_TYPES, scan_overdue
+from novara.automation import webhooks as W
+from novara.automation.events import EVENT_TYPES, scan_overdue, scan_schedules
 from novara.automation.models import Notification, Task, Workflow, WorkflowRun, WorkflowStep
 from novara.db import utcnow
 from novara.deps import OrgContext, client_ip, get_db, org_context, require
@@ -21,6 +22,9 @@ router = APIRouter(tags=["automation"])
 class WorkflowIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     trigger: str
+    # Only with trigger "schedule": {"every": "day"|"week"|"month", "time": "HH:MM", "timezone": "Asia/Riyadh",
+    # "weekday": 0-6 for weekly (Monday = 0), "day": 1-28 for monthly}
+    schedule: dict | None = None
     conditions: list[dict] = Field(default_factory=list, max_length=20)
     actions: list[dict] = Field(min_length=1, max_length=E.MAX_ACTIONS)
     enabled: bool = True
@@ -29,6 +33,7 @@ class WorkflowIn(BaseModel):
 
 class WorkflowUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
+    schedule: dict | None = None
     conditions: list[dict] | None = None
     actions: list[dict] | None = None
     enabled: bool | None = None
@@ -38,6 +43,7 @@ class WorkflowOut(BaseModel):
     id: str
     name: str
     trigger: str
+    schedule: dict | None = None
     conditions: list[dict]
     actions: list[dict]
     enabled: bool
@@ -89,7 +95,7 @@ class NotificationOut(BaseModel):
 
 
 def _wf_out(w: Workflow) -> WorkflowOut:
-    return WorkflowOut(id=w.id, name=w.name, trigger=w.trigger, conditions=w.conditions, actions=w.actions,
+    return WorkflowOut(id=w.id, name=w.name, trigger=w.trigger, schedule=w.schedule, conditions=w.conditions, actions=w.actions,
                        enabled=w.enabled, owner_user_id=w.owner_user_id, created_at=w.created_at)
 
 
@@ -124,8 +130,9 @@ def catalog(_: OrgContext = Depends(require(P.WORKFLOWS_MANAGE))):
 @router.post("/orgs/{org_id}/workflows", response_model=WorkflowOut, status_code=status.HTTP_201_CREATED)
 def create_workflow(body: WorkflowIn, request: Request, ctx: OrgContext = Depends(require(P.WORKFLOWS_MANAGE)),
                     db: Session = Depends(get_db)):
-    _validated(lambda: E.validate(db, trigger=body.trigger, conditions=body.conditions, actions=body.actions))
-    w = Workflow(name=body.name, trigger=body.trigger, conditions=body.conditions, actions=body.actions,
+    schedule = _validated(lambda: E.validate(db, trigger=body.trigger, conditions=body.conditions,
+                                             actions=body.actions, schedule=body.schedule))
+    w = Workflow(name=body.name, trigger=body.trigger, schedule=schedule, conditions=body.conditions, actions=body.actions,
                  enabled=body.enabled, notify_owner_on_failure=body.notify_owner_on_failure, owner_user_id=ctx.user.id)
     db.add(w)
     db.flush()
@@ -147,7 +154,9 @@ def update_workflow(workflow_id: str, body: WorkflowUpdate, request: Request,
     w = _workflow(db, workflow_id)
     conditions = w.conditions if body.conditions is None else body.conditions
     actions = w.actions if body.actions is None else body.actions
-    _validated(lambda: E.validate(db, trigger=w.trigger, conditions=conditions, actions=actions))
+    schedule = w.schedule if body.schedule is None else body.schedule
+    w.schedule = _validated(lambda: E.validate(db, trigger=w.trigger, conditions=conditions, actions=actions,
+                                               schedule=schedule))
     w.conditions, w.actions = conditions, actions
     if body.name is not None:
         w.name = body.name
@@ -172,8 +181,10 @@ def process_now(request: Request, ctx: OrgContext = Depends(require(P.WORKFLOWS_
                 db: Session = Depends(get_db)):
     """Process this organization's automation now (the background worker does this continuously)."""
     emitted = scan_overdue(db, date.today())
+    scheduled = scan_schedules(db, utcnow())
     db.commit()
-    return {"overdue_events": emitted, **E.process(db, provider=request.app.state.ai_provider)}
+    return {"overdue_events": emitted, "scheduled_events": scheduled,
+            **E.process(db, provider=request.app.state.ai_provider, webhooks=request.app.state.webhooks)}
 
 
 def _waiting_run(db: Session, run_id: str) -> tuple[WorkflowRun, WorkflowStep]:
@@ -195,7 +206,7 @@ def _decide(run_id: str, approve: bool, request: Request, ctx: OrgContext, db: S
                  ip_address=client_ip(request))
     db.commit()
     if approve:
-        E.process(db, provider=request.app.state.ai_provider)  # continue right away
+        E.process(db, provider=request.app.state.ai_provider, webhooks=request.app.state.webhooks)  # continue right away
     return _run_out(db, db.get(WorkflowRun, run_id))
 
 
@@ -268,3 +279,30 @@ def mark_read(notification_id: str, ctx: OrgContext = Depends(org_context), db: 
     n.read_at = n.read_at or utcnow()
     db.commit()
     return NotificationOut(id=n.id, title=n.title, body=n.body, read=True, created_at=n.created_at)
+
+
+# ---------------------------------------------------------------- webhook signing secret
+
+
+class WebhookSecretOut(BaseModel):
+    secret: str
+
+
+@router.get("/orgs/{org_id}/automation/webhook-secret", response_model=WebhookSecretOut)
+def webhook_secret(request: Request, ctx: OrgContext = Depends(require(P.WORKFLOWS_MANAGE)),
+                   db: Session = Depends(get_db)):
+    """The secret webhook receivers use to check the X-Novara-Signature header."""
+    secret = W.org_secret(db, request.app.state.settings)
+    db.commit()
+    return WebhookSecretOut(secret=secret)
+
+
+@router.post("/orgs/{org_id}/automation/webhook-secret/rotate", response_model=WebhookSecretOut)
+def rotate_webhook_secret(request: Request, ctx: OrgContext = Depends(require(P.WORKFLOWS_MANAGE)),
+                          db: Session = Depends(get_db)):
+    """A new secret; deliveries are signed with it from now on (update your receivers)."""
+    secret = W.org_secret(db, request.app.state.settings, rotate=True)
+    audit.record(db, actor_user_id=ctx.user.id, action="automation.webhook_secret_rotated", target_type="automation",
+                 target_id="", details={}, ip_address=client_ip(request))
+    db.commit()
+    return WebhookSecretOut(secret=secret)

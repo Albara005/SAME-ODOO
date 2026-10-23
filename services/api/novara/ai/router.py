@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import json
+import logging
+import queue
+import threading
 from collections import defaultdict
 from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,17 +17,22 @@ from sqlalchemy.orm import Session
 from novara.ai import assistant as A
 from novara.ai import routing
 from novara.ai import tools as T
-from novara.ai.models import Conversation, ModelUsage, ToolCall
-from novara.deps import OrgContext, client_ip, get_db, require
+from novara.ai.models import AssistantMemory, Conversation, ModelUsage, ToolCall
+from novara.deps import OrgContext, client_ip, get_db, member_context, require
 from novara.modules.access import permissions as P
 from novara.modules.audit import service as audit
+from novara.modules.identity.models import User
+from novara.tenancy import bind_user
 
 router = APIRouter(tags=["assistant"])
+log = logging.getLogger("novara.assistant")
 
 
 class SettingsOut(BaseModel):
     enabled: bool
     monthly_budget_usd: str
+    # Cap per member per month; null = members share the organization budget without a personal cap.
+    user_monthly_budget_usd: str | None = None
     month_spend_usd: str
     routes: dict[str, dict[str, str]]
     # What a route can be set to, so clients offer only valid choices.
@@ -33,6 +43,8 @@ class SettingsOut(BaseModel):
 class SettingsUpdate(BaseModel):
     enabled: bool | None = None
     monthly_budget_usd: Decimal | None = Field(default=None, ge=0, le=1_000_000, decimal_places=2)
+    # Send null to remove the per-member cap.
+    user_monthly_budget_usd: Decimal | None = Field(default=None, ge=0, le=1_000_000, decimal_places=2)
     routes: dict[str, dict[str, str]] | None = None
 
 
@@ -126,6 +138,8 @@ def get_settings(ctx: OrgContext = Depends(require(P.AI_MANAGE)), db: Session = 
     s = A.settings_for(db)
     db.commit()
     return SettingsOut(enabled=s.enabled, monthly_budget_usd=_usd(s.monthly_budget_micros),
+                       user_monthly_budget_usd=None if s.user_monthly_budget_micros is None
+                       else _usd(s.user_monthly_budget_micros),
                        month_spend_usd=_usd(A.month_spend_micros(db)),
                        routes={name: {"model": r.model, "effort": r.effort}
                                for name, r in ((n, routing.resolve(n, s.routes)) for n in routing.DEFAULT_ROUTES)},
@@ -142,6 +156,10 @@ def update_settings(body: SettingsUpdate, request: Request, ctx: OrgContext = De
     if body.monthly_budget_usd is not None:
         s.monthly_budget_micros = int(body.monthly_budget_usd * 1_000_000)
         changes["monthly_budget_usd"] = str(body.monthly_budget_usd)
+    if "user_monthly_budget_usd" in body.model_fields_set:
+        cap = body.user_monthly_budget_usd
+        s.user_monthly_budget_micros = None if cap is None else int(cap * 1_000_000)
+        changes["user_monthly_budget_usd"] = None if cap is None else str(cap)
     if body.routes is not None:
         try:
             s.routes = changes["routes"] = routing.validate_overrides(body.routes)
@@ -186,18 +204,77 @@ def read_conversation(conversation_id: str, ctx: OrgContext = Depends(require(P.
                               actions=[_action(c) for c in calls])
 
 
+def _turn_out(result: A.TurnResult) -> TurnOut:
+    return TurnOut(reply=result.reply, stop=result.stop,
+                   pending_actions=[_action(c) for c in result.tool_calls if c.status == "pending_approval"],
+                   tool_calls=[_action(c) for c in result.tool_calls],
+                   cost_usd=_usd(sum(u.cost_micros for u in result.usage)))
+
+
 @router.post("/orgs/{org_id}/assistant/conversations/{conversation_id}/messages", response_model=TurnOut)
 def send_message(conversation_id: str, body: MessageIn, request: Request,
                  ctx: OrgContext = Depends(require(P.AI_USE)), db: Session = Depends(get_db)):
     conv = _own_conversation(db, ctx, conversation_id)
     result = _availability(lambda: A.run_turn(
         db, ctx, conv, body.content, provider=request.app.state.ai_provider,
-        route_name="assistant_deep" if body.deep else "assistant", ip=client_ip(request)))
+        route_name="assistant_deep" if body.deep else "assistant", ip=client_ip(request),
+        storage=request.app.state.storage))
     db.commit()
-    return TurnOut(reply=result.reply, stop=result.stop,
-                   pending_actions=[_action(c) for c in result.tool_calls if c.status == "pending_approval"],
-                   tool_calls=[_action(c) for c in result.tool_calls],
-                   cost_usd=_usd(sum(u.cost_micros for u in result.usage)))
+    return _turn_out(result)
+
+
+def _sse(name: str, data: dict) -> str:
+    return f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False, default=str)}\n\n"
+
+
+@router.post("/orgs/{org_id}/assistant/conversations/{conversation_id}/messages/stream",
+             responses={200: {"content": {"text/event-stream": {}}}})
+def stream_message(conversation_id: str, body: MessageIn, request: Request,
+                   ctx: OrgContext = Depends(require(P.AI_USE)), db: Session = Depends(get_db)):
+    """Like sending a message, but the reply arrives as server-sent events while it is written:
+    `delta` {text} pieces, `tool` {name, status} per tool call, then `done` (the same body as the
+    non-streaming endpoint) or `error` {detail}."""
+    conv = _own_conversation(db, ctx, conversation_id)
+    _availability(lambda: A.check_available(db, ctx.user.id))  # refuse with a normal HTTP error, before streaming
+    db.commit()  # end this request's transaction: the turn writes from its own session
+    maker, provider, storage = request.app.state.sessionmaker, request.app.state.ai_provider, request.app.state.storage
+    org_id, user_id, conv_id, ip = ctx.organization.id, ctx.user.id, conv.id, client_ip(request)
+    route_name = "assistant_deep" if body.deep else "assistant"
+    events: queue.Queue = queue.Queue()
+
+    def work() -> None:
+        # The turn runs in its own session: the request's session ends when the response starts.
+        with maker() as s:
+            try:
+                bind_user(s, user_id)
+                turn_ctx = member_context(s, org_id, s.get(User, user_id))
+                if turn_ctx is None or not turn_ctx.has(P.AI_USE):
+                    events.put(("error", {"detail": "you no longer have access to the assistant"}))
+                    return
+                result = A.run_turn(s, turn_ctx, s.get(Conversation, conv_id), body.content, provider=provider,
+                                    route_name=route_name, ip=ip, storage=storage,
+                                    on_event=lambda kind, data: events.put((kind, data)))
+                done = _turn_out(result).model_dump(mode="json")
+                s.commit()
+                events.put(("done", done))
+            except (A.AssistantUnavailable, A.BudgetExceeded) as e:
+                s.rollback()
+                events.put(("error", {"detail": str(e)}))
+            except Exception:  # noqa: BLE001 - reported to the client; details go to the log
+                log.exception("assistant stream failed")
+                s.rollback()
+                events.put(("error", {"detail": "the assistant failed to answer; try again"}))
+            finally:
+                events.put(None)
+
+    threading.Thread(target=work, name="assistant-stream", daemon=True).start()
+
+    def stream():
+        while (item := events.get()) is not None:
+            yield _sse(*item)
+
+    return StreamingResponse(stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 def _decide(action_id: str, approve: bool, request: Request, ctx: OrgContext, db: Session) -> ActionOut:
@@ -210,7 +287,7 @@ def _decide(action_id: str, approve: bool, request: Request, ctx: OrgContext, db
         # Permissions are checked at approval time, not when the assistant proposed the action.
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"you no longer have permission '{permission}'")
     try:
-        call = A.decide(db, ctx, call, approve=approve, ip=client_ip(request))
+        call = A.decide(db, ctx, call, approve=approve, ip=client_ip(request), storage=request.app.state.storage)
     except ValueError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
     audit.record(db, actor_user_id=ctx.user.id, action=f"assistant.action_{call.status}", target_type="ai_action",
@@ -255,3 +332,30 @@ def usage_report(ctx: OrgContext = Depends(require(P.AI_MANAGE)), db: Session = 
     db.commit()
     return UsageOut(month=now.strftime("%Y-%m"), total_cost_usd=_usd(sum(u.cost_micros for u in rows)),
                     budget_usd=_usd(s.monthly_budget_micros), by_model=table("model"), by_user=table("user"))
+
+
+# ---------------------------------------------------------------- memories
+
+
+class MemoryOut(BaseModel):
+    id: str
+    text: str
+    created_at: datetime
+
+
+@router.get("/orgs/{org_id}/assistant/memories", response_model=list[MemoryOut])
+def list_memories(ctx: OrgContext = Depends(require(P.AI_USE)), db: Session = Depends(get_db)):
+    """Your own saved notes (each was approved by you); nobody else's assistant sees them."""
+    rows = db.scalars(select(AssistantMemory).where(AssistantMemory.user_id == ctx.user.id)
+                      .order_by(AssistantMemory.created_at))
+    return [MemoryOut(id=m.id, text=m.text, created_at=m.created_at) for m in rows]
+
+
+@router.delete("/orgs/{org_id}/assistant/memories/{memory_id}", status_code=status.HTTP_204_NO_CONTENT,
+               response_model=None)
+def forget(memory_id: str, ctx: OrgContext = Depends(require(P.AI_USE)), db: Session = Depends(get_db)):
+    memory = db.get(AssistantMemory, memory_id)
+    if memory is None or memory.user_id != ctx.user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "note not found")
+    db.delete(memory)
+    db.commit()

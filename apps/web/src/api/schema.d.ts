@@ -751,6 +751,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/assistant/conversations/{conversation_id}/messages/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stream Message
+         * @description Like sending a message, but the reply arrives as server-sent events while it is written:
+         *     `delta` {text} pieces, `tool` {name, status} per tool call, then `done` (the same body as the
+         *     non-streaming endpoint) or `error` {detail}.
+         */
+        post: operations["stream_message_api_v1_orgs__org_id__assistant_conversations__conversation_id__messages_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/assistant/memories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Memories
+         * @description Your own saved notes (each was approved by you); nobody else's assistant sees them.
+         */
+        get: operations["list_memories_api_v1_orgs__org_id__assistant_memories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/assistant/memories/{memory_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Forget */
+        delete: operations["forget_api_v1_orgs__org_id__assistant_memories__memory_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/assistant/settings": {
         parameters: {
             query?: never;
@@ -817,6 +876,46 @@ export interface paths {
          * @description Process this organization's automation now (the background worker does this continuously).
          */
         post: operations["process_now_api_v1_orgs__org_id__automation_process_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/automation/webhook-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Webhook Secret
+         * @description The secret webhook receivers use to check the X-Novara-Signature header.
+         */
+        get: operations["webhook_secret_api_v1_orgs__org_id__automation_webhook_secret_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/automation/webhook-secret/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Webhook Secret
+         * @description A new secret; deliveries are signed with it from now on (update your receivers).
+         */
+        post: operations["rotate_webhook_secret_api_v1_orgs__org_id__automation_webhook_secret_rotate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3985,6 +4084,18 @@ export interface components {
             /** Status */
             status?: string | null;
         };
+        /** MemoryOut */
+        MemoryOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+        };
         /** MessageIn */
         MessageIn: {
             /** Content */
@@ -4957,6 +5068,8 @@ export interface components {
                     [key: string]: string;
                 };
             };
+            /** User Monthly Budget Usd */
+            user_monthly_budget_usd?: string | null;
         };
         /** SettingsUpdate */
         SettingsUpdate: {
@@ -4970,6 +5083,8 @@ export interface components {
                     [key: string]: string;
                 };
             } | null;
+            /** User Monthly Budget Usd */
+            user_monthly_budget_usd?: number | string | null;
         };
         /** StatementLine */
         StatementLine: {
@@ -5348,6 +5463,11 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** WebhookSecretOut */
+        WebhookSecretOut: {
+            /** Secret */
+            secret: string;
+        };
         /** WorkflowIn */
         WorkflowIn: {
             /** Actions */
@@ -5366,6 +5486,8 @@ export interface components {
              * @default true
              */
             notify_owner_on_failure: boolean;
+            /** Schedule */
+            schedule?: Record<string, unknown> | null;
             /** Trigger */
             trigger: string;
         };
@@ -5388,6 +5510,8 @@ export interface components {
             name: string;
             /** Owner User Id */
             owner_user_id: string;
+            /** Schedule */
+            schedule?: Record<string, unknown> | null;
             /** Trigger */
             trigger: string;
         };
@@ -5401,6 +5525,8 @@ export interface components {
             enabled?: boolean | null;
             /** Name */
             name?: string | null;
+            /** Schedule */
+            schedule?: Record<string, unknown> | null;
         };
         /** RunOut */
         novara__agents__router__RunOut: {
@@ -7041,6 +7167,104 @@ export interface operations {
             };
         };
     };
+    stream_message_api_v1_orgs__org_id__assistant_conversations__conversation_id__messages_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_memories_api_v1_orgs__org_id__assistant_memories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_api_v1_orgs__org_id__assistant_memories__memory_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_settings_api_v1_orgs__org_id__assistant_settings_get: {
         parameters: {
             query?: never;
@@ -7190,6 +7414,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    webhook_secret_api_v1_orgs__org_id__automation_webhook_secret_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSecretOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_webhook_secret_api_v1_orgs__org_id__automation_webhook_secret_rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSecretOut"];
                 };
             };
             /** @description Validation Error */

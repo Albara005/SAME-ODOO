@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, MessageSquarePlus, Send, X } from "lucide-react";
+import { Check, MessageSquarePlus, NotebookPen, Send, Trash2, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { StarMark } from "../components/Art";
 import { StatusBadge } from "../components/business";
-import { Badge, Button, Checkbox, ErrorNotice, QueryView, useToast } from "../components/ui";
+import { Badge, Button, Checkbox, Dialog, Empty, ErrorNotice, IconButton, QueryView, useToast } from "../components/ui";
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
+import { streamTurn } from "../lib/assistantStream";
 
 type Action = Schemas["ActionOut"];
 
@@ -22,6 +23,7 @@ export function AssistantPage() {
     queryKey: ["conversations", org.id],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/assistant/conversations", { params: { path: { org_id: org.id } } })),
   });
+  const [notesOpen, setNotesOpen] = useState(false);
 
   return (
     <div className="assistant">
@@ -51,9 +53,51 @@ export function AssistantPage() {
             )
           }
         </QueryView>
+        <Button size="sm" variant="ghost" icon={<NotebookPen size={16} />} onClick={() => setNotesOpen(true)}>
+          {t("memory.title")}
+        </Button>
       </aside>
       <Chat key={conversationId ?? "new"} conversationId={conversationId} />
+      {notesOpen && <NotesDialog onClose={() => setNotesOpen(false)} />}
     </div>
+  );
+}
+
+/** What the assistant remembers for this user: each note was approved by them, and only their assistant sees it. */
+function NotesDialog({ onClose }: { onClose: () => void }) {
+  const { t, date } = useI18n();
+  const { org } = useOrg();
+  const qc = useQueryClient();
+  const notes = useQuery({
+    queryKey: ["memories", org.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/assistant/memories", { params: { path: { org_id: org.id } } })),
+  });
+  const forget = useMutation({
+    mutationFn: (id: string) =>
+      unwrap(api.DELETE("/api/v1/orgs/{org_id}/assistant/memories/{memory_id}", { params: { path: { org_id: org.id, memory_id: id } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["memories", org.id] }),
+  });
+  return (
+    <Dialog open onClose={onClose} title={t("memory.title")}>
+      <div className="stack">
+        <p className="muted small">{t("memory.about")}</p>
+        <QueryView query={notes}>
+          {(list) => list.length === 0 ? <Empty>{t("memory.empty")}</Empty> : (
+            <ul className="memory-list">
+              {list.map((n) => (
+                <li key={n.id}>
+                  <span className="grow" dir="auto">{n.text}</span>
+                  <span className="muted small num">{date(n.created_at)}</span>
+                  <IconButton label={`${t("memory.forget")}: ${n.text}`} onClick={() => forget.mutate(n.id)}>
+                    <Trash2 size={16} />
+                  </IconButton>
+                </li>
+              ))}
+            </ul>
+          )}
+        </QueryView>
+      </div>
+    </Dialog>
   );
 }
 
@@ -65,6 +109,8 @@ function Chat({ conversationId }: { conversationId?: string }) {
   const [text, setText] = useState("");
   const [deep, setDeep] = useState(false);
   const [sending, setSending] = useState<string | null>(null); // the message on its way, shown at once
+  const [live, setLive] = useState(""); // the reply as it is being written
+  const [tools, setTools] = useState<string[]>([]); // tools used so far in this turn
   const endRef = useRef<HTMLDivElement>(null);
 
   const detail = useQuery({
@@ -85,22 +131,28 @@ function Chat({ conversationId }: { conversationId?: string }) {
         }));
         id = conv.id;
       }
-      const turn = await unwrap(api.POST("/api/v1/orgs/{org_id}/assistant/conversations/{conversation_id}/messages", {
-        params: { path: { org_id: org.id, conversation_id: id } }, body: { content, deep },
-      }));
+      const turn = await streamTurn(org.id, id, { content, deep }, {
+        onDelta: (piece) => setLive((so) => so + piece),
+        onTool: (name) => setTools((so) => (so.includes(name) ? so : [...so, name])),
+      });
       return { id, turn };
     },
     onSuccess: async ({ id }) => {
       await qc.invalidateQueries({ queryKey: ["conversation", org.id, id] });
       void qc.invalidateQueries({ queryKey: ["conversations", org.id] });
+      void qc.invalidateQueries({ queryKey: ["memories", org.id] });
       if (id !== conversationId) navigate(path(`assistant/${id}`), { replace: true });
     },
-    onSettled: () => setSending(null),
+    onSettled: () => {
+      setSending(null);
+      setLive("");
+      setTools([]);
+    },
   });
 
   const messages = detail.data?.messages ?? [];
   const actions = (detail.data?.actions ?? []).filter((a) => a.kind === "write");
-  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [messages.length, actions.length, sending]);
+  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [messages.length, actions.length, sending, live]);
 
   function submit(e?: FormEvent) {
     e?.preventDefault();
@@ -125,11 +177,18 @@ function Chat({ conversationId }: { conversationId?: string }) {
           <Bubble key={i} role={m.role} text={m.text} />
         ))}
         {sending && <Bubble role="user" text={sending} />}
-        {send.isPending && (
+        {send.isPending && tools.length > 0 && (
+          <div className="tool-trail small muted" role="status">
+            <Wrench size={14} aria-hidden /> {t("assistant.usedTools", { tools: tools.map((n) => toolLabel(t, n)).join("، ") })}
+          </div>
+        )}
+        {send.isPending && (live ? (
+          <Bubble role="assistant" text={live} streaming />
+        ) : (
           <div className="bubble bubble-assistant thinking" role="status">
             <StarMark size={18} /> {t("assistant.thinking")}
           </div>
-        )}
+        ))}
         {actions.length > 0 && (
           <div className="stack-sm">
             {actions.map((a) => (
@@ -190,9 +249,16 @@ function Welcome({ onPick }: { onPick: (q: string) => void }) {
   );
 }
 
-function Bubble({ role, text }: { role: string; text: string }) {
+/** A tool's name in the reader's language, when the app knows it. */
+function toolLabel(t: (k: MessageKey) => string, name: string): string {
+  const key = `tool.${name}` as MessageKey;
+  return t(key) === key ? name : t(key);
+}
+
+function Bubble({ role, text, streaming }: { role: string; text: string; streaming?: boolean }) {
   return (
-    <div className={`bubble ${role === "user" ? "bubble-user" : "bubble-assistant"}`}>
+    <div className={`bubble ${role === "user" ? "bubble-user" : "bubble-assistant"} ${streaming ? "streaming" : ""}`}
+      aria-busy={streaming || undefined}>
       {role !== "user" && <StarMark size={18} />}
       <div className="bubble-text" dir="auto">
         {text}
@@ -206,6 +272,7 @@ const TOOL_LABEL: Record<string, MessageKey> = {
   create_draft_invoice: "assistant.tool.create_draft_invoice",
   create_quotation: "assistant.tool.create_quotation",
   register_payment: "assistant.tool.register_payment",
+  remember: "assistant.tool.remember",
 };
 
 function ActionCard({ action: a, conversationId }: { action: Action; conversationId: string }) {
@@ -225,6 +292,7 @@ function ActionCard({ action: a, conversationId }: { action: Action; conversatio
       void qc.invalidateQueries({ queryKey: ["customers", org.id] });
       void qc.invalidateQueries({ queryKey: ["invoices", org.id] });
       void qc.invalidateQueries({ queryKey: ["orders", org.id] });
+      void qc.invalidateQueries({ queryKey: ["memories", org.id] });
     },
     onError: (e) => toast(e instanceof ApiError ? e.message : t("common.error"), "error"),
   });

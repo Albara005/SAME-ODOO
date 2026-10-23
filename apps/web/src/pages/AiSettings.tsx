@@ -52,11 +52,13 @@ function SettingsForm({ settings: s }: { settings: Settings }) {
   const toast = useToast();
   const [enabled, setEnabled] = useState(s.enabled);
   const [budget, setBudget] = useState(usd(s.monthly_budget_usd).replace(/\.00$/, ""));
+  const [perUser, setPerUser] = useState(s.user_monthly_budget_usd ? usd(s.user_monthly_budget_usd).replace(/\.00$/, "") : "");
   const [routes, setRoutes] = useState(s.routes);
   const save = useMutation({
     mutationFn: () =>
       unwrap(api.PATCH("/api/v1/orgs/{org_id}/assistant/settings", {
-        params: { path: { org_id: org.id } }, body: { enabled, monthly_budget_usd: budget, routes },
+        params: { path: { org_id: org.id } },
+        body: { enabled, monthly_budget_usd: budget, user_monthly_budget_usd: perUser.trim() || null, routes },
       })),
     onSuccess: (updated) => {
       qc.setQueryData(["ai-settings", org.id], updated);
@@ -88,6 +90,9 @@ function SettingsForm({ settings: s }: { settings: Settings }) {
             <span className="small">
               {t("ai.spentOf", { spent: usd(s.month_spend_usd), budget: usd(s.monthly_budget_usd) })}
             </span>
+            <Field label={t("ai.perUser")} hint={t("ai.perUserHint")} error={err["user_monthly_budget_usd"]} optional>
+              <Input inputMode="decimal" value={perUser} onChange={(e) => setPerUser(e.target.value)} ltr />
+            </Field>
           </div>
         </Card>
       </div>

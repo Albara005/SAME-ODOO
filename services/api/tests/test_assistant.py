@@ -90,7 +90,7 @@ def test_only_tools_the_user_may_use_are_offered(api, biz):
     sales_tools, wh_tools = offered(biz["ai"].requests[0]), offered(biz["ai"].requests[1])
     assert "create_draft_invoice" in sales_tools
     assert {"trial_balance", "register_payment"}.isdisjoint(sales_tools)   # accounting isn't theirs
-    assert wh_tools == {"search_products", "stock_levels", "list_sales_orders"}
+    assert wh_tools == {"search_products", "stock_levels", "list_sales_orders", "search_files", "remember"}
     # The tool list order is deterministic (prompt-cache friendly).
     assert [t["name"] for t in biz["ai"].requests[0]["tools"]] == sorted(sales_tools)
 

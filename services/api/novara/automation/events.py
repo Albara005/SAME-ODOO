@@ -7,7 +7,8 @@ the same transaction. ``invoice.overdue`` comes from a daily scan instead.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -24,6 +25,7 @@ EVENT_TYPES: dict[str, str] = {
     "invoice.payment_registered": "A payment was recorded on an invoice (details: amount, method)",
     "invoice.cancelled": "A posted invoice was cancelled",
     "invoice.overdue": "An invoice passed its due date with money still owed (daily scan)",
+    "schedule": "On a schedule: every day, week or month at a set time (details: scheduled_for, date)",
     "credit_note.created": "A credit note was issued against an invoice (details: number, invoice, total)",
     "purchase_order.confirmed": "A purchase order was confirmed",
     "purchase_order.received": "Goods were received for a purchase order",
@@ -60,6 +62,51 @@ def _from_audit(session: Session, entry: AuditLog) -> None:
     if entry.action in EVENT_TYPES:
         emit(session, entry.action, {"target_type": entry.target_type, "target_id": entry.target_id,
                                      "actor_user_id": entry.actor_user_id, **(entry.details or {})})
+
+
+def last_slot(schedule: dict, now: datetime) -> datetime:
+    """The latest scheduled time at or before ``now`` (UTC), in the schedule's own time zone."""
+    tz = ZoneInfo(schedule["timezone"])
+    local = now.astimezone(tz)
+    hour, minute = (int(x) for x in schedule["time"].split(":"))
+    slot = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if schedule["every"] == "day":
+        if slot > local:
+            slot -= timedelta(days=1)
+    elif schedule["every"] == "week":
+        slot -= timedelta(days=(local.weekday() - schedule["weekday"]) % 7)
+        if slot > local:
+            slot -= timedelta(days=7)
+    else:  # month; days 1-28 exist in every month
+        slot = slot.replace(day=schedule["day"])
+        if slot > local:
+            first = slot.replace(day=1) - timedelta(days=1)
+            slot = first.replace(day=schedule["day"])
+    return slot.astimezone(timezone.utc)
+
+
+def scan_schedules(session: Session, now: datetime) -> int:
+    """Emit one ``schedule`` event per workflow per scheduled time. If the worker was down, only the
+    latest missed time fires (once), never a backlog; times before the workflow existed never fire."""
+    emitted = 0
+    for wf in session.scalars(select(Workflow).where(Workflow.trigger == "schedule", Workflow.enabled.is_(True))):
+        if not wf.schedule:
+            continue
+        slot = last_slot(wf.schedule, now)
+        created = wf.created_at if wf.created_at.tzinfo else wf.created_at.replace(tzinfo=timezone.utc)
+        if slot < created:
+            continue
+        payload = {"target_type": "workflow", "target_id": wf.id, "workflow_id": wf.id,
+                   "scheduled_for": slot.isoformat(),
+                   "date": slot.astimezone(ZoneInfo(wf.schedule["timezone"])).date().isoformat()}
+        if emit(session, "schedule", payload, dedup_key=f"schedule:{wf.id}:{slot.isoformat()}") is not None:
+            emitted += 1
+    try:
+        session.flush()
+    except IntegrityError:  # another worker emitted the same slot concurrently
+        session.rollback()
+        return 0
+    return emitted
 
 
 def scan_overdue(session: Session, today: date) -> int:

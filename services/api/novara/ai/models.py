@@ -25,6 +25,8 @@ class AISettings(IdMixin, TimestampMixin, TenantScoped, Base):
     monthly_budget_micros: Mapped[int] = mapped_column(BigInteger, default=DEFAULT_BUDGET_MICROS, nullable=False)
     # Optional per-route overrides: {"assistant": {"model": "...", "effort": "..."}}
     routes: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    # Optional cap per member per month (micro-USD); empty means only the organization budget applies.
+    user_monthly_budget_micros: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
 
 class Conversation(IdMixin, TimestampMixin, TenantScoped, Base):
@@ -94,3 +96,13 @@ class ModelUsage(IdMixin, TimestampMixin, TenantScoped, Base):
     stop_reason: Mapped[str] = mapped_column(String(30), default="", nullable=False)
     ok: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     error: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+
+class AssistantMemory(IdMixin, TimestampMixin, TenantScoped, Base):
+    """A note a user asked their assistant to remember. Saved only once the user approved it,
+    used only in that user's own conversations, and deletable by them at any time."""
+
+    __tablename__ = "ai_memories"
+
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    text: Mapped[str] = mapped_column(String(500), nullable=False)

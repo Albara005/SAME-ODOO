@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -93,14 +94,49 @@ ACTION_SPECS: dict[str, dict] = {
     "notify": {"required": ["title"], "optional": ["body", "to"]},
     "require_approval": {"required": ["permission"], "optional": ["message"]},
     "run_agent": {"required": ["agent_id", "input"], "optional": []},
+    # POST the event as signed JSON to an https endpoint on the public internet (see webhooks.py).
+    "webhook": {"required": ["url"], "optional": []},
 }
+SCHEDULE_EVERY = ("day", "week", "month")
 
 
-def validate(db: Session, *, trigger: str, conditions: list, actions: list) -> None:
+def validate_schedule(schedule: dict | None) -> dict:
+    if not isinstance(schedule, dict):
+        raise WorkflowError("a scheduled workflow needs a schedule")
+    if set(schedule) - {"every", "time", "timezone", "weekday", "day"}:
+        raise WorkflowError("schedule fields are every, time, timezone, weekday and day")
+    every, at, tz = schedule.get("every"), schedule.get("time", ""), schedule.get("timezone", "")
+    if every not in SCHEDULE_EVERY:
+        raise WorkflowError(f"schedule.every must be one of {SCHEDULE_EVERY}")
+    if not (isinstance(at, str) and re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", at)):
+        raise WorkflowError("schedule.time must be HH:MM (24-hour)")
+    try:
+        ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError, TypeError):
+        raise WorkflowError(f"unknown time zone: {tz!r}")
+    out = {"every": every, "time": at, "timezone": tz}
+    if every == "week":
+        if not (isinstance(schedule.get("weekday"), int) and 0 <= schedule["weekday"] <= 6):
+            raise WorkflowError("a weekly schedule needs weekday 0-6 (Monday = 0)")
+        out["weekday"] = schedule["weekday"]
+    if every == "month":
+        if not (isinstance(schedule.get("day"), int) and 1 <= schedule["day"] <= 28):
+            raise WorkflowError("a monthly schedule needs day 1-28 (every month has them)")
+        out["day"] = schedule["day"]
+    return out
+
+
+def validate(db: Session, *, trigger: str, conditions: list, actions: list, schedule: dict | None = None) -> dict | None:
+    """Raises WorkflowError for an invalid definition; returns the normalised schedule (or None)."""
     from novara.agents.models import Agent
+    from novara.automation.webhooks import UnsafeDestination, check_url
 
     if trigger not in EVENT_TYPES:
         raise WorkflowError(f"unknown trigger: {trigger}")
+    if trigger == "schedule":
+        schedule = validate_schedule(schedule)
+    elif schedule is not None:
+        raise WorkflowError("only workflows with the schedule trigger take a schedule")
     for c in conditions:
         if not isinstance(c, dict) or set(c) - {"field", "op", "value"} or "field" not in c or c.get("op") not in OPS:
             raise WorkflowError(f"invalid condition {c!r}: needs field and op (one of {OPS})")
@@ -126,6 +162,12 @@ def validate(db: Session, *, trigger: str, conditions: list, actions: list) -> N
         if a["type"] == "create_task" and "due_in_days" in a and not (
                 isinstance(a["due_in_days"], int) and 0 <= a["due_in_days"] <= 365):
             raise WorkflowError("due_in_days must be a whole number of days between 0 and 365")
+        if a["type"] == "webhook":
+            try:
+                check_url(a["url"] if isinstance(a["url"], str) else "")
+            except UnsafeDestination as e:
+                raise WorkflowError(f"webhook: {e}")
+    return schedule
 
 
 # ---------------------------------------------------------------- actions
@@ -199,7 +241,26 @@ def _run_agent(db, run, index, action, payload, provider, **_):
     return {"agent_run_id": result.id, "reply": result.reply[:2000]}
 
 
-ACTIONS = {"create_task": _create_task, "notify": _notify, "run_agent": _run_agent}
+def _webhook(db, run, index, action, payload, webhooks=None, **_):
+    from novara.automation.webhooks import UnsafeDestination
+
+    if webhooks is None:
+        raise ActionFailed("webhooks are not configured on this server")
+    event = db.get(OutboxEvent, run.event_id)
+    body = {"event": event.type, "occurred_at": event.created_at.isoformat(), "data": payload,
+            "workflow": {"id": run.workflow_id, "name": run.definition["name"]}, "run_id": run.id}
+    try:
+        code = webhooks.send(db, action["url"], body, idempotency_key=f"wf:{run.id}:{index}")
+    except UnsafeDestination as e:
+        raise ActionFailed(f"webhook refused: {e}")
+    except Exception as e:  # noqa: BLE001 - network errors: retried with backoff like any failed step
+        raise ActionFailed(f"webhook delivery failed: {type(e).__name__}")
+    if not 200 <= code < 300:
+        raise ActionFailed(f"the webhook endpoint answered HTTP {code}")
+    return {"status": code}
+
+
+ACTIONS = {"create_task": _create_task, "notify": _notify, "run_agent": _run_agent, "webhook": _webhook}
 
 
 # ---------------------------------------------------------------- processing
@@ -212,6 +273,8 @@ def match_events(db: Session, limit: int = 200) -> int:
                         .order_by(OutboxEvent.created_at).limit(limit)).all()
     for ev in events:
         for wf in db.scalars(select(Workflow).where(Workflow.trigger == ev.type, Workflow.enabled.is_(True))):
+            if ev.type == "schedule" and ev.payload.get("workflow_id") != wf.id:
+                continue  # a schedule event belongs to the one workflow whose time came
             exists = db.scalar(select(WorkflowRun.id).where(WorkflowRun.workflow_id == wf.id,
                                                             WorkflowRun.event_id == ev.id))
             if exists is None:
@@ -224,7 +287,7 @@ def match_events(db: Session, limit: int = 200) -> int:
     return created
 
 
-def execute(db: Session, run: WorkflowRun, *, provider, today: date) -> None:
+def execute(db: Session, run: WorkflowRun, *, provider, today: date, webhooks=None) -> None:
     """Advance one run as far as it can go. Raises on action failure (the caller rolls back)."""
     payload = db.get(OutboxEvent, run.event_id).payload
     d = run.definition
@@ -240,7 +303,8 @@ def execute(db: Session, run: WorkflowRun, *, provider, today: date) -> None:
                                         "message": render(action.get("message", ""), payload)}))
             run.status = "waiting_approval"
             return
-        result = ACTIONS[action["type"]](db, run, index, action, payload, provider=provider, today=today)
+        result = ACTIONS[action["type"]](db, run, index, action, payload, provider=provider, today=today,
+                                         webhooks=webhooks)
         db.add(WorkflowStep(run_id=run.id, index=index, type=action["type"], status="done", result=result))
         run.current_step = index + 1
         db.flush()
@@ -261,7 +325,8 @@ def _record_failure(db: Session, run: WorkflowRun, error: str, now: datetime) ->
         run.status, run.next_attempt_at = "retrying", now + timedelta(minutes=2 ** (run.attempts - 1))
 
 
-def process(db: Session, *, provider, now: datetime | None = None, today: date | None = None) -> dict:
+def process(db: Session, *, provider, now: datetime | None = None, today: date | None = None,
+            webhooks=None) -> dict:
     """Process the bound organization: match new events, then run every due run.
     Commits after each run so one failing run never affects another."""
     now = now or utcnow()
@@ -275,7 +340,7 @@ def process(db: Session, *, provider, now: datetime | None = None, today: date |
     for run_id in due:
         run = db.get(WorkflowRun, run_id)
         try:
-            execute(db, run, provider=provider, today=today)
+            execute(db, run, provider=provider, today=today, webhooks=webhooks)
             db.commit()
         except Exception as e:  # noqa: BLE001 - any failure is recorded on the run and retried
             db.rollback()

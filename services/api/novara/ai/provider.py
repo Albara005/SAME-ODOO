@@ -42,8 +42,11 @@ class ProviderError(RuntimeError):
 
 
 class ModelProvider(Protocol):
+    """``on_text``, when given, receives the reply's text as it is generated (the call then streams)."""
+
     def create(self, *, model: str, effort: str, system: str, tools: list[dict], messages: list[dict],
-               max_tokens: int, stream: bool = False) -> ModelReply: ...
+               max_tokens: int, stream: bool = False,
+               on_text: Callable[[str], None] | None = None) -> ModelReply: ...
 
 
 class AnthropicProvider:
@@ -84,20 +87,22 @@ class AnthropicProvider:
         return kwargs
 
     def create(self, *, model: str, effort: str, system: str, tools: list[dict], messages: list[dict],
-               max_tokens: int, stream: bool = False) -> ModelReply:
+               max_tokens: int, stream: bool = False, on_text: Callable[[str], None] | None = None) -> ModelReply:
         kwargs = self.request_kwargs(model=model, effort=effort, system=system, tools=tools, messages=messages,
                                      max_tokens=max_tokens, stream=stream)
         api = self.client.beta.messages if "betas" in kwargs else self.client.messages
         started = time.monotonic()
         try:
-            if not stream:
+            if not stream and on_text is None:
                 message = api.create(**kwargs)
             else:
                 for attempt in range(3):
                     try:
                         with api.stream(**kwargs) as s:
-                            for _ in s:  # consume events; only the final message is needed
-                                pass
+                            for event in s:
+                                delta = getattr(event, "delta", None) if event.type == "content_block_delta" else None
+                                if on_text is not None and getattr(delta, "type", "") == "text_delta":
+                                    on_text(delta.text)
                             message = s.get_final_message()
                         break
                     except ValueError:
@@ -146,11 +151,24 @@ class ScriptedProvider:
     requests: list[dict] = field(default_factory=list)
 
     def create(self, **kwargs) -> ModelReply:
+        on_text = kwargs.pop("on_text", None)
         self.requests.append(kwargs)
         if not self.script:
             raise ProviderError("scripted provider has no more replies", retryable=False)
         step = self.script.pop(0)
-        return step(kwargs) if callable(step) else step
+        reply = step(kwargs) if callable(step) else step
+        if on_text is not None:
+            stream_text(reply, on_text)
+        return reply
+
+
+def stream_text(reply: ModelReply, on_text: Callable[[str], None]) -> None:
+    """Hand a finished reply's text to ``on_text`` a few words at a time, as a streamed reply would arrive."""
+    for block in reply.content:
+        if block.get("type") == "text":
+            words = block["text"].split(" ")
+            for i in range(0, len(words), 3):
+                on_text(" ".join(words[i:i + 3]) + (" " if i + 3 < len(words) else ""))
 
 
 def text_reply(text: str, *, model: str = "claude-opus-5-5", input_tokens: int = 1000,

@@ -33,6 +33,9 @@ class Workflow(IdMixin, TimestampMixin, TenantScoped, Base):
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     trigger: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
+    # For trigger "schedule": {"every": "day"|"week"|"month", "time": "HH:MM", "timezone": "...",
+    #                          "weekday": 0-6 (Monday = 0, weekly), "day": 1-28 (monthly)}
+    schedule: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     conditions: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     actions: Mapped[list] = mapped_column(JSON, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
