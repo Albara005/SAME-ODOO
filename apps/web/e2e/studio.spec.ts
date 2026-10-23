@@ -97,6 +97,49 @@ test("App Studio: edit, review the diff, version, preview, approved production",
   expect(await site.text()).toContain("تتبع الطلبات");
 });
 
+test("App Studio: a data key lets the site read the catalog until it is switched off", async ({ page }) => {
+  page.on("dialog", (d) => d.accept()); // window.confirm before switching a key off
+  await signUpAndIn(page, uniqueEmail("datakey"));
+  await createOrg(page, "متجر البيانات");
+  const orgId = page.url().match(/\/o\/([0-9a-f-]+)/)![1]!;
+  const token = await page.evaluate(() => localStorage.getItem("novara.token"));
+  const call = async (path: string, data: object) => {
+    const res = await page.request.post(`/api/v1/orgs/${orgId}${path}`, { headers: { Authorization: `Bearer ${token}` }, data });
+    expect(res.ok(), await res.text()).toBeTruthy();
+    return res.json();
+  };
+  const tax = await call("/taxes", { name: "ضريبة القيمة المضافة", rate: "15" });
+  await call("/products", { name: "قهوة عربية", sku: "CF-1", kind: "goods", sale_price: "40", default_tax_id: tax.id });
+
+  await nav(page, "استوديو التطبيقات");
+  await page.getByRole("button", { name: "تطبيق جديد" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("الاسم", { exact: true }).fill("Coffee Shop");
+  await dialog.getByRole("button", { name: "إنشاء" }).click();
+  await page.getByRole("tab", { name: "البيانات" }).click();
+  await expect(page.getByText(/لا مفاتيح بيانات بعد/)).toBeVisible();
+
+  await page.getByRole("button", { name: "مفتاح بيانات جديد" }).click();
+  await page.getByRole("dialog").getByLabel(/توفر كل منتج/).check();
+  await page.getByRole("dialog").getByRole("button", { name: "إنشاء المفتاح" }).click();
+  const shown = page.getByLabel("المفتاح", { exact: true });
+  await expect(shown).toContainText("nvpk_");
+  await expect(page.getByLabel("مثال الشيفرة")).toContainText("X-Novara-Key");
+  await page.screenshot({ path: "test-results/screens/studio-data-key-ar.png", fullPage: true });
+  const key = (await shown.textContent())!.trim();
+
+  // What the published site sees
+  const read = () => page.request.get("/api/v1/public/catalog", { headers: { "X-Novara-Key": key } });
+  const catalog = await (await read()).json();
+  expect(catalog.products).toEqual([expect.objectContaining({ name: "قهوة عربية", price: "40.00", price_with_tax: "46.00", available: false })]);
+  await expect(page.getByRole("cell", { name: "التوفر" })).toBeVisible();
+
+  await page.getByRole("button", { name: "إيقاف" }).click();
+  await expect(page.getByText("موقوف", { exact: true })).toBeVisible();
+  await expect(shown).toHaveCount(0);
+  expect((await read()).status()).toBe(401);
+});
+
 test("Agents: build, test, publish, run", async ({ page }) => {
   await signUpAndIn(page, uniqueEmail("agent"));
   await createOrg(page, "شركة الوكلاء");

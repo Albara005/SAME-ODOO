@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CheckCircle2, Download, ExternalLink, FileCode2, FilePlus2, GitCommitVertical, LayoutTemplate, Plus, Rocket, RotateCcw, Save, Send,
-  ShieldCheck, Trash2, XCircle,
+  CheckCircle2, Copy, Download, ExternalLink, FileCode2, FilePlus2, GitCommitVertical, KeyRound, LayoutTemplate, Plus, Rocket, RotateCcw, Save,
+  Send, ShieldCheck, Trash2, XCircle,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -10,8 +10,8 @@ import { useOrg } from "../auth/Org";
 import { StarMark } from "../components/Art";
 import { StatusBadge, Tabs, download } from "../components/business";
 import {
-  Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, Loading, PageHeader, QueryView, Select, Textarea, errorText,
-  useToast,
+  Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, Loading, PageHeader, QueryView, Select, Textarea,
+  errorText, useToast,
 } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
 
@@ -21,7 +21,8 @@ const CodeEditor = lazy(() => import("../components/CodeEditor").then((m) => ({ 
 type Project = Schemas["ProjectOut"];
 type Version = Schemas["novara__studio__router__VersionOut"];
 type Check = Schemas["CheckOut"];
-type Tab = "build" | "changes" | "versions" | "deployments";
+type DataKey = Schemas["DataKeyOut"];
+type Tab = "build" | "changes" | "versions" | "deployments" | "data";
 
 const slugify = (s: string) =>
   s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
@@ -195,12 +196,14 @@ function ProjectView({ project: p }: { project: Project }) {
           { key: "changes", label: t("studio.tab.changes") },
           { key: "versions", label: t("studio.tab.versions") },
           { key: "deployments", label: t("studio.tab.deployments") },
+          { key: "data", label: t("studio.tab.data") },
         ]}
       />
       {tab === "build" && <BuildTab project={p} onChanged={refresh} />}
       {tab === "changes" && <ChangesTab project={p} />}
       {tab === "versions" && <VersionsTab project={p} onChanged={refresh} />}
       {tab === "deployments" && <DeploymentsTab project={p} />}
+      {tab === "data" && <DataTab project={p} />}
       {cutting && (
         <CutVersionDialog project={p} onClose={() => setCutting(false)} onDone={(v) => {
           setCutting(false);
@@ -641,3 +644,160 @@ function DeploymentsTab({ project: p }: { project: Project }) {
   );
 }
 
+// ---------------------------------------------------------------- data keys
+
+/** Publishable keys: how the published site reads the catalog. They sit in the site's code, so they only ever read. */
+function DataTab({ project: p }: { project: Project }) {
+  const { t, date } = useI18n();
+  const { org, can } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const ids = { org_id: org.id, project_id: p.id };
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState<DataKey | null>(null);
+  const keys = useQuery({
+    queryKey: ["data-keys", org.id, p.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys", { params: { path: ids } })),
+  });
+  const revoke = useMutation({
+    mutationFn: (id: string) =>
+      unwrap(api.DELETE("/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys/{key_id}", { params: { path: { ...ids, key_id: id } } })),
+    onSuccess: (k) => {
+      if (created?.id === k.id) setCreated(null);
+      toast(t("dataKeys.revoked", { name: k.name }));
+      void qc.invalidateQueries({ queryKey: ["data-keys", org.id, p.id] });
+    },
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  return (
+    <div className="stack">
+      <Card
+        title={t("dataKeys.title")}
+        actions={can("apps.deploy") && can("products.read") && (
+          <Button size="sm" variant="primary" icon={<KeyRound size={14} />} onClick={() => setCreating(true)}>{t("dataKeys.new")}</Button>
+        )}
+      >
+        <p className="muted small">{t("dataKeys.about")}</p>
+      </Card>
+      {created?.key && <NewKeyCard dataKey={created} secret={created.key} onClose={() => setCreated(null)} />}
+      <QueryView query={keys}>
+        {(list) =>
+          list.length === 0 ? (
+            <Empty>{t("dataKeys.none")}</Empty>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("common.name")}</th>
+                    <th>{t("dataKeys.key")}</th>
+                    <th>{t("dataKeys.scopes")}</th>
+                    <th>{t("dataKeys.lastUsed")}</th>
+                    <th>{t("common.status")}</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((k) => (
+                    <tr key={k.id}>
+                      <td dir="auto">{k.name}</td>
+                      <td className="mono small" dir="ltr">{k.hint}…</td>
+                      <td>
+                        <span className="row" style={{ gap: 4 }}>
+                          {k.scopes.map((s) => <Badge key={s}>{t(`dataKeys.scope.${s}` as "dataKeys.scope.catalog")}</Badge>)}
+                        </span>
+                      </td>
+                      <td className="num small">{k.last_used_at ? date(k.last_used_at) : t("dataKeys.neverUsed")}</td>
+                      <td><Badge tone={k.revoked ? "danger" : "success"}>{k.revoked ? t("dataKeys.statusRevoked") : t("dataKeys.statusActive")}</Badge></td>
+                      <td className="end">
+                        {!k.revoked && can("apps.write") && (
+                          <Button size="sm" variant="danger" loading={revoke.isPending && revoke.variables === k.id}
+                            onClick={() => window.confirm(t("dataKeys.revokeConfirm", { name: k.name })) && revoke.mutate(k.id)}>
+                            {t("dataKeys.revoke")}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </QueryView>
+      {creating && (
+        <NewKeyDialog project={p} onClose={() => setCreating(false)} onCreated={(k) => {
+          setCreating(false);
+          setCreated(k);
+          void qc.invalidateQueries({ queryKey: ["data-keys", org.id, p.id] });
+        }} />
+      )}
+    </div>
+  );
+}
+
+function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; onClose: () => void; onCreated: (k: DataKey) => void }) {
+  const { t } = useI18n();
+  const { org, can } = useOrg();
+  const [name, setName] = useState(t("dataKeys.defaultName"));
+  const [availability, setAvailability] = useState(false);
+  const create = useMutation({
+    mutationFn: () =>
+      unwrap(api.POST("/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys", {
+        params: { path: { org_id: org.id, project_id: p.id } },
+        body: { name: name.trim(), scopes: availability ? ["catalog", "availability"] : ["catalog"] },
+      })),
+    onSuccess: onCreated,
+  });
+  return (
+    <Dialog open onClose={onClose} title={t("dataKeys.new")}>
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
+        {create.isError && <ErrorNotice error={create.error} />}
+        <Field label={t("common.name")} hint={t("dataKeys.nameHint")}>
+          <Input value={name} required maxLength={80} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <fieldset className="stack-sm">
+          <legend className="small"><strong>{t("dataKeys.scopes")}</strong></legend>
+          <Checkbox label={t("dataKeys.scope.catalogLong")} checked disabled readOnly />
+          <Checkbox label={t("dataKeys.scope.availabilityLong")} checked={availability} disabled={!can("inventory.read")}
+            onChange={(e) => setAvailability(e.target.checked)} />
+        </fieldset>
+        <p className="muted small">{t("dataKeys.publicWarning")}</p>
+        <div className="form-actions">
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" variant="primary" loading={create.isPending} disabled={!name.trim()}>{t("dataKeys.create")}</Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+/** The key is shown once, with the code a page needs to use it. */
+function NewKeyCard({ dataKey, secret, onClose }: { dataKey: DataKey; secret: string; onClose: () => void }) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const copy = (text: string) => void navigator.clipboard?.writeText(text).then(() => toast(t("common.copied")), () => undefined);
+  const snippet = [
+    `const res = await fetch("${window.location.origin}/api/v1/public/catalog", {`,
+    `  headers: { "X-Novara-Key": "${secret}" },`,
+    `});`,
+    `const { currency, products } = await res.json();`,
+    `// products: [{ name, sku, price, price_with_tax${dataKey.scopes.includes("availability") ? ", available" : ""}, ... }]`,
+  ].join("\n");
+  return (
+    <div className="notice notice-success" role="status">
+      <KeyRound size={18} aria-hidden />
+      <div className="grow stack-sm">
+        <strong>{t("dataKeys.createdTitle", { name: dataKey.name })}</strong>
+        <span className="small">{t("dataKeys.createdHint")}</span>
+        <code className="mfa-secret" dir="ltr" style={{ textAlign: "start" }} aria-label={t("dataKeys.key")}>{secret}</code>
+        <pre className="snippet" dir="ltr" aria-label={t("dataKeys.example")}>{snippet}</pre>
+        <div className="row">
+          <Button size="sm" icon={<Copy size={14} />} onClick={() => copy(secret)}>{t("dataKeys.copyKey")}</Button>
+          <Button size="sm" icon={<Copy size={14} />} onClick={() => copy(snippet)}>{t("dataKeys.copyExample")}</Button>
+        </div>
+      </div>
+      <Button size="sm" variant="ghost" onClick={onClose}>{t("common.close")}</Button>
+    </div>
+  );
+}

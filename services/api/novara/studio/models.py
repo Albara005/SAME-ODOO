@@ -87,3 +87,27 @@ class SiteRoute(Base):
     environment: Mapped[str] = mapped_column(String(20), nullable=False)
     deployment_id: Mapped[str] = mapped_column(String(36), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class AppDataKey(IdMixin, TimestampMixin, TenantScoped, Base):
+    """A publishable key a project's site uses to read a fixed, public view of business data.
+
+    Published sites are public, so a key embedded in one is public too: it can only ever read
+    the scopes chosen here (the product catalog, optionally whether each product is in stock),
+    never costs, quantities, customers or anything else. Only its SHA-256 is stored.
+    """
+
+    __tablename__ = "app_data_keys"
+    __table_args__ = (
+        same_org_fk("project_id", "app_projects", ondelete="CASCADE"),
+        UniqueConstraint("key_hash", name="uq_app_data_key_hash"),
+    )
+
+    project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    hint: Mapped[str] = mapped_column(String(16), nullable=False)  # the first characters, to tell keys apart
+    scopes: Mapped[list] = mapped_column(JSON, nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))

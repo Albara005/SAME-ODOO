@@ -193,6 +193,7 @@ def _search_files(t: ToolContext, a: FileQuery):
     from sqlalchemy import select
 
     from novara.modules.files.models import StoredFile
+    from novara.modules.files.storage import StorageError
 
     needle = a.query.lower()
     out = []
@@ -201,7 +202,7 @@ def _search_files(t: ToolContext, a: FileQuery):
         if t.storage is not None and f.size_bytes <= MAX_SEARCH_BYTES and f.content_type.startswith(TEXT_TYPES):
             try:
                 snippet = _snippet(t.storage.get(f.storage_key).decode("utf-8", errors="replace"), needle)
-            except (OSError, KeyError):
+            except (OSError, KeyError, StorageError):
                 snippet = None
         if snippet is None and needle not in f.filename.lower():
             continue

@@ -662,6 +662,10 @@ textarea.code {
 .mfa-qr { display: grid; place-items: center; padding: var(--space-3); background: #fff; border-radius: var(--radius); border: 1px solid var(--color-border); inline-size: max-content; margin-inline: auto; }
 .mfa-qr img { display: block; }
 .mfa-secret { display: block; text-align: center; margin-block-start: var(--space-2); font-size: 1rem; letter-spacing: 0.06em; word-break: break-all; user-select: all; }
+.snippet {
+  margin: 0; padding: var(--space-3); border-radius: var(--radius); overflow-x: auto; white-space: pre; text-align: start;
+  font: 12.5px/1.55 ui-monospace, Menlo, monospace; background: var(--color-surface); border: 1px solid var(--color-border);
+}
 .recovery-codes {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-5); margin: 0;
   padding: var(--space-3) var(--space-5); border: 1px dashed var(--color-border); border-radius: var(--radius); background: var(--color-bg);

@@ -24,8 +24,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: System libraries (libcairo for logo PNG export)
-        run: sudo apt-get update && sudo apt-get install -y libcairo2
+      - name: System libraries (libcairo for logo PNG export, age for encrypted backups)
+        run: sudo apt-get update && sudo apt-get install -y libcairo2 age
       - run: pip install -r requirements-dev.txt
       - name: Tests (SQLite)
         run: pytest
@@ -41,6 +41,8 @@ jobs:
         env:
           NOVARA_TEST_PG_OWNER_URL: postgresql+psycopg://novara_owner:owner@localhost:5432/novara_test
           NOVARA_TEST_PG_APP_URL: postgresql+psycopg://novara_app:app@localhost:5432/novara_test
+          # Backup round trip (tests/test_backup.py) restores into a scratch database it creates and drops.
+          NOVARA_TEST_PG_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: pytest
 
   web:

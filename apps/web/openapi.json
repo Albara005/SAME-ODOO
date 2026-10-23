@@ -1916,6 +1916,97 @@
     "title": "CustomerUpdate",
     "type": "object"
    },
+   "DataKeyIn": {
+    "properties": {
+     "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "scopes": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 2,
+      "minItems": 1,
+      "title": "Scopes",
+      "type": "array"
+     }
+    },
+    "required": [
+     "name",
+     "scopes"
+    ],
+    "title": "DataKeyIn",
+    "type": "object"
+   },
+   "DataKeyOut": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "hint": {
+      "title": "Hint",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Key"
+     },
+     "last_used_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Used At"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "revoked": {
+      "title": "Revoked",
+      "type": "boolean"
+     },
+     "scopes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Scopes",
+      "type": "array"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "hint",
+     "scopes",
+     "created_at",
+     "last_used_at",
+     "revoked"
+    ],
+    "title": "DataKeyOut",
+    "type": "object"
+   },
    "DeliveryIn": {
     "properties": {
      "lines": {
@@ -17267,6 +17358,197 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys": {
+   "get": {
+    "operationId": "list_keys_api_v1_orgs__org_id__studio_projects__project_id__data_keys_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DataKeyOut"
+         },
+         "title": "Response List Keys Api V1 Orgs  Org Id  Studio Projects  Project Id  Data Keys Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Keys",
+    "tags": [
+     "app data keys"
+    ]
+   },
+   "post": {
+    "description": "Making data public is a production decision (apps.deploy), and you can only publish data you can read.",
+    "operationId": "create_key_api_v1_orgs__org_id__studio_projects__project_id__data_keys_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DataKeyIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DataKeyOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Key",
+    "tags": [
+     "app data keys"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys/{key_id}": {
+   "delete": {
+    "description": "Anyone who can edit the app can switch a key off at once.",
+    "operationId": "revoke_key_api_v1_orgs__org_id__studio_projects__project_id__data_keys__key_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "key_id",
+      "required": true,
+      "schema": {
+       "title": "Key Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DataKeyOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Revoke Key",
+    "tags": [
+     "app data keys"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/studio/projects/{project_id}/deployments": {
    "get": {
     "operationId": "list_deployments_api_v1_orgs__org_id__studio_projects__project_id__deployments_get",
@@ -19295,6 +19577,88 @@
     "summary": "Permission Catalog",
     "tags": [
      "access"
+    ]
+   }
+  },
+  "/api/v1/public/catalog": {
+   "get": {
+    "operationId": "public_catalog_api_v1_public_catalog_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Key"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-novara-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Novara-Key"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Public Catalog",
+    "tags": [
+     "public data"
+    ]
+   },
+   "options": {
+    "operationId": "catalog_preflight_api_v1_public_catalog_options",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Catalog Preflight",
+    "tags": [
+     "public data"
     ]
    }
   },

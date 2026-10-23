@@ -2309,6 +2309,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Keys */
+        get: operations["list_keys_api_v1_orgs__org_id__studio_projects__project_id__data_keys_get"];
+        put?: never;
+        /**
+         * Create Key
+         * @description Making data public is a production decision (apps.deploy), and you can only publish data you can read.
+         */
+        post: operations["create_key_api_v1_orgs__org_id__studio_projects__project_id__data_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Key
+         * @description Anyone who can edit the app can switch a key off at once.
+         */
+        delete: operations["revoke_key_api_v1_orgs__org_id__studio_projects__project_id__data_keys__key_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/studio/projects/{project_id}/deployments": {
         parameters: {
             query?: never;
@@ -2746,6 +2787,24 @@ export interface paths {
         post?: never;
         delete?: never;
         options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public Catalog */
+        get: operations["public_catalog_api_v1_public_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        /** Catalog Preflight */
+        options: operations["catalog_preflight_api_v1_public_catalog_options"];
         head?: never;
         patch?: never;
         trace?: never;
@@ -3499,6 +3558,35 @@ export interface components {
             postal_code?: string | null;
             /** Tax Number */
             tax_number?: string | null;
+        };
+        /** DataKeyIn */
+        DataKeyIn: {
+            /** Name */
+            name: string;
+            /** Scopes */
+            scopes: string[];
+        };
+        /** DataKeyOut */
+        DataKeyOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Hint */
+            hint: string;
+            /** Id */
+            id: string;
+            /** Key */
+            key?: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Name */
+            name: string;
+            /** Revoked */
+            revoked: boolean;
+            /** Scopes */
+            scopes: string[];
         };
         /** DeliveryIn */
         DeliveryIn: {
@@ -10996,6 +11084,107 @@ export interface operations {
             };
         };
     };
+    list_keys_api_v1_orgs__org_id__studio_projects__project_id__data_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataKeyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_key_api_v1_orgs__org_id__studio_projects__project_id__data_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataKeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_key_api_v1_orgs__org_id__studio_projects__project_id__data_keys__key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                key_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_deployments_api_v1_orgs__org_id__studio_projects__project_id__deployments_get: {
         parameters: {
             query?: never;
@@ -12089,6 +12278,59 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    public_catalog_api_v1_public_catalog_get: {
+        parameters: {
+            query?: {
+                key?: string | null;
+            };
+            header?: {
+                "x-novara-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_preflight_api_v1_public_catalog_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

@@ -17,6 +17,7 @@ from novara.automation.webhooks import WebhookSender
 from novara.config import Settings, load_settings
 from novara.creative.router import router as creative_router
 from novara.hosting.router import router as hosting_router
+from novara.studio.data_keys import public_router as public_data_router, router as data_keys_router
 from novara.studio.router import router as studio_router, sites_router
 from novara.db import Base, make_engine, make_sessionmaker
 from novara.modules.access.router import router as access_router
@@ -32,7 +33,7 @@ from novara.modules.sales.router import router as sales_router
 from novara.modules.audit.router import router as audit_router
 from novara.modules.dataio.router import router as dataio_router
 from novara.modules.files.router import router as files_router
-from novara.modules.files.storage import LocalObjectStorage, ObjectStorage
+from novara.modules.files.storage import ObjectStorage, storage_from_settings
 from novara.modules.identity.router import router as identity_router
 from novara.modules.organizations.router import router as organizations_router
 
@@ -75,7 +76,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     app.state.settings = settings
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
-    app.state.storage = storage or LocalObjectStorage(settings.storage_root)
+    app.state.storage = storage or storage_from_settings(settings)
     # Claude via the Anthropic SDK; credentials come from the environment when first used.
     app.state.ai_provider = ai_provider or AnthropicProvider()
     # SMTP when NOVARA_SMTP_HOST is set; otherwise emails go to the log (development).
@@ -102,7 +103,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router, credit_router,
               inventory_router, sales_router, purchasing_router, assistant_router, studio_router, agents_router, automation_router,
-              creative_router, hosting_router, live_router):
+              creative_router, hosting_router, live_router, data_keys_router, public_data_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(sites_router)  # public, unauthenticated: published App Studio sites
     return app
