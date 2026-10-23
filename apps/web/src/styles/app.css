@@ -498,6 +498,23 @@ ol.journey { list-style: none; margin: 0; padding-inline: 0; }
 .bubble-user .bubble-text { background: var(--color-primary); color: var(--color-on-primary); border-end-end-radius: 4px; }
 .bubble-assistant { align-self: flex-start; }
 .bubble-assistant .bubble-text { background: color-mix(in srgb, var(--color-surface-raised) 60%, var(--color-surface)); border-end-start-radius: 4px; }
+/* Assistant replies: a small Markdown subset (lib/markdown.tsx), rendered as elements, never as HTML. */
+.md { white-space: normal; }
+.md > * { margin: 0; }
+.md > * + * { margin-block-start: 0.6em; }
+.md ul, .md ol { padding-inline-start: 1.4em; }
+.md li + li { margin-block-start: 2px; }
+.md code { font: 0.9em/1.4 ui-monospace, Menlo, monospace; padding: 1px 5px; border-radius: 4px;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent); }
+.md pre { white-space: pre; overflow-x: auto; padding: var(--space-2) var(--space-3); border-radius: var(--radius); text-align: start;
+  background: var(--color-surface); border: 1px solid var(--color-border); }
+.md pre code { padding: 0; background: none; }
+.md-table { overflow-x: auto; }
+.md table { border-collapse: collapse; font-size: 0.92em; }
+.md th, .md td { border: 1px solid var(--color-border); padding: 4px 10px; text-align: start; }
+.md th { background: color-mix(in srgb, var(--color-surface-raised) 70%, transparent); }
+.md-h1 { font-size: 1.12em; } .md-h2 { font-size: 1.06em; }
+.md a { color: var(--color-link); text-decoration: underline; }
 .bubble-assistant > svg { flex-shrink: 0; margin-block-start: 8px; }
 .bubble .star-mark-inner, .thinking .star-mark-inner { fill: var(--color-surface); }
 .thinking { align-items: center; color: var(--color-text-muted); padding-inline: 2px; }
@@ -699,9 +716,9 @@ td.short { color: var(--color-warning-text); font-weight: 600; }
 }
 
 /* ---------------------------------------------------------------- assistant: streaming, tools, notes */
-.bubble.streaming .bubble-text::after { content: "▍"; margin-inline-start: 2px; animation: caret 1s steps(2) infinite; color: var(--gold-deep); }
+.bubble.streaming .bubble-text .md > :last-child::after { content: "▍"; margin-inline-start: 2px; animation: caret 1s steps(2) infinite; color: var(--gold-deep); }
 @keyframes caret { 50% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .bubble.streaming .bubble-text::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .bubble.streaming .bubble-text .md > :last-child::after { animation: none; } }
 .tool-trail { display: inline-flex; align-items: center; gap: var(--space-1); padding-inline-start: var(--space-6); }
 .memory-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .memory-list li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); }

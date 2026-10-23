@@ -10,6 +10,7 @@ import { Badge, Button, Checkbox, Dialog, Empty, ErrorNotice, IconButton, QueryV
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
 import { streamTurn } from "../lib/assistantStream";
+import { Markdown } from "../lib/markdown";
 
 type Action = Schemas["ActionOut"];
 
@@ -263,7 +264,7 @@ function Bubble({ role, text, streaming }: { role: string; text: string; streami
       aria-busy={streaming || undefined}>
       {role !== "user" && <StarMark size={18} />}
       <div className="bubble-text" dir="auto">
-        {text}
+        {role === "user" ? text : <Markdown text={text} />}
       </div>
     </div>
   );
