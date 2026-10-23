@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -41,6 +41,7 @@ class OrgUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=200)
     default_locale: str | None = Field(default=None, pattern="^(ar|en)$")
     default_currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
+    vat_number: str | None = Field(default=None, max_length=20, pattern="^[0-9A-Z]*$")
 
 
 class OrgOut(BaseModel):
@@ -52,6 +53,8 @@ class OrgOut(BaseModel):
     hosting_mode: str
     default_locale: str
     default_currency: str
+    vat_number: str
+    books_locked_until: date | None
     created_at: datetime
 
 

@@ -23,6 +23,7 @@ from novara.modules.inventory import service as stock
 from novara.modules.inventory.models import Warehouse
 from novara.modules.invoicing.models import Invoice, InvoiceLine
 from novara.modules.invoicing.service import line_net_minor, recompute as recompute_invoice, tax_groups
+from novara.modules.sales import reservations
 from novara.modules.sales.models import SalesOrder, SalesOrderLine
 
 
@@ -135,6 +136,14 @@ def deliver(db: Session, order: SalesOrder, *, move_date: date, quantities: dict
             raise OrderValidationError(f"'{item.line.description}': can deliver at most {item.to_deliver.normalize():f}")
         plan.append((item, qty))
     warehouse = db.get(Warehouse, order.warehouse_id) if order.warehouse_id else stock.default_warehouse(db)
+    for item, qty in plan:
+        # Stock held for orders confirmed earlier is theirs (see reservations.py).
+        level = stock.stock_level(db, item.product.id, warehouse.id)
+        free = level.quantity - reservations.demand_before(db, order, item.product.id, warehouse.id)
+        if qty > free:
+            raise stock.InsufficientStock(
+                f"only {max(free, Decimal(0)).normalize():f} of '{item.product.name}' is free for this order "
+                f"in {warehouse.code}; the rest is reserved for orders confirmed earlier")
     result = stock.deliver(db, warehouse=warehouse, move_date=move_date, currency=order.currency,
                            lines=[(i.product, qty, i.line.id) for i, qty in plan],
                            source_type="sales_order", source_id=order.id, user_id=user_id)

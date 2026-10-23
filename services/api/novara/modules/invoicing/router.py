@@ -16,7 +16,9 @@ from novara.modules.accounting.models import Tax
 from novara.modules.audit import service as audit
 from novara.modules.invoicing import service as svc
 from novara.modules.invoicing.lines import LineIn, resolve_lines
-from novara.modules.invoicing.models import Invoice, InvoiceLine, Payment
+from novara.modules.invoicing.models import CreditNote, Invoice, InvoiceLine, Payment
+from novara.modules.invoicing.zatca import qr_payload
+from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
 from novara.modules.sales.service import order_has_invoice_links, order_of_invoice
 from novara.money import fmt_decimal, from_minor, to_minor
@@ -70,6 +72,13 @@ class TaxLineOut(BaseModel):
     amount: str
 
 
+class CreditNoteRef(BaseModel):
+    id: str
+    number: str
+    issue_date: date
+    total: str
+
+
 class InvoiceOut(BaseModel):
     id: str
     number: str | None
@@ -84,11 +93,15 @@ class InvoiceOut(BaseModel):
     tax: str
     total: str
     amount_paid: str
+    amount_credited: str
     amount_due: str
     journal_entry_id: str | None
     reversal_entry_id: str | None
     posted_at: datetime | None
     created_at: datetime
+    credit_notes: list[CreditNoteRef] = []
+    # Base64 TLV for the e-invoice QR code (ZATCA phase 1), once posted and when the organization has a VAT number.
+    zatca_qr: str | None = None
     # Set when the invoice was created from a sales order (its draft is then edited through the order).
     sales_order_id: str | None = None
     sales_order_number: str | None = None
@@ -131,12 +144,21 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
     tax_names = {t.id: t.name for t in db.scalars(select(Tax).where(Tax.id.in_([g.tax_id for g in groups])))}
     c = inv.currency
     order = order_of_invoice(db, inv)
+    org = db.get(Organization, inv.organization_id)
+    notes = db.scalars(select(CreditNote).where(CreditNote.invoice_id == inv.id).order_by(CreditNote.number)).all()
+    qr = None
+    if org.vat_number and inv.status not in ("draft", "cancelled") and inv.posted_at is not None:
+        qr = qr_payload(seller=org.name, vat_number=org.vat_number, issued_at=inv.posted_at,
+                        total=_money(inv.total_minor, c), vat_total=_money(inv.tax_minor, c))
     return InvoiceOut(
         id=inv.id, number=inv.number, status=inv.status, customer_id=inv.customer_id, customer_name=customer.name,
         issue_date=inv.issue_date, due_date=inv.due_date, currency=c, notes=inv.notes,
         subtotal=_money(inv.subtotal_minor, c), tax=_money(inv.tax_minor, c), total=_money(inv.total_minor, c),
-        amount_paid=_money(inv.amount_paid_minor, c),
-        amount_due=_money(0 if inv.status in ("draft", "cancelled") else inv.total_minor - inv.amount_paid_minor, c),
+        amount_paid=_money(inv.amount_paid_minor, c), amount_credited=_money(inv.amount_credited_minor, c),
+        amount_due=_money(inv.amount_due_minor, c),
+        credit_notes=[CreditNoteRef(id=n.id, number=n.number, issue_date=n.issue_date, total=_money(n.total_minor, c))
+                      for n in notes],
+        zatca_qr=qr,
         journal_entry_id=inv.journal_entry_id, reversal_entry_id=inv.reversal_entry_id, posted_at=inv.posted_at,
         created_at=inv.created_at, sales_order_id=order.id if order else None,
         sales_order_number=order.number if order else None,
@@ -212,7 +234,7 @@ def list_invoices(
         stmt = stmt.where(Invoice.customer_id == customer_id)
     out = []
     for inv, name in db.execute(stmt):
-        due = 0 if inv.status in ("draft", "cancelled") else inv.total_minor - inv.amount_paid_minor
+        due = inv.amount_due_minor
         out.append(InvoiceSummary(id=inv.id, number=inv.number, status=inv.status, customer_id=inv.customer_id,
                                   customer_name=name, issue_date=inv.issue_date, due_date=inv.due_date,
                                   currency=inv.currency, total=_money(inv.total_minor, inv.currency),
@@ -410,7 +432,7 @@ def receivables_aging(as_of: date | None = None, ctx: OrgContext = Depends(requi
     per_customer: dict[str, dict] = {}
     totals: dict[str, int] = defaultdict(int)
     for inv, name in rows:
-        due = inv.total_minor - inv.amount_paid_minor
+        due = inv.amount_due_minor
         bucket = _bucket((as_of - inv.due_date).days)
         c = per_customer.setdefault(inv.customer_id, {"name": name, "buckets": defaultdict(int), "count": 0})
         c["buckets"][bucket] += due

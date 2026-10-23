@@ -1,7 +1,8 @@
 """Stock operations. Every change is a StockMove plus, when value moves, a journal entry:
 
-    receipt      Dr Inventory              Cr payable / equity / bank / cash
+    receipt      Dr Inventory              Cr payable / equity / bank / cash / goods received not invoiced
     delivery     Dr Cost of Goods Sold     Cr Inventory
+    return       Dr Inventory              Cr Cost of Goods Sold   (goods a customer sent back)
     adjustment   Dr/Cr Inventory           Cr/Dr Inventory Adjustments
 
 Costing is weighted average per warehouse. A delivery takes value
@@ -30,6 +31,8 @@ from novara.money import to_minor
 from novara.tenancy import current_tenant
 
 RECEIPT_COUNTERPARTS = ("payable", "equity", "bank", "cash")
+# Purchase order receipts credit "goods received not invoiced" until the vendor's bill arrives.
+_ALL_COUNTERPARTS = RECEIPT_COUNTERPARTS + ("grni",)
 
 
 class InventoryError(ValueError):
@@ -110,20 +113,22 @@ def _save(db: Session, reference: str, moves: list[StockMove], entry: JournalEnt
 
 
 def receive(db: Session, *, warehouse: Warehouse, move_date: date, currency: str, counterpart: str,
-            lines: list[tuple[Product, Decimal, Decimal]], memo: str, user_id: str) -> StockResult:
+            lines: list[tuple[Product, Decimal, Decimal]], memo: str, user_id: str,
+            source_type: str = "receipt", source_id: str = "", source_line_ids: list[str] | None = None) -> StockResult:
     """Add stock. ``lines`` are (product, quantity, unit cost)."""
-    if counterpart not in RECEIPT_COUNTERPARTS:
+    if counterpart not in _ALL_COUNTERPARTS:
         raise InventoryError(f"counterpart must be one of {RECEIPT_COUNTERPARTS}")
     reference = next_number(db, f"receipt:{move_date.year}", f"REC-{move_date.year}-")
     moves = []
-    for product, qty, unit_cost in lines:
+    for n, (product, qty, unit_cost) in enumerate(lines):
         _stockable(product)
         if qty <= 0 or unit_cost < 0:
             raise InventoryError("receipts need a positive quantity and a non-negative cost")
         level = stock_level(db, product.id, warehouse.id)
         moves.append(_move(db, level, reference=reference, kind="receipt", qty=qty,
                            value_minor=to_minor(qty * unit_cost, currency), move_date=move_date, user_id=user_id,
-                           source_type="receipt"))
+                           source_type=source_type, source_id=source_id,
+                           source_line_id=source_line_ids[n] if source_line_ids else None))
     total = sum(m.value_minor for m in moves)
     entry = None
     if total:
@@ -158,6 +163,30 @@ def deliver(db: Session, *, warehouse: Warehouse, move_date: date, currency: str
                            memo=f"Delivery {reference}", source_type="stock", source_id=reference,
                            lines=[LineSpec(system_account(db, "cogs"), debit_minor=total, label=reference),
                                   LineSpec(system_account(db, "inventory"), credit_minor=total, label=reference)])
+    return _save(db, reference, moves, entry)
+
+
+def return_in(db: Session, *, warehouse: Warehouse, move_date: date, currency: str,
+              lines: list[tuple[Product, Decimal, int, str | None]], source_type: str, source_id: str,
+              user_id: str) -> StockResult:
+    """Take back goods a customer returned. ``lines`` are (product, quantity, value, source line id)."""
+    reference = next_number(db, f"return:{move_date.year}", f"RET-{move_date.year}-")
+    moves = []
+    for product, qty, value, source_line_id in lines:
+        _stockable(product)
+        if qty <= 0 or value < 0:
+            raise InventoryError("returns need a positive quantity and a non-negative value")
+        level = stock_level(db, product.id, warehouse.id)
+        moves.append(_move(db, level, reference=reference, kind="return", qty=qty, value_minor=value,
+                           move_date=move_date, user_id=user_id, source_type=source_type, source_id=source_id,
+                           source_line_id=source_line_id))
+    total = sum(m.value_minor for m in moves)
+    entry = None
+    if total:
+        entry = post_entry(db, entry_date=move_date, currency=currency, created_by=user_id,
+                           memo=f"Customer return {reference}", source_type="stock", source_id=reference,
+                           lines=[LineSpec(system_account(db, "inventory"), debit_minor=total, label=reference),
+                                  LineSpec(system_account(db, "cogs"), credit_minor=total, label=reference)])
     return _save(db, reference, moves, entry)
 
 

@@ -83,6 +83,7 @@ class JournalLine(IdMixin, TenantScoped, Base):
         same_org_fk("entry_id", "journal_entries", ondelete="CASCADE"),
         same_org_fk("account_id", "accounts"),
         same_org_fk("customer_id", "customers"),
+        same_org_fk("vendor_id", "vendors"),
         CheckConstraint(
             "debit_minor >= 0 AND credit_minor >= 0 AND (debit_minor = 0) <> (credit_minor = 0)",
             name="ck_journal_line_one_side",
@@ -94,4 +95,5 @@ class JournalLine(IdMixin, TenantScoped, Base):
     debit_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     credit_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     customer_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    vendor_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     label: Mapped[str] = mapped_column(String(300), default="", nullable=False)

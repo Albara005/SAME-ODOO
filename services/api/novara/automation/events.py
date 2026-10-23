@@ -24,6 +24,10 @@ EVENT_TYPES: dict[str, str] = {
     "invoice.payment_registered": "A payment was recorded on an invoice (details: amount, method)",
     "invoice.cancelled": "A posted invoice was cancelled",
     "invoice.overdue": "An invoice passed its due date with money still owed (daily scan)",
+    "credit_note.created": "A credit note was issued against an invoice (details: number, invoice, total)",
+    "purchase_order.confirmed": "A purchase order was confirmed",
+    "purchase_order.received": "Goods were received for a purchase order",
+    "bill.posted": "A vendor bill was posted (details: number, total)",
     "sales_order.created": "A quotation was created",
     "sales_order.confirmed": "A quotation was confirmed as a sales order",
     "sales_order.delivered": "Goods were delivered for a sales order",
@@ -72,7 +76,7 @@ def scan_overdue(session: Session, today: date) -> int:
     for inv, name in rows:
         payload = {"target_type": "invoice", "target_id": inv.id, "number": inv.number, "customer_id": inv.customer_id,
                    "customer_name": name, "due_date": inv.due_date.isoformat(), "days_overdue": (today - inv.due_date).days,
-                   "amount_due": str(from_minor(inv.total_minor - inv.amount_paid_minor, inv.currency))}
+                   "amount_due": str(from_minor(inv.amount_due_minor, inv.currency))}
         if emit(session, "invoice.overdue", payload, dedup_key=f"invoice.overdue:{inv.id}") is not None:
             emitted += 1
     try:

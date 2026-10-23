@@ -32,8 +32,13 @@ INVOICES_READ = "invoices.read"
 INVOICES_WRITE = "invoices.write"
 INVOICES_POST = "invoices.post"
 INVOICES_CANCEL = "invoices.cancel"
+INVOICES_CREDIT = "invoices.credit"
 PAYMENTS_WRITE = "payments.write"
 ACCOUNTING_READ = "accounting.read"
+ACCOUNTING_CLOSE = "accounting.close"
+PURCHASES_READ = "purchases.read"
+PURCHASES_WRITE = "purchases.write"
+BILLS_POST = "bills.post"
 SALES_READ = "sales.read"
 SALES_WRITE = "sales.write"
 INVENTORY_READ = "inventory.read"
@@ -68,8 +73,13 @@ CATALOG: dict[str, str] = {
     INVOICES_WRITE: "Create and edit draft invoices",
     INVOICES_POST: "Post invoices to the ledger (makes them final)",
     INVOICES_CANCEL: "Cancel posted invoices with a reversing entry",
-    PAYMENTS_WRITE: "Register customer payments",
+    INVOICES_CREDIT: "Issue credit notes (and take back returned goods) against posted invoices",
+    PAYMENTS_WRITE: "Register customer payments, refunds and payments to vendors",
     ACCOUNTING_READ: "View the chart of accounts, journal and financial reports",
+    ACCOUNTING_CLOSE: "Close the books up to a date (nothing can be posted on or before it)",
+    PURCHASES_READ: "View vendors, purchase orders and vendor bills",
+    PURCHASES_WRITE: "Create vendors, purchase orders and draft vendor bills",
+    BILLS_POST: "Post and cancel vendor bills",
     SALES_READ: "View quotations and sales orders",
     SALES_WRITE: "Create, confirm and cancel quotations and sales orders",
     INVENTORY_READ: "View stock levels, moves and valuation",
@@ -92,10 +102,12 @@ OWNER_ROLE = "owner"
 _SALES = [CUSTOMERS_READ, CUSTOMERS_WRITE, PRODUCTS_READ, INVOICES_READ, INVOICES_WRITE,
           SALES_READ, SALES_WRITE, INVENTORY_READ]
 _ACCOUNTING = [
-    CUSTOMERS_READ, PRODUCTS_READ, INVOICES_READ, INVOICES_POST, INVOICES_CANCEL,
-    PAYMENTS_WRITE, ACCOUNTING_READ, TAXES_MANAGE, SALES_READ, INVENTORY_READ,
+    CUSTOMERS_READ, PRODUCTS_READ, INVOICES_READ, INVOICES_POST, INVOICES_CANCEL, INVOICES_CREDIT,
+    PAYMENTS_WRITE, ACCOUNTING_READ, ACCOUNTING_CLOSE, TAXES_MANAGE, SALES_READ, INVENTORY_READ,
+    PURCHASES_READ, BILLS_POST,
 ]
-_WAREHOUSE = [PRODUCTS_READ, SALES_READ, INVENTORY_READ, INVENTORY_WRITE]
+# Receiving goods against purchase orders is warehouse work.
+_WAREHOUSE = [PRODUCTS_READ, SALES_READ, INVENTORY_READ, INVENTORY_WRITE, PURCHASES_READ]
 
 SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     OWNER_ROLE: ("Owner", sorted(CATALOG)),

@@ -392,6 +392,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/accounting/balance-sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Balance Sheet */
+        get: operations["get_balance_sheet_api_v1_orgs__org_id__accounting_balance_sheet_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/accounting/journal-entries": {
         parameters: {
             query?: never;
@@ -421,6 +438,44 @@ export interface paths {
          * @description General journal, one row per line, for the accountant or an external system.
          */
         get: operations["export_journal_api_v1_orgs__org_id__accounting_journal_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/accounting/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Lock */
+        get: operations["get_lock_api_v1_orgs__org_id__accounting_lock_get"];
+        /**
+         * Set Lock
+         * @description Close the books up to a date: no invoice, payment, stock move or other entry can be dated on or before it.
+         */
+        put: operations["set_lock_api_v1_orgs__org_id__accounting_lock_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/accounting/profit-and-loss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profit And Loss */
+        get: operations["get_profit_and_loss_api_v1_orgs__org_id__accounting_profit_and_loss_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -768,6 +823,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Bills */
+        get: operations["list_bills_api_v1_orgs__org_id__bills_get"];
+        put?: never;
+        /**
+         * Create Bill
+         * @description A bill without a purchase order: services and expenses (rent, utilities...).
+         */
+        post: operations["create_bill_api_v1_orgs__org_id__bills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bills/{bill_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Bill */
+        get: operations["read_bill_api_v1_orgs__org_id__bills__bill_id__get"];
+        /** Replace Bill */
+        put: operations["replace_bill_api_v1_orgs__org_id__bills__bill_id__put"];
+        post?: never;
+        /** Delete Bill */
+        delete: operations["delete_bill_api_v1_orgs__org_id__bills__bill_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bills/{bill_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Bill */
+        post: operations["cancel_bill_api_v1_orgs__org_id__bills__bill_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bills/{bill_id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Bill Payments */
+        get: operations["list_bill_payments_api_v1_orgs__org_id__bills__bill_id__payments_get"];
+        put?: never;
+        /** Pay Bill */
+        post: operations["pay_bill_api_v1_orgs__org_id__bills__bill_id__payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bills/{bill_id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Bill */
+        post: operations["post_bill_api_v1_orgs__org_id__bills__bill_id__post_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/creative/brand-kits": {
         parameters: {
             query?: never;
@@ -963,6 +1110,61 @@ export interface paths {
          * @description Preview the full colour system for a brand colour without saving anything.
          */
         post: operations["preview_palette_api_v1_orgs__org_id__creative_palette_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Credit Notes */
+        get: operations["list_credit_notes_api_v1_orgs__org_id__credit_notes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/credit-notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Credit Note */
+        get: operations["read_credit_note_api_v1_orgs__org_id__credit_notes__note_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/credit-notes/{note_id}/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Refunds */
+        get: operations["list_refunds_api_v1_orgs__org_id__credit_notes__note_id__refunds_get"];
+        put?: never;
+        /**
+         * Refund
+         * @description Pay back what a credit note owes the customer (the part that didn't reduce an open invoice).
+         */
+        post: operations["refund_api_v1_orgs__org_id__credit_notes__note_id__refunds_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1390,6 +1592,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/invoices/{invoice_id}/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Credit Note
+         * @description Credit some or all of a posted invoice; optionally take returned goods back into stock.
+         */
+        post: operations["create_credit_note_api_v1_orgs__org_id__invoices__invoice_id__credit_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/invoices/{invoice_id}/payments": {
         parameters: {
             query?: never;
@@ -1595,6 +1817,136 @@ export interface paths {
         head?: never;
         /** Update Product */
         patch: operations["update_product_api_v1_orgs__org_id__products__product_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Orders */
+        get: operations["list_orders_api_v1_orgs__org_id__purchase_orders_get"];
+        put?: never;
+        /** Create Order */
+        post: operations["create_order_api_v1_orgs__org_id__purchase_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/purchase-orders/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Order */
+        get: operations["read_order_api_v1_orgs__org_id__purchase_orders__order_id__get"];
+        /** Replace Order */
+        put: operations["replace_order_api_v1_orgs__org_id__purchase_orders__order_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/purchase-orders/{order_id}/bill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bill Order
+         * @description A draft bill for received goods and ordered services not billed yet, at the order's prices.
+         */
+        post: operations["bill_order_api_v1_orgs__org_id__purchase_orders__order_id__bill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/purchase-orders/{order_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Order */
+        post: operations["cancel_order_api_v1_orgs__org_id__purchase_orders__order_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/purchase-orders/{order_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Order */
+        post: operations["confirm_order_api_v1_orgs__org_id__purchase_orders__order_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/purchase-orders/{order_id}/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Receive Order
+         * @description Receive goods into the order's warehouse at the order's unit cost.
+         */
+        post: operations["receive_order_api_v1_orgs__org_id__purchase_orders__order_id__receipts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/reports/payables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Payables Aging
+         * @description What is owed to each vendor, by how many days past the due date.
+         */
+        get: operations["payables_aging_api_v1_orgs__org_id__reports_payables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/orgs/{org_id}/reports/receivables": {
@@ -2122,6 +2474,42 @@ export interface paths {
         patch: operations["update_tax_api_v1_orgs__org_id__taxes__tax_id__patch"];
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/vendors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Vendors */
+        get: operations["list_vendors_api_v1_orgs__org_id__vendors_get"];
+        put?: never;
+        /** Create Vendor */
+        post: operations["create_vendor_api_v1_orgs__org_id__vendors_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/vendors/{vendor_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Vendor */
+        get: operations["read_vendor_api_v1_orgs__org_id__vendors__vendor_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Vendor */
+        patch: operations["update_vendor_api_v1_orgs__org_id__vendors__vendor_id__patch"];
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/warehouses": {
         parameters: {
             query?: never;
@@ -2455,6 +2843,230 @@ export interface components {
             /** Target Type */
             target_type: string;
         };
+        /** BalanceSheetOut */
+        BalanceSheetOut: {
+            /** As Of */
+            as_of: string | null;
+            /** Assets */
+            assets: components["schemas"]["StatementLine"][];
+            /** Balanced */
+            balanced: boolean;
+            /** Currency */
+            currency: string;
+            /** Current Earnings */
+            current_earnings: string;
+            /** Equity */
+            equity: components["schemas"]["StatementLine"][];
+            /** Liabilities */
+            liabilities: components["schemas"]["StatementLine"][];
+            /** Total Assets */
+            total_assets: string;
+            /** Total Equity */
+            total_equity: string;
+            /** Total Liabilities */
+            total_liabilities: string;
+            /** Total Liabilities And Equity */
+            total_liabilities_and_equity: string;
+        };
+        /** BillCancelIn */
+        BillCancelIn: {
+            /**
+             * Cancel Date
+             * Format: date
+             */
+            cancel_date: string;
+        };
+        /** BillFromOrderIn */
+        BillFromOrderIn: {
+            /**
+             * Bill Date
+             * Format: date
+             */
+            bill_date: string;
+            /** Due Date */
+            due_date?: string | null;
+            /**
+             * Vendor Reference
+             * @default
+             */
+            vendor_reference: string;
+        };
+        /** BillIn */
+        BillIn: {
+            /**
+             * Bill Date
+             * Format: date
+             */
+            bill_date: string;
+            /** Due Date */
+            due_date?: string | null;
+            /** Lines */
+            lines: components["schemas"]["PurchaseLineIn"][];
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Vendor Id */
+            vendor_id: string;
+            /**
+             * Vendor Reference
+             * @default
+             */
+            vendor_reference: string;
+        };
+        /** BillLineOut */
+        BillLineOut: {
+            /** Account Id */
+            account_id: string | null;
+            /** Description */
+            description: string;
+            /** Id */
+            id: string;
+            /** Net Amount */
+            net_amount: string;
+            /** Position */
+            position: number;
+            /** Product Id */
+            product_id: string | null;
+            /** Purchase Order Line Id */
+            purchase_order_line_id: string | null;
+            /** Quantity */
+            quantity: string;
+            /** Tax Id */
+            tax_id: string | null;
+            /** Tax Rate */
+            tax_rate: string;
+            /** Unit Cost */
+            unit_cost: string;
+        };
+        /** BillOut */
+        BillOut: {
+            /** Amount Due */
+            amount_due: string;
+            /** Amount Paid */
+            amount_paid: string;
+            /**
+             * Bill Date
+             * Format: date
+             */
+            bill_date: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
+            /** Id */
+            id: string;
+            /** Journal Entry Id */
+            journal_entry_id: string | null;
+            /** Lines */
+            lines: components["schemas"]["BillLineOut"][];
+            /** Notes */
+            notes: string;
+            /** Number */
+            number: string | null;
+            /** Posted At */
+            posted_at: string | null;
+            /** Purchase Order Id */
+            purchase_order_id: string | null;
+            /** Purchase Order Number */
+            purchase_order_number: string | null;
+            /** Reversal Entry Id */
+            reversal_entry_id: string | null;
+            /** Status */
+            status: string;
+            /** Subtotal */
+            subtotal: string;
+            /** Tax */
+            tax: string;
+            /** Total */
+            total: string;
+            /** Vendor Id */
+            vendor_id: string;
+            /** Vendor Name */
+            vendor_name: string;
+            /** Vendor Reference */
+            vendor_reference: string;
+        };
+        /** BillPaymentIn */
+        BillPaymentIn: {
+            /** Amount */
+            amount: number | string;
+            /** Method */
+            method: string;
+            /**
+             * Payment Date
+             * Format: date
+             */
+            payment_date: string;
+            /**
+             * Reference
+             * @default
+             */
+            reference: string;
+        };
+        /** BillPaymentOut */
+        BillPaymentOut: {
+            /** Amount */
+            amount: string;
+            /** Bill Id */
+            bill_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Journal Entry Id */
+            journal_entry_id: string;
+            /** Method */
+            method: string;
+            /**
+             * Payment Date
+             * Format: date
+             */
+            payment_date: string;
+            /** Reference */
+            reference: string;
+        };
+        /** BillSummary */
+        BillSummary: {
+            /** Amount Due */
+            amount_due: string;
+            /**
+             * Bill Date
+             * Format: date
+             */
+            bill_date: string;
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
+            /** Id */
+            id: string;
+            /** Number */
+            number: string | null;
+            /** Status */
+            status: string;
+            /** Total */
+            total: string;
+            /** Vendor Id */
+            vendor_id: string;
+            /** Vendor Name */
+            vendor_name: string;
+            /** Vendor Reference */
+            vendor_reference: string;
+        };
         /** BuilderIn */
         BuilderIn: {
             /** Content */
@@ -2532,6 +3144,149 @@ export interface components {
             id: string;
             /** Title */
             title: string;
+        };
+        /** CreditLineIn */
+        CreditLineIn: {
+            /** Invoice Line Id */
+            invoice_line_id: string;
+            /** Quantity */
+            quantity: number | string;
+            /**
+             * Returned Quantity
+             * @default 0
+             */
+            returned_quantity: number | string;
+        };
+        /** CreditLineOut */
+        CreditLineOut: {
+            /** Description */
+            description: string;
+            /** Discount Percent */
+            discount_percent: string;
+            /** Invoice Line Id */
+            invoice_line_id: string;
+            /** Net Amount */
+            net_amount: string;
+            /** Quantity */
+            quantity: string;
+            /** Returned Quantity */
+            returned_quantity: string;
+            /** Tax Rate */
+            tax_rate: string;
+            /** Unit Price */
+            unit_price: string;
+        };
+        /** CreditNoteIn */
+        CreditNoteIn: {
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Lines */
+            lines: components["schemas"]["CreditLineIn"][];
+            /** Reason */
+            reason: string;
+        };
+        /** CreditNoteOut */
+        CreditNoteOut: {
+            /** Applied */
+            applied: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Customer Id */
+            customer_id: string;
+            /** Customer Name */
+            customer_name: string;
+            /** Id */
+            id: string;
+            /** Invoice Id */
+            invoice_id: string;
+            /** Invoice Number */
+            invoice_number: string;
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Journal Entry Id */
+            journal_entry_id: string;
+            /** Lines */
+            lines: components["schemas"]["CreditLineOut"][];
+            /** Number */
+            number: string;
+            /** Reason */
+            reason: string;
+            /** Refundable */
+            refundable: string;
+            /** Refunded */
+            refunded: string;
+            /** Stock Reference */
+            stock_reference: string;
+            /** Subtotal */
+            subtotal: string;
+            /** Tax */
+            tax: string;
+            /** Taxes */
+            taxes: components["schemas"]["CreditTaxOut"][];
+            /** Total */
+            total: string;
+            /** Zatca Qr */
+            zatca_qr: string | null;
+        };
+        /** CreditNoteRef */
+        CreditNoteRef: {
+            /** Id */
+            id: string;
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Number */
+            number: string;
+            /** Total */
+            total: string;
+        };
+        /** CreditNoteSummary */
+        CreditNoteSummary: {
+            /** Customer Name */
+            customer_name: string;
+            /** Id */
+            id: string;
+            /** Invoice Id */
+            invoice_id: string;
+            /** Invoice Number */
+            invoice_number: string;
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Number */
+            number: string;
+            /** Refundable */
+            refundable: string;
+            /** Total */
+            total: string;
+        };
+        /** CreditTaxOut */
+        CreditTaxOut: {
+            /** Amount */
+            amount: string;
+            /** Base */
+            base: string;
+            /** Name */
+            name: string;
+            /** Rate */
+            rate: string;
+            /** Tax Id */
+            tax_id: string;
         };
         /** CustomerIn */
         CustomerIn: {
@@ -2836,6 +3591,8 @@ export interface components {
         };
         /** InvoiceOut */
         InvoiceOut: {
+            /** Amount Credited */
+            amount_credited: string;
             /** Amount Due */
             amount_due: string;
             /** Amount Paid */
@@ -2845,6 +3602,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Credit Notes
+             * @default []
+             */
+            credit_notes: components["schemas"]["CreditNoteRef"][];
             /** Currency */
             currency: string;
             /** Customer Id */
@@ -2889,6 +3651,8 @@ export interface components {
             taxes: components["schemas"]["TaxLineOut"][];
             /** Total */
             total: string;
+            /** Zatca Qr */
+            zatca_qr?: string | null;
         };
         /** InvoiceSummary */
         InvoiceSummary: {
@@ -3017,6 +3781,11 @@ export interface components {
         };
         /** LevelOut */
         LevelOut: {
+            /**
+             * Available
+             * @default 0
+             */
+            available: string;
             /** Average Cost */
             average_cost: string;
             /** Product Id */
@@ -3025,6 +3794,11 @@ export interface components {
             product_name: string;
             /** Quantity */
             quantity: string;
+            /**
+             * Reserved
+             * @default 0
+             */
+            reserved: string;
             /** Sku */
             sku: string | null;
             /** Value */
@@ -3074,6 +3848,16 @@ export interface components {
             tax_rate: string;
             /** Unit Price */
             unit_price: string;
+        };
+        /** LockIn */
+        LockIn: {
+            /** Locked Until */
+            locked_until: string | null;
+        };
+        /** LockOut */
+        LockOut: {
+            /** Locked Until */
+            locked_until: string | null;
         };
         /** LoginIn */
         LoginIn: {
@@ -3259,6 +4043,8 @@ export interface components {
         };
         /** MyOrgOut */
         MyOrgOut: {
+            /** Books Locked Until */
+            books_locked_until: string | null;
             /**
              * Created At
              * Format: date-time
@@ -3280,6 +4066,8 @@ export interface components {
             role: string;
             /** Slug */
             slug: string;
+            /** Vat Number */
+            vat_number: string;
         };
         /** NotificationOut */
         NotificationOut: {
@@ -3336,6 +4124,11 @@ export interface components {
             qty_delivered: string;
             /** Qty Invoiced */
             qty_invoiced: string;
+            /**
+             * Qty Reserved
+             * @default 0
+             */
+            qty_reserved: string;
             /** Qty To Deliver */
             qty_to_deliver: string;
             /** Qty To Invoice */
@@ -3433,6 +4226,8 @@ export interface components {
         };
         /** OrgOut */
         OrgOut: {
+            /** Books Locked Until */
+            books_locked_until: string | null;
             /**
              * Created At
              * Format: date-time
@@ -3450,6 +4245,8 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
+            /** Vat Number */
+            vat_number: string;
         };
         /** OrgUpdate */
         OrgUpdate: {
@@ -3459,6 +4256,8 @@ export interface components {
             default_locale?: string | null;
             /** Name */
             name?: string | null;
+            /** Vat Number */
+            vat_number?: string | null;
         };
         /** PaletteIn */
         PaletteIn: {
@@ -3488,6 +4287,39 @@ export interface components {
         PasswordIn: {
             /** Password */
             password: string;
+        };
+        /** PayablesOut */
+        PayablesOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Currency */
+            currency: string;
+            /** Total Due */
+            total_due: string;
+            /** Totals */
+            totals: {
+                [key: string]: string;
+            };
+            /** Vendors */
+            vendors: components["schemas"]["PayablesRow"][];
+        };
+        /** PayablesRow */
+        PayablesRow: {
+            /** Bills */
+            bills: number;
+            /** Buckets */
+            buckets: {
+                [key: string]: string;
+            };
+            /** Total Due */
+            total_due: string;
+            /** Vendor Id */
+            vendor_id: string;
+            /** Vendor Name */
+            vendor_name: string;
         };
         /** PaymentIn */
         PaymentIn: {
@@ -3602,6 +4434,25 @@ export interface components {
             /** Unit */
             unit?: string | null;
         };
+        /** ProfitAndLossOut */
+        ProfitAndLossOut: {
+            /** Currency */
+            currency: string;
+            /** Date From */
+            date_from: string | null;
+            /** Date To */
+            date_to: string | null;
+            /** Expenses */
+            expenses: components["schemas"]["StatementLine"][];
+            /** Income */
+            income: components["schemas"]["StatementLine"][];
+            /** Net Profit */
+            net_profit: string;
+            /** Total Expenses */
+            total_expenses: string;
+            /** Total Income */
+            total_income: string;
+        };
         /** ProjectIn */
         ProjectIn: {
             /**
@@ -3642,6 +4493,138 @@ export interface components {
             slug: string;
             /** Template */
             template: string;
+        };
+        /** PurchaseLineIn */
+        PurchaseLineIn: {
+            /** Account Id */
+            account_id?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Product Id */
+            product_id?: string | null;
+            /** Quantity */
+            quantity: number | string;
+            /** Tax Id */
+            tax_id?: string | null;
+            /** Unit Cost */
+            unit_cost: number | string;
+        };
+        /** PurchaseOrderIn */
+        PurchaseOrderIn: {
+            /** Expected Date */
+            expected_date?: string | null;
+            /** Lines */
+            lines: components["schemas"]["PurchaseLineIn"][];
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /**
+             * Order Date
+             * Format: date
+             */
+            order_date: string;
+            /** Vendor Id */
+            vendor_id: string;
+            /** Warehouse Id */
+            warehouse_id?: string | null;
+        };
+        /** PurchaseOrderLineOut */
+        PurchaseOrderLineOut: {
+            /** Description */
+            description: string;
+            /** Id */
+            id: string;
+            /** Net Amount */
+            net_amount: string;
+            /** Position */
+            position: number;
+            /** Product Id */
+            product_id: string | null;
+            /** Qty Billed */
+            qty_billed: string;
+            /** Qty Received */
+            qty_received: string;
+            /** Qty To Bill */
+            qty_to_bill: string;
+            /** Qty To Receive */
+            qty_to_receive: string;
+            /** Quantity */
+            quantity: string;
+            /** Tax Id */
+            tax_id: string | null;
+            /** Tax Rate */
+            tax_rate: string;
+            /** Unit Cost */
+            unit_cost: string;
+        };
+        /** PurchaseOrderOut */
+        PurchaseOrderOut: {
+            /** Bill Status */
+            bill_status: string;
+            /** Confirmed At */
+            confirmed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Expected Date */
+            expected_date: string | null;
+            /** Id */
+            id: string;
+            /** Lines */
+            lines: components["schemas"]["PurchaseOrderLineOut"][];
+            /** Notes */
+            notes: string;
+            /** Number */
+            number: string;
+            /**
+             * Order Date
+             * Format: date
+             */
+            order_date: string;
+            /** Receipt Status */
+            receipt_status: string;
+            /** Status */
+            status: string;
+            /** Subtotal */
+            subtotal: string;
+            /** Tax */
+            tax: string;
+            /** Total */
+            total: string;
+            /** Vendor Id */
+            vendor_id: string;
+            /** Vendor Name */
+            vendor_name: string;
+            /** Warehouse Id */
+            warehouse_id: string | null;
+        };
+        /** PurchaseOrderSummary */
+        PurchaseOrderSummary: {
+            /** Expected Date */
+            expected_date: string | null;
+            /** Id */
+            id: string;
+            /** Number */
+            number: string;
+            /**
+             * Order Date
+             * Format: date
+             */
+            order_date: string;
+            /** Status */
+            status: string;
+            /** Total */
+            total: string;
+            /** Vendor Id */
+            vendor_id: string;
+            /** Vendor Name */
+            vendor_name: string;
         };
         /** QuoteIn */
         QuoteIn: {
@@ -3701,10 +4684,69 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** ReceiveIn */
+        ReceiveIn: {
+            /** Lines */
+            lines?: components["schemas"]["ReceiveLineIn"][] | null;
+            /**
+             * Move Date
+             * Format: date
+             */
+            move_date: string;
+        };
+        /** ReceiveLineIn */
+        ReceiveLineIn: {
+            /** Line Id */
+            line_id: string;
+            /** Quantity */
+            quantity: number | string;
+        };
         /** RecoveryCodesOut */
         RecoveryCodesOut: {
             /** Recovery Codes */
             recovery_codes: string[];
+        };
+        /** RefundIn */
+        RefundIn: {
+            /** Amount */
+            amount: number | string;
+            /** Method */
+            method: string;
+            /**
+             * Reference
+             * @default
+             */
+            reference: string;
+            /**
+             * Refund Date
+             * Format: date
+             */
+            refund_date: string;
+        };
+        /** RefundOut */
+        RefundOut: {
+            /** Amount */
+            amount: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Credit Note Id */
+            credit_note_id: string;
+            /** Id */
+            id: string;
+            /** Journal Entry Id */
+            journal_entry_id: string;
+            /** Method */
+            method: string;
+            /** Reference */
+            reference: string;
+            /**
+             * Refund Date
+             * Format: date
+             */
+            refund_date: string;
         };
         /** RegisterIn */
         RegisterIn: {
@@ -3923,6 +4965,17 @@ export interface components {
                     [key: string]: string;
                 };
             } | null;
+        };
+        /** StatementLine */
+        StatementLine: {
+            /** Account Id */
+            account_id: string;
+            /** Amount */
+            amount: string;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
         };
         /** StepOut */
         StepOut: {
@@ -4177,6 +5230,92 @@ export interface components {
             matches_ledger: boolean;
             /** Stock Value */
             stock_value: string;
+        };
+        /** VendorIn */
+        VendorIn: {
+            /**
+             * Address Line
+             * @default
+             */
+            address_line: string;
+            /**
+             * City
+             * @default
+             */
+            city: string;
+            /**
+             * Commercial Registration
+             * @default
+             */
+            commercial_registration: string;
+            /**
+             * Country
+             * @default
+             */
+            country: string;
+            /** Email */
+            email?: string | null;
+            /**
+             * Kind
+             * @default company
+             */
+            kind: string;
+            /** Name */
+            name: string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /**
+             * Phone
+             * @default
+             */
+            phone: string;
+            /**
+             * Postal Code
+             * @default
+             */
+            postal_code: string;
+            /**
+             * Tax Number
+             * @default
+             */
+            tax_number: string;
+        };
+        /** VendorOut */
+        VendorOut: {
+            /** Active */
+            active: boolean;
+            /** Address Line */
+            address_line: string;
+            /** City */
+            city: string;
+            /** Commercial Registration */
+            commercial_registration: string;
+            /** Country */
+            country: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Email */
+            email: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes: string;
+            /** Phone */
+            phone: string;
+            /** Postal Code */
+            postal_code: string;
+            /** Tax Number */
+            tax_number: string;
         };
         /** VersionIn */
         VersionIn: {
@@ -5061,6 +6200,39 @@ export interface operations {
             };
         };
     };
+    get_balance_sheet_api_v1_orgs__org_id__accounting_balance_sheet_get: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceSheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_journal_entries_api_v1_orgs__org_id__accounting_journal_entries_get: {
         parameters: {
             query?: {
@@ -5117,6 +6289,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_lock_api_v1_orgs__org_id__accounting_lock_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LockOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_lock_api_v1_orgs__org_id__accounting_lock_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LockIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LockOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_profit_and_loss_api_v1_orgs__org_id__accounting_profit_and_loss_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfitAndLossOut"];
                 };
             };
             /** @description Validation Error */
@@ -5926,6 +7198,313 @@ export interface operations {
             };
         };
     };
+    list_bills_api_v1_orgs__org_id__bills_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                vendor_id?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_bill_api_v1_orgs__org_id__bills_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_bill_api_v1_orgs__org_id__bills__bill_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bill_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_bill_api_v1_orgs__org_id__bills__bill_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bill_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_bill_api_v1_orgs__org_id__bills__bill_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bill_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_bill_api_v1_orgs__org_id__bills__bill_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bill_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillCancelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bill_payments_api_v1_orgs__org_id__bills__bill_id__payments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bill_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillPaymentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pay_bill_api_v1_orgs__org_id__bills__bill_id__payments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                bill_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillPaymentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillPaymentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_bill_api_v1_orgs__org_id__bills__bill_id__post_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bill_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_kits_api_v1_orgs__org_id__creative_brand_kits_get: {
         parameters: {
             query?: never;
@@ -6353,6 +7932,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_credit_notes_api_v1_orgs__org_id__credit_notes_get: {
+        parameters: {
+            query?: {
+                invoice_id?: string | null;
+                customer_id?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_credit_note_api_v1_orgs__org_id__credit_notes__note_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_refunds_api_v1_orgs__org_id__credit_notes__note_id__refunds_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refund_api_v1_orgs__org_id__credit_notes__note_id__refunds_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                note_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundOut"];
                 };
             };
             /** @description Validation Error */
@@ -7432,6 +9149,44 @@ export interface operations {
             };
         };
     };
+    create_credit_note_api_v1_orgs__org_id__invoices__invoice_id__credit_notes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                invoice_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreditNoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreditNoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_payments_api_v1_orgs__org_id__invoices__invoice_id__payments_get: {
         parameters: {
             query?: never;
@@ -7984,6 +9739,316 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_orders_api_v1_orgs__org_id__purchase_orders_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                vendor_id?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_order_api_v1_orgs__org_id__purchase_orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_order_api_v1_orgs__org_id__purchase_orders__order_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_order_api_v1_orgs__org_id__purchase_orders__order_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bill_order_api_v1_orgs__org_id__purchase_orders__order_id__bill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillFromOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_order_api_v1_orgs__org_id__purchase_orders__order_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_order_api_v1_orgs__org_id__purchase_orders__order_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_order_api_v1_orgs__org_id__purchase_orders__order_id__receipts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                order_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockOperationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payables_aging_api_v1_orgs__org_id__reports_payables_get: {
+        parameters: {
+            query?: {
+                as_of?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayablesOut"];
                 };
             };
             /** @description Validation Error */
@@ -9268,6 +11333,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_vendors_api_v1_orgs__org_id__vendors_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                include_archived?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_vendor_api_v1_orgs__org_id__vendors_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_vendor_api_v1_orgs__org_id__vendors__vendor_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_vendor_api_v1_orgs__org_id__vendors__vendor_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorOut"];
                 };
             };
             /** @description Validation Error */

@@ -192,7 +192,7 @@ def export_invoices(date_from: date | None = None, date_to: date | None = None,
     def rows():
         for inv, cust in db.execute(stmt):
             m = lambda v: from_minor(v, inv.currency)  # noqa: E731
-            due = 0 if inv.status == "cancelled" else inv.total_minor - inv.amount_paid_minor
+            due = inv.amount_due_minor
             yield [inv.number, inv.status, inv.issue_date, inv.due_date, cust.name, cust.tax_number, inv.currency,
                    m(inv.subtotal_minor), m(inv.tax_minor), m(inv.total_minor), m(inv.amount_paid_minor), m(due)]
 

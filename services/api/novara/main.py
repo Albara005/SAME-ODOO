@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from novara.ai.provider import AnthropicProvider, ModelProvider
@@ -19,10 +20,13 @@ from novara.studio.router import router as studio_router, sites_router
 from novara.db import Base, make_engine, make_sessionmaker
 from novara.modules.access.router import router as access_router
 from novara.modules.accounting.router import router as accounting_router
+from novara.modules.accounting.service import PeriodLocked
 from novara.modules.catalog.router import router as catalog_router
 from novara.modules.inventory.router import router as inventory_router
+from novara.modules.invoicing.credit_router import router as credit_router
 from novara.modules.invoicing.router import router as invoicing_router
 from novara.modules.partners.router import router as partners_router
+from novara.modules.purchasing.router import router as purchasing_router
 from novara.modules.sales.router import router as sales_router
 from novara.modules.audit.router import router as audit_router
 from novara.modules.dataio.router import router as dataio_router
@@ -39,6 +43,7 @@ from novara.modules.inventory import models as _inventory_models  # noqa: F401
 from novara.modules.invoicing import models as _invoicing_models  # noqa: F401
 from novara.modules.partners import models as _partner_models  # noqa: F401
 from novara.modules.sales import models as _sales_models  # noqa: F401
+from novara.modules.purchasing import models as _purchasing_models  # noqa: F401
 from novara import idempotency as _idempotency_models  # noqa: F401
 from novara.ai import models as _ai_models  # noqa: F401
 from novara.studio import models as _studio_models  # noqa: F401
@@ -75,6 +80,11 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     # SMTP when NOVARA_SMTP_HOST is set; otherwise emails go to the log (development).
     app.state.mailer = mailer or mailer_from_settings(settings)
 
+    @app.exception_handler(PeriodLocked)
+    def closed_books(_request: Request, exc: PeriodLocked) -> JSONResponse:
+        # Any posting (invoice, payment, stock move...) dated in closed books.
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
     if settings.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,
                            allow_methods=["*"], allow_headers=["*"])
@@ -87,8 +97,8 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
 
     for r in (identity_router, organizations_router, access_router, audit_router, files_router,
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
-              dataio_router, partners_router, catalog_router, accounting_router, invoicing_router,
-              inventory_router, sales_router, assistant_router, studio_router, agents_router, automation_router,
+              dataio_router, partners_router, catalog_router, accounting_router, invoicing_router, credit_router,
+              inventory_router, sales_router, purchasing_router, assistant_router, studio_router, agents_router, automation_router,
               creative_router, hosting_router, live_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(sites_router)  # public, unauthenticated: published App Studio sites

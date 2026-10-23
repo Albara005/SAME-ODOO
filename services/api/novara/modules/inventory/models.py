@@ -56,7 +56,7 @@ class StockMove(IdMixin, TimestampMixin, TenantScoped, Base):
     )
 
     reference: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    kind: Mapped[str] = mapped_column(String(20), nullable=False)  # receipt | delivery | adjustment
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)  # receipt | delivery | adjustment | return
     product_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     warehouse_id: Mapped[str] = mapped_column(String(36), nullable=False)
     move_date: Mapped[date] = mapped_column(Date, nullable=False)

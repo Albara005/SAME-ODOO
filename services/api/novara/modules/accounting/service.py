@@ -4,7 +4,8 @@ Rules enforced here (and again by the database on PostgreSQL):
 * every entry balances: total debit == total credit, at least two lines;
 * each line is either a debit or a credit, never both, never negative;
 * entries and lines are never updated or deleted; mistakes are fixed with
-  ``reverse_entry``.
+  ``reverse_entry``;
+* nothing is dated on or before the organization's lock date (closed books).
 """
 
 from __future__ import annotations
@@ -16,6 +17,8 @@ from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 
 from novara.modules.accounting.models import Account, JournalEntry, JournalLine, NumberSequence
+from novara.modules.organizations.models import Organization
+from novara.tenancy import current_tenant
 
 # A small, country-neutral starting chart. Organizations can add accounts later;
 # system_key marks the ones the platform posts to automatically.
@@ -24,13 +27,15 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     ("1200", "Bank", "asset", "bank"),
     ("1300", "Accounts Receivable", "asset", "receivable"),
     ("1400", "Inventory", "asset", "inventory"),
+    ("1500", "Input VAT Recoverable", "asset", "vat_input"),
     ("2100", "Accounts Payable", "liability", "payable"),
+    ("2150", "Goods Received Not Invoiced", "liability", "grni"),
     ("2200", "Output VAT Payable", "liability", "vat_output"),
     ("3000", "Owner's Equity", "equity", "equity"),
     ("4000", "Sales Revenue", "income", "sales"),
     ("5000", "Cost of Goods Sold", "expense", "cogs"),
     ("5100", "Inventory Adjustments", "expense", "inventory_adjustment"),
-    ("6000", "General Expenses", "expense", None),
+    ("6000", "General Expenses", "expense", "expense"),
 ]
 
 
@@ -42,13 +47,29 @@ class LedgerImmutable(RuntimeError):
     pass
 
 
+class PeriodLocked(LedgerError):
+    """The date falls in closed books (HTTP 409)."""
+
+
 @dataclass(frozen=True)
 class LineSpec:
     account: Account
     debit_minor: int = 0
     credit_minor: int = 0
     customer_id: str | None = None
+    vendor_id: str | None = None
     label: str = ""
+
+
+def lock_date(db: Session) -> date | None:
+    org = db.get(Organization, current_tenant(db))
+    return org.books_locked_until if org is not None else None
+
+
+def check_open(db: Session, entry_date: date) -> None:
+    locked = lock_date(db)
+    if locked is not None and entry_date <= locked:
+        raise PeriodLocked(f"the books are closed up to {locked.isoformat()}; use a later date")
 
 
 def ensure_chart(db: Session) -> dict[str, Account]:
@@ -117,6 +138,7 @@ def post_entry(
     credit = sum(l.credit_minor for l in lines)
     if debit != credit:
         raise LedgerError(f"unbalanced entry: debit {debit} != credit {credit}")
+    check_open(db, entry_date)
 
     entry = JournalEntry(
         number=next_number(db, f"journal:{entry_date.year}", f"JE-{entry_date.year}-", 6),
@@ -137,6 +159,7 @@ def post_entry(
             debit_minor=l.debit_minor,
             credit_minor=l.credit_minor,
             customer_id=l.customer_id,
+            vendor_id=l.vendor_id,
             label=l.label,
         )
         for l in lines
@@ -160,7 +183,7 @@ def reverse_entry(db: Session, entry: JournalEntry, *, entry_date: date, memo: s
         reversal_of_id=entry.id,
         lines=[
             LineSpec(accounts[l.account_id], debit_minor=l.credit_minor, credit_minor=l.debit_minor,
-                     customer_id=l.customer_id, label=f"Reversal: {l.label}"[:300])
+                     customer_id=l.customer_id, vendor_id=l.vendor_id, label=f"Reversal: {l.label}"[:300])
             for l in originals
         ],
     )
@@ -177,7 +200,7 @@ class TrialBalanceRow:
         return self.debit_minor - self.credit_minor
 
 
-def trial_balance(db: Session, *, as_of: date | None = None) -> list[TrialBalanceRow]:
+def trial_balance(db: Session, *, as_of: date | None = None, date_from: date | None = None) -> list[TrialBalanceRow]:
     stmt = (
         select(JournalLine.account_id, func.sum(JournalLine.debit_minor), func.sum(JournalLine.credit_minor))
         .join(JournalEntry, JournalEntry.id == JournalLine.entry_id)
@@ -185,9 +208,73 @@ def trial_balance(db: Session, *, as_of: date | None = None) -> list[TrialBalanc
     )
     if as_of is not None:
         stmt = stmt.where(JournalEntry.entry_date <= as_of)
+    if date_from is not None:
+        stmt = stmt.where(JournalEntry.entry_date >= date_from)
     sums = {acc: (int(d or 0), int(c or 0)) for acc, d, c in db.execute(stmt)}
     accounts = db.scalars(select(Account).order_by(Account.code)).all()
     return [TrialBalanceRow(a, *sums[a.id]) for a in accounts if a.id in sums]
+
+
+# Which side increases each account type: assets and expenses grow with debits, the rest with credits.
+DEBIT_NORMAL = {"asset", "expense"}
+
+
+def natural_balance(row: TrialBalanceRow) -> int:
+    return row.balance_minor if row.account.type in DEBIT_NORMAL else -row.balance_minor
+
+
+@dataclass(frozen=True)
+class ProfitAndLoss:
+    income: list[TrialBalanceRow]
+    expenses: list[TrialBalanceRow]
+
+    @property
+    def total_income(self) -> int:
+        return sum(natural_balance(r) for r in self.income)
+
+    @property
+    def total_expenses(self) -> int:
+        return sum(natural_balance(r) for r in self.expenses)
+
+    @property
+    def net_profit(self) -> int:
+        return self.total_income - self.total_expenses
+
+
+def profit_and_loss(db: Session, *, date_from: date | None, date_to: date | None) -> ProfitAndLoss:
+    rows = trial_balance(db, as_of=date_to, date_from=date_from)
+    return ProfitAndLoss(income=[r for r in rows if r.account.type == "income"],
+                         expenses=[r for r in rows if r.account.type == "expense"])
+
+
+@dataclass(frozen=True)
+class BalanceSheet:
+    assets: list[TrialBalanceRow]
+    liabilities: list[TrialBalanceRow]
+    equity: list[TrialBalanceRow]
+    # Income minus expenses up to the date: not closed into equity by an entry, so shown on its own line.
+    earnings_minor: int
+
+    @property
+    def total_assets(self) -> int:
+        return sum(natural_balance(r) for r in self.assets)
+
+    @property
+    def total_liabilities(self) -> int:
+        return sum(natural_balance(r) for r in self.liabilities)
+
+    @property
+    def total_equity(self) -> int:
+        return sum(natural_balance(r) for r in self.equity) + self.earnings_minor
+
+
+def balance_sheet(db: Session, *, as_of: date | None) -> BalanceSheet:
+    rows = trial_balance(db, as_of=as_of)
+    pnl = ProfitAndLoss(income=[r for r in rows if r.account.type == "income"],
+                        expenses=[r for r in rows if r.account.type == "expense"])
+    return BalanceSheet(assets=[r for r in rows if r.account.type == "asset"],
+                        liabilities=[r for r in rows if r.account.type == "liability"],
+                        equity=[r for r in rows if r.account.type == "equity"], earnings_minor=pnl.net_profit)
 
 
 @event.listens_for(Session, "before_flush")

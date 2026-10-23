@@ -14,12 +14,12 @@ from novara.modules.access import permissions as P
 from novara.modules.accounting.service import next_number
 from novara.modules.audit import service as audit
 from novara.modules.inventory import service as stock
-from novara.modules.inventory.models import Warehouse
+from novara.modules.inventory.models import StockLevel, Warehouse
 from novara.modules.inventory.router import StockOperationOut, _replay, operation_out
 from novara.modules.invoicing.lines import LineIn, resolve_lines
 from novara.modules.invoicing.router import InvoiceOut, invoice_out
 from novara.modules.partners.models import Customer
-from novara.modules.sales import service as svc
+from novara.modules.sales import reservations, service as svc
 from novara.modules.sales.models import SalesOrder, SalesOrderLine
 from novara.money import fmt_decimal, from_minor
 
@@ -72,6 +72,8 @@ class OrderLineOut(BaseModel):
     qty_invoiced: str
     qty_to_deliver: str
     qty_to_invoice: str
+    # Of what is left to deliver, how much the stock covers once earlier orders take theirs.
+    qty_reserved: str = "0"
 
 
 class OrderOut(BaseModel):
@@ -112,6 +114,11 @@ def _money(minor: int, currency: str) -> str:
 def order_out(db: Session, order: SalesOrder) -> OrderOut:
     items = svc.progress(db, order)
     c = order.currency
+    reserved: dict[str, Decimal] = {}
+    if order.status == "confirmed" and any(i.to_deliver > 0 for i in items):
+        on_hand = {(l.product_id, l.warehouse_id): l.quantity for l in db.scalars(select(StockLevel).where(
+            StockLevel.product_id.in_({i.line.product_id for i in items if i.is_goods})))}
+        reserved = reservations.reserved_for_lines(db, order, on_hand)
     return OrderOut(
         id=order.id, number=order.number, status=order.status,
         delivery_status=svc.delivery_status(items), invoice_status=svc.invoice_status(items),
@@ -127,6 +134,7 @@ def order_out(db: Session, order: SalesOrder) -> OrderOut:
                 tax_rate=fmt_decimal(i.line.tax_rate), net_amount=_money(i.line.net_minor, c),
                 qty_delivered=fmt_decimal(i.line.qty_delivered), qty_invoiced=fmt_decimal(i.invoiced),
                 qty_to_deliver=fmt_decimal(i.to_deliver), qty_to_invoice=fmt_decimal(i.to_invoice),
+                qty_reserved=fmt_decimal(reserved.get(i.line.id, Decimal(0))),
             )
             for i in items
         ],

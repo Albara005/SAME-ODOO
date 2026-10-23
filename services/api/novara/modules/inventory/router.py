@@ -18,6 +18,7 @@ from novara.modules.audit import service as audit
 from novara.modules.catalog.models import Product
 from novara.modules.inventory import service as svc
 from novara.modules.inventory.models import StockLevel, StockMove, Warehouse
+from novara.modules.sales.reservations import reserved_totals
 from novara.money import fmt_decimal, from_minor
 
 router = APIRouter(tags=["inventory"])
@@ -91,6 +92,9 @@ class LevelOut(BaseModel):
     warehouse_id: str
     warehouse_code: str
     quantity: str
+    # Held for confirmed sales orders not delivered yet; available = quantity - reserved (can go negative).
+    reserved: str = "0"
+    available: str = "0"
     value: str
     average_cost: str
 
@@ -229,10 +233,13 @@ def stock_levels(product_id: str | None = None, warehouse_id: str | None = None,
     if warehouse_id:
         stmt = stmt.where(StockLevel.warehouse_id == warehouse_id)
     out = []
+    reserved = reserved_totals(db)
     for level, product, wh in db.execute(stmt):
         avg = (from_minor(level.value_minor, currency) / level.quantity) if level.quantity else Decimal(0)
+        held = reserved.get((product.id, wh.id), Decimal(0))
         out.append(LevelOut(product_id=product.id, product_name=product.name, sku=product.sku, warehouse_id=wh.id,
                             warehouse_code=wh.code, quantity=fmt_decimal(level.quantity),
+                            reserved=fmt_decimal(held), available=fmt_decimal(level.quantity - held),
                             value=str(from_minor(level.value_minor, currency)),
                             average_cost=fmt_decimal(avg.quantize(Decimal("0.000001")))))
     return out

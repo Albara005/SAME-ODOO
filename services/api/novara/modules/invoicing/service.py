@@ -12,6 +12,7 @@ Posting writes one balanced journal entry:
         Cr Output VAT (per tax)       tax
 Payments:  Dr Bank/Cash, Cr Accounts Receivable.
 Cancelling a posted, unpaid invoice posts the exact reversal of its entry.
+Credit notes (``credit.py``) reduce what is due without touching the invoice itself.
 """
 
 from __future__ import annotations
@@ -141,7 +142,7 @@ def register_payment(
         raise InvoiceStateError(f"invoice cannot receive payments (status: {invoice.status})")
     if method not in PAYMENT_METHODS:
         raise InvoiceValidationError(f"unknown payment method: {method}")
-    residual = invoice.total_minor - invoice.amount_paid_minor
+    residual = invoice.amount_due_minor
     if amount_minor <= 0 or amount_minor > residual:
         raise InvoiceValidationError(
             f"payment must be between 0 and the open amount {from_minor(residual, invoice.currency)}"
@@ -165,9 +166,17 @@ def register_payment(
     )
     db.add(payment)
     invoice.amount_paid_minor += amount_minor
-    invoice.status = "paid" if invoice.amount_paid_minor == invoice.total_minor else "partially_paid"
+    settle(invoice)
     db.flush()
     return payment, True
+
+
+def settle(invoice: Invoice) -> None:
+    """Status after a payment or a credit: paid/credited when nothing is due, else (partially) paid."""
+    if invoice.amount_due_minor == 0:
+        invoice.status = "paid" if invoice.amount_paid_minor > 0 else "credited"
+    else:
+        invoice.status = "partially_paid" if invoice.amount_paid_minor > 0 else "posted"
 
 
 def cancel_invoice(db: Session, invoice: Invoice, *, user_id: str, cancel_date: date) -> JournalEntry:
@@ -176,6 +185,8 @@ def cancel_invoice(db: Session, invoice: Invoice, *, user_id: str, cancel_date: 
             "only posted invoices without payments can be cancelled" if invoice.status != "draft"
             else "draft invoices are deleted, not cancelled"
         )
+    if invoice.amount_credited_minor:
+        raise InvoiceStateError("invoices with credit notes cannot be cancelled; credit the rest instead")
     if cancel_date < invoice.issue_date:
         raise InvoiceValidationError("cancellation date cannot be before the invoice date")
     original = db.get(JournalEntry, invoice.journal_entry_id)
@@ -192,7 +203,7 @@ class InvoiceLocked(RuntimeError):
 
 
 # Fields that may still change after posting (payment and cancellation bookkeeping).
-_MUTABLE_AFTER_POST = {"status", "amount_paid_minor", "reversal_entry_id", "cancelled_at",
+_MUTABLE_AFTER_POST = {"status", "amount_paid_minor", "amount_credited_minor", "reversal_entry_id", "cancelled_at",
                        "number", "journal_entry_id", "posted_at", "posted_by"}
 
 

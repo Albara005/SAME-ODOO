@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -23,6 +23,10 @@ class Organization(IdMixin, TimestampMixin, Base):
     hosting_mode: Mapped[str] = mapped_column(String(32), default="shared", nullable=False)
     default_locale: Mapped[str] = mapped_column(String(10), default="ar", nullable=False)
     default_currency: Mapped[str] = mapped_column(String(3), default="SAR", nullable=False)
+    # Seller VAT registration number: printed on invoices and in the e-invoice QR code.
+    vat_number: Mapped[str] = mapped_column(String(20), default="", nullable=False)
+    # Closed books: no journal entry may be dated on or before this day (also enforced by the database).
+    books_locked_until: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
 class Membership(IdMixin, TimestampMixin, TenantScoped, Base):

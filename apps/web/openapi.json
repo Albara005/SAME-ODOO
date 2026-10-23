@@ -469,6 +469,599 @@
     "title": "AuditOut",
     "type": "object"
    },
+   "BalanceSheetOut": {
+    "properties": {
+     "as_of": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "As Of"
+     },
+     "assets": {
+      "items": {
+       "$ref": "#/components/schemas/StatementLine"
+      },
+      "title": "Assets",
+      "type": "array"
+     },
+     "balanced": {
+      "title": "Balanced",
+      "type": "boolean"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "current_earnings": {
+      "title": "Current Earnings",
+      "type": "string"
+     },
+     "equity": {
+      "items": {
+       "$ref": "#/components/schemas/StatementLine"
+      },
+      "title": "Equity",
+      "type": "array"
+     },
+     "liabilities": {
+      "items": {
+       "$ref": "#/components/schemas/StatementLine"
+      },
+      "title": "Liabilities",
+      "type": "array"
+     },
+     "total_assets": {
+      "title": "Total Assets",
+      "type": "string"
+     },
+     "total_equity": {
+      "title": "Total Equity",
+      "type": "string"
+     },
+     "total_liabilities": {
+      "title": "Total Liabilities",
+      "type": "string"
+     },
+     "total_liabilities_and_equity": {
+      "title": "Total Liabilities And Equity",
+      "type": "string"
+     }
+    },
+    "required": [
+     "currency",
+     "as_of",
+     "assets",
+     "liabilities",
+     "equity",
+     "current_earnings",
+     "total_assets",
+     "total_liabilities",
+     "total_equity",
+     "total_liabilities_and_equity",
+     "balanced"
+    ],
+    "title": "BalanceSheetOut",
+    "type": "object"
+   },
+   "BillCancelIn": {
+    "properties": {
+     "cancel_date": {
+      "format": "date",
+      "title": "Cancel Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "cancel_date"
+    ],
+    "title": "BillCancelIn",
+    "type": "object"
+   },
+   "BillFromOrderIn": {
+    "properties": {
+     "bill_date": {
+      "format": "date",
+      "title": "Bill Date",
+      "type": "string"
+     },
+     "due_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due Date"
+     },
+     "vendor_reference": {
+      "default": "",
+      "maxLength": 60,
+      "title": "Vendor Reference",
+      "type": "string"
+     }
+    },
+    "required": [
+     "bill_date"
+    ],
+    "title": "BillFromOrderIn",
+    "type": "object"
+   },
+   "BillIn": {
+    "properties": {
+     "bill_date": {
+      "format": "date",
+      "title": "Bill Date",
+      "type": "string"
+     },
+     "due_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due Date"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/PurchaseLineIn"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Lines",
+      "type": "array"
+     },
+     "notes": {
+      "default": "",
+      "maxLength": 5000,
+      "title": "Notes",
+      "type": "string"
+     },
+     "vendor_id": {
+      "title": "Vendor Id",
+      "type": "string"
+     },
+     "vendor_reference": {
+      "default": "",
+      "maxLength": 60,
+      "title": "Vendor Reference",
+      "type": "string"
+     }
+    },
+    "required": [
+     "vendor_id",
+     "bill_date",
+     "lines"
+    ],
+    "title": "BillIn",
+    "type": "object"
+   },
+   "BillLineOut": {
+    "properties": {
+     "account_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account Id"
+     },
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "net_amount": {
+      "title": "Net Amount",
+      "type": "string"
+     },
+     "position": {
+      "title": "Position",
+      "type": "integer"
+     },
+     "product_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Product Id"
+     },
+     "purchase_order_line_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Purchase Order Line Id"
+     },
+     "quantity": {
+      "title": "Quantity",
+      "type": "string"
+     },
+     "tax_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tax Id"
+     },
+     "tax_rate": {
+      "title": "Tax Rate",
+      "type": "string"
+     },
+     "unit_cost": {
+      "title": "Unit Cost",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "position",
+     "product_id",
+     "description",
+     "quantity",
+     "unit_cost",
+     "tax_id",
+     "tax_rate",
+     "net_amount",
+     "account_id",
+     "purchase_order_line_id"
+    ],
+    "title": "BillLineOut",
+    "type": "object"
+   },
+   "BillOut": {
+    "properties": {
+     "amount_due": {
+      "title": "Amount Due",
+      "type": "string"
+     },
+     "amount_paid": {
+      "title": "Amount Paid",
+      "type": "string"
+     },
+     "bill_date": {
+      "format": "date",
+      "title": "Bill Date",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "due_date": {
+      "format": "date",
+      "title": "Due Date",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "journal_entry_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Journal Entry Id"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/BillLineOut"
+      },
+      "title": "Lines",
+      "type": "array"
+     },
+     "notes": {
+      "title": "Notes",
+      "type": "string"
+     },
+     "number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Number"
+     },
+     "posted_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Posted At"
+     },
+     "purchase_order_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Purchase Order Id"
+     },
+     "purchase_order_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Purchase Order Number"
+     },
+     "reversal_entry_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reversal Entry Id"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "subtotal": {
+      "title": "Subtotal",
+      "type": "string"
+     },
+     "tax": {
+      "title": "Tax",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     },
+     "vendor_id": {
+      "title": "Vendor Id",
+      "type": "string"
+     },
+     "vendor_name": {
+      "title": "Vendor Name",
+      "type": "string"
+     },
+     "vendor_reference": {
+      "title": "Vendor Reference",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "vendor_reference",
+     "status",
+     "vendor_id",
+     "vendor_name",
+     "bill_date",
+     "due_date",
+     "currency",
+     "notes",
+     "subtotal",
+     "tax",
+     "total",
+     "amount_paid",
+     "amount_due",
+     "journal_entry_id",
+     "reversal_entry_id",
+     "purchase_order_id",
+     "purchase_order_number",
+     "posted_at",
+     "created_at",
+     "lines"
+    ],
+    "title": "BillOut",
+    "type": "object"
+   },
+   "BillPaymentIn": {
+    "properties": {
+     "amount": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Amount"
+     },
+     "method": {
+      "pattern": "^(bank|cash)$",
+      "title": "Method",
+      "type": "string"
+     },
+     "payment_date": {
+      "format": "date",
+      "title": "Payment Date",
+      "type": "string"
+     },
+     "reference": {
+      "default": "",
+      "maxLength": 120,
+      "title": "Reference",
+      "type": "string"
+     }
+    },
+    "required": [
+     "amount",
+     "payment_date",
+     "method"
+    ],
+    "title": "BillPaymentIn",
+    "type": "object"
+   },
+   "BillPaymentOut": {
+    "properties": {
+     "amount": {
+      "title": "Amount",
+      "type": "string"
+     },
+     "bill_id": {
+      "title": "Bill Id",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "journal_entry_id": {
+      "title": "Journal Entry Id",
+      "type": "string"
+     },
+     "method": {
+      "title": "Method",
+      "type": "string"
+     },
+     "payment_date": {
+      "format": "date",
+      "title": "Payment Date",
+      "type": "string"
+     },
+     "reference": {
+      "title": "Reference",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "bill_id",
+     "payment_date",
+     "amount",
+     "method",
+     "reference",
+     "journal_entry_id",
+     "created_at"
+    ],
+    "title": "BillPaymentOut",
+    "type": "object"
+   },
+   "BillSummary": {
+    "properties": {
+     "amount_due": {
+      "title": "Amount Due",
+      "type": "string"
+     },
+     "bill_date": {
+      "format": "date",
+      "title": "Bill Date",
+      "type": "string"
+     },
+     "due_date": {
+      "format": "date",
+      "title": "Due Date",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Number"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     },
+     "vendor_id": {
+      "title": "Vendor Id",
+      "type": "string"
+     },
+     "vendor_name": {
+      "title": "Vendor Name",
+      "type": "string"
+     },
+     "vendor_reference": {
+      "title": "Vendor Reference",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "vendor_reference",
+     "status",
+     "vendor_id",
+     "vendor_name",
+     "bill_date",
+     "due_date",
+     "total",
+     "amount_due"
+    ],
+    "title": "BillSummary",
+    "type": "object"
+   },
    "BuilderIn": {
     "properties": {
      "content": {
@@ -654,6 +1247,363 @@
      "created_at"
     ],
     "title": "ConversationOut",
+    "type": "object"
+   },
+   "CreditLineIn": {
+    "properties": {
+     "invoice_line_id": {
+      "title": "Invoice Line Id",
+      "type": "string"
+     },
+     "quantity": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Quantity"
+     },
+     "returned_quantity": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "default": "0",
+      "title": "Returned Quantity"
+     }
+    },
+    "required": [
+     "invoice_line_id",
+     "quantity"
+    ],
+    "title": "CreditLineIn",
+    "type": "object"
+   },
+   "CreditLineOut": {
+    "properties": {
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "discount_percent": {
+      "title": "Discount Percent",
+      "type": "string"
+     },
+     "invoice_line_id": {
+      "title": "Invoice Line Id",
+      "type": "string"
+     },
+     "net_amount": {
+      "title": "Net Amount",
+      "type": "string"
+     },
+     "quantity": {
+      "title": "Quantity",
+      "type": "string"
+     },
+     "returned_quantity": {
+      "title": "Returned Quantity",
+      "type": "string"
+     },
+     "tax_rate": {
+      "title": "Tax Rate",
+      "type": "string"
+     },
+     "unit_price": {
+      "title": "Unit Price",
+      "type": "string"
+     }
+    },
+    "required": [
+     "invoice_line_id",
+     "description",
+     "quantity",
+     "unit_price",
+     "discount_percent",
+     "tax_rate",
+     "net_amount",
+     "returned_quantity"
+    ],
+    "title": "CreditLineOut",
+    "type": "object"
+   },
+   "CreditNoteIn": {
+    "properties": {
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/CreditLineIn"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Lines",
+      "type": "array"
+     },
+     "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "issue_date",
+     "reason",
+     "lines"
+    ],
+    "title": "CreditNoteIn",
+    "type": "object"
+   },
+   "CreditNoteOut": {
+    "properties": {
+     "applied": {
+      "title": "Applied",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "customer_id": {
+      "title": "Customer Id",
+      "type": "string"
+     },
+     "customer_name": {
+      "title": "Customer Name",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "invoice_id": {
+      "title": "Invoice Id",
+      "type": "string"
+     },
+     "invoice_number": {
+      "title": "Invoice Number",
+      "type": "string"
+     },
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "journal_entry_id": {
+      "title": "Journal Entry Id",
+      "type": "string"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/CreditLineOut"
+      },
+      "title": "Lines",
+      "type": "array"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "refundable": {
+      "title": "Refundable",
+      "type": "string"
+     },
+     "refunded": {
+      "title": "Refunded",
+      "type": "string"
+     },
+     "stock_reference": {
+      "title": "Stock Reference",
+      "type": "string"
+     },
+     "subtotal": {
+      "title": "Subtotal",
+      "type": "string"
+     },
+     "tax": {
+      "title": "Tax",
+      "type": "string"
+     },
+     "taxes": {
+      "items": {
+       "$ref": "#/components/schemas/CreditTaxOut"
+      },
+      "title": "Taxes",
+      "type": "array"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     },
+     "zatca_qr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Zatca Qr"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "invoice_id",
+     "invoice_number",
+     "customer_id",
+     "customer_name",
+     "issue_date",
+     "currency",
+     "reason",
+     "subtotal",
+     "tax",
+     "total",
+     "applied",
+     "refunded",
+     "refundable",
+     "stock_reference",
+     "journal_entry_id",
+     "zatca_qr",
+     "created_at",
+     "lines",
+     "taxes"
+    ],
+    "title": "CreditNoteOut",
+    "type": "object"
+   },
+   "CreditNoteRef": {
+    "properties": {
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "issue_date",
+     "total"
+    ],
+    "title": "CreditNoteRef",
+    "type": "object"
+   },
+   "CreditNoteSummary": {
+    "properties": {
+     "customer_name": {
+      "title": "Customer Name",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "invoice_id": {
+      "title": "Invoice Id",
+      "type": "string"
+     },
+     "invoice_number": {
+      "title": "Invoice Number",
+      "type": "string"
+     },
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "refundable": {
+      "title": "Refundable",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "invoice_id",
+     "invoice_number",
+     "customer_name",
+     "issue_date",
+     "total",
+     "refundable"
+    ],
+    "title": "CreditNoteSummary",
+    "type": "object"
+   },
+   "CreditTaxOut": {
+    "properties": {
+     "amount": {
+      "title": "Amount",
+      "type": "string"
+     },
+     "base": {
+      "title": "Base",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "rate": {
+      "title": "Rate",
+      "type": "string"
+     },
+     "tax_id": {
+      "title": "Tax Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "tax_id",
+     "name",
+     "rate",
+     "base",
+     "amount"
+    ],
+    "title": "CreditTaxOut",
     "type": "object"
    },
    "CustomerIn": {
@@ -1430,6 +2380,10 @@
    },
    "InvoiceOut": {
     "properties": {
+     "amount_credited": {
+      "title": "Amount Credited",
+      "type": "string"
+     },
      "amount_due": {
       "title": "Amount Due",
       "type": "string"
@@ -1442,6 +2396,14 @@
       "format": "date-time",
       "title": "Created At",
       "type": "string"
+     },
+     "credit_notes": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/CreditNoteRef"
+      },
+      "title": "Credit Notes",
+      "type": "array"
      },
      "currency": {
       "title": "Currency",
@@ -1569,6 +2531,17 @@
      "total": {
       "title": "Total",
       "type": "string"
+     },
+     "zatca_qr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Zatca Qr"
      }
     },
     "required": [
@@ -1585,6 +2558,7 @@
      "tax",
      "total",
      "amount_paid",
+     "amount_credited",
      "amount_due",
      "journal_entry_id",
      "reversal_entry_id",
@@ -1965,6 +2939,11 @@
    },
    "LevelOut": {
     "properties": {
+     "available": {
+      "default": "0",
+      "title": "Available",
+      "type": "string"
+     },
      "average_cost": {
       "title": "Average Cost",
       "type": "string"
@@ -1979,6 +2958,11 @@
      },
      "quantity": {
       "title": "Quantity",
+      "type": "string"
+     },
+     "reserved": {
+      "default": "0",
+      "title": "Reserved",
       "type": "string"
      },
      "sku": {
@@ -2173,6 +3157,48 @@
      "net_amount"
     ],
     "title": "LineOut",
+    "type": "object"
+   },
+   "LockIn": {
+    "properties": {
+     "locked_until": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Locked Until"
+     }
+    },
+    "required": [
+     "locked_until"
+    ],
+    "title": "LockIn",
+    "type": "object"
+   },
+   "LockOut": {
+    "properties": {
+     "locked_until": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Locked Until"
+     }
+    },
+    "required": [
+     "locked_until"
+    ],
+    "title": "LockOut",
     "type": "object"
    },
    "LoginIn": {
@@ -2585,6 +3611,18 @@
    },
    "MyOrgOut": {
     "properties": {
+     "books_locked_until": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Books Locked Until"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",
@@ -2624,6 +3662,10 @@
      "slug": {
       "title": "Slug",
       "type": "string"
+     },
+     "vat_number": {
+      "title": "Vat Number",
+      "type": "string"
      }
     },
     "required": [
@@ -2633,6 +3675,8 @@
      "hosting_mode",
      "default_locale",
      "default_currency",
+     "vat_number",
+     "books_locked_until",
      "created_at",
      "role",
      "permissions"
@@ -2771,6 +3815,11 @@
      },
      "qty_invoiced": {
       "title": "Qty Invoiced",
+      "type": "string"
+     },
+     "qty_reserved": {
+      "default": "0",
+      "title": "Qty Reserved",
       "type": "string"
      },
      "qty_to_deliver": {
@@ -3030,6 +4079,18 @@
    },
    "OrgOut": {
     "properties": {
+     "books_locked_until": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Books Locked Until"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",
@@ -3058,6 +4119,10 @@
      "slug": {
       "title": "Slug",
       "type": "string"
+     },
+     "vat_number": {
+      "title": "Vat Number",
+      "type": "string"
      }
     },
     "required": [
@@ -3067,6 +4132,8 @@
      "hosting_mode",
      "default_locale",
      "default_currency",
+     "vat_number",
+     "books_locked_until",
      "created_at"
     ],
     "title": "OrgOut",
@@ -3110,6 +4177,19 @@
        }
       ],
       "title": "Name"
+     },
+     "vat_number": {
+      "anyOf": [
+       {
+        "maxLength": 20,
+        "pattern": "^[0-9A-Z]*$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Vat Number"
      }
     },
     "title": "OrgUpdate",
@@ -3193,6 +4273,82 @@
      "password"
     ],
     "title": "PasswordIn",
+    "type": "object"
+   },
+   "PayablesOut": {
+    "properties": {
+     "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "total_due": {
+      "title": "Total Due",
+      "type": "string"
+     },
+     "totals": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Totals",
+      "type": "object"
+     },
+     "vendors": {
+      "items": {
+       "$ref": "#/components/schemas/PayablesRow"
+      },
+      "title": "Vendors",
+      "type": "array"
+     }
+    },
+    "required": [
+     "as_of",
+     "currency",
+     "vendors",
+     "totals",
+     "total_due"
+    ],
+    "title": "PayablesOut",
+    "type": "object"
+   },
+   "PayablesRow": {
+    "properties": {
+     "bills": {
+      "title": "Bills",
+      "type": "integer"
+     },
+     "buckets": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Buckets",
+      "type": "object"
+     },
+     "total_due": {
+      "title": "Total Due",
+      "type": "string"
+     },
+     "vendor_id": {
+      "title": "Vendor Id",
+      "type": "string"
+     },
+     "vendor_name": {
+      "title": "Vendor Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "vendor_id",
+     "vendor_name",
+     "bills",
+     "buckets",
+     "total_due"
+    ],
+    "title": "PayablesRow",
     "type": "object"
    },
    "PaymentIn": {
@@ -3534,6 +4690,76 @@
     "title": "ProductUpdate",
     "type": "object"
    },
+   "ProfitAndLossOut": {
+    "properties": {
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "date_from": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date From"
+     },
+     "date_to": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Date To"
+     },
+     "expenses": {
+      "items": {
+       "$ref": "#/components/schemas/StatementLine"
+      },
+      "title": "Expenses",
+      "type": "array"
+     },
+     "income": {
+      "items": {
+       "$ref": "#/components/schemas/StatementLine"
+      },
+      "title": "Income",
+      "type": "array"
+     },
+     "net_profit": {
+      "title": "Net Profit",
+      "type": "string"
+     },
+     "total_expenses": {
+      "title": "Total Expenses",
+      "type": "string"
+     },
+     "total_income": {
+      "title": "Total Income",
+      "type": "string"
+     }
+    },
+    "required": [
+     "currency",
+     "date_from",
+     "date_to",
+     "income",
+     "expenses",
+     "total_income",
+     "total_expenses",
+     "net_profit"
+    ],
+    "title": "ProfitAndLossOut",
+    "type": "object"
+   },
    "ProjectIn": {
     "properties": {
      "description": {
@@ -3622,6 +4848,414 @@
      "created_at"
     ],
     "title": "ProjectOut",
+    "type": "object"
+   },
+   "PurchaseLineIn": {
+    "properties": {
+     "account_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Account Id"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "product_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Product Id"
+     },
+     "quantity": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Quantity"
+     },
+     "tax_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tax Id"
+     },
+     "unit_cost": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Unit Cost"
+     }
+    },
+    "required": [
+     "quantity",
+     "unit_cost"
+    ],
+    "title": "PurchaseLineIn",
+    "type": "object"
+   },
+   "PurchaseOrderIn": {
+    "properties": {
+     "expected_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Date"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/PurchaseLineIn"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Lines",
+      "type": "array"
+     },
+     "notes": {
+      "default": "",
+      "maxLength": 5000,
+      "title": "Notes",
+      "type": "string"
+     },
+     "order_date": {
+      "format": "date",
+      "title": "Order Date",
+      "type": "string"
+     },
+     "vendor_id": {
+      "title": "Vendor Id",
+      "type": "string"
+     },
+     "warehouse_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Warehouse Id"
+     }
+    },
+    "required": [
+     "vendor_id",
+     "order_date",
+     "lines"
+    ],
+    "title": "PurchaseOrderIn",
+    "type": "object"
+   },
+   "PurchaseOrderLineOut": {
+    "properties": {
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "net_amount": {
+      "title": "Net Amount",
+      "type": "string"
+     },
+     "position": {
+      "title": "Position",
+      "type": "integer"
+     },
+     "product_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Product Id"
+     },
+     "qty_billed": {
+      "title": "Qty Billed",
+      "type": "string"
+     },
+     "qty_received": {
+      "title": "Qty Received",
+      "type": "string"
+     },
+     "qty_to_bill": {
+      "title": "Qty To Bill",
+      "type": "string"
+     },
+     "qty_to_receive": {
+      "title": "Qty To Receive",
+      "type": "string"
+     },
+     "quantity": {
+      "title": "Quantity",
+      "type": "string"
+     },
+     "tax_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tax Id"
+     },
+     "tax_rate": {
+      "title": "Tax Rate",
+      "type": "string"
+     },
+     "unit_cost": {
+      "title": "Unit Cost",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "position",
+     "product_id",
+     "description",
+     "quantity",
+     "unit_cost",
+     "tax_id",
+     "tax_rate",
+     "net_amount",
+     "qty_received",
+     "qty_billed",
+     "qty_to_receive",
+     "qty_to_bill"
+    ],
+    "title": "PurchaseOrderLineOut",
+    "type": "object"
+   },
+   "PurchaseOrderOut": {
+    "properties": {
+     "bill_status": {
+      "title": "Bill Status",
+      "type": "string"
+     },
+     "confirmed_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Confirmed At"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "expected_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Date"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/PurchaseOrderLineOut"
+      },
+      "title": "Lines",
+      "type": "array"
+     },
+     "notes": {
+      "title": "Notes",
+      "type": "string"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "order_date": {
+      "format": "date",
+      "title": "Order Date",
+      "type": "string"
+     },
+     "receipt_status": {
+      "title": "Receipt Status",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "subtotal": {
+      "title": "Subtotal",
+      "type": "string"
+     },
+     "tax": {
+      "title": "Tax",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     },
+     "vendor_id": {
+      "title": "Vendor Id",
+      "type": "string"
+     },
+     "vendor_name": {
+      "title": "Vendor Name",
+      "type": "string"
+     },
+     "warehouse_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Warehouse Id"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "status",
+     "receipt_status",
+     "bill_status",
+     "vendor_id",
+     "vendor_name",
+     "order_date",
+     "expected_date",
+     "warehouse_id",
+     "currency",
+     "notes",
+     "subtotal",
+     "tax",
+     "total",
+     "confirmed_at",
+     "created_at",
+     "lines"
+    ],
+    "title": "PurchaseOrderOut",
+    "type": "object"
+   },
+   "PurchaseOrderSummary": {
+    "properties": {
+     "expected_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Date"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "order_date": {
+      "format": "date",
+      "title": "Order Date",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     },
+     "vendor_id": {
+      "title": "Vendor Id",
+      "type": "string"
+     },
+     "vendor_name": {
+      "title": "Vendor Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "status",
+     "vendor_id",
+     "vendor_name",
+     "order_date",
+     "expected_date",
+     "total"
+    ],
+    "title": "PurchaseOrderSummary",
     "type": "object"
    },
    "QuoteIn": {
@@ -3773,6 +5407,60 @@
     "title": "ReceivablesOut",
     "type": "object"
    },
+   "ReceiveIn": {
+    "properties": {
+     "lines": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/ReceiveLineIn"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lines"
+     },
+     "move_date": {
+      "format": "date",
+      "title": "Move Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "move_date"
+    ],
+    "title": "ReceiveIn",
+    "type": "object"
+   },
+   "ReceiveLineIn": {
+    "properties": {
+     "line_id": {
+      "title": "Line Id",
+      "type": "string"
+     },
+     "quantity": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Quantity"
+     }
+    },
+    "required": [
+     "line_id",
+     "quantity"
+    ],
+    "title": "ReceiveLineIn",
+    "type": "object"
+   },
    "RecoveryCodesOut": {
     "properties": {
      "recovery_codes": {
@@ -3787,6 +5475,95 @@
      "recovery_codes"
     ],
     "title": "RecoveryCodesOut",
+    "type": "object"
+   },
+   "RefundIn": {
+    "properties": {
+     "amount": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Amount"
+     },
+     "method": {
+      "pattern": "^(bank|cash)$",
+      "title": "Method",
+      "type": "string"
+     },
+     "reference": {
+      "default": "",
+      "maxLength": 120,
+      "title": "Reference",
+      "type": "string"
+     },
+     "refund_date": {
+      "format": "date",
+      "title": "Refund Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "amount",
+     "refund_date",
+     "method"
+    ],
+    "title": "RefundIn",
+    "type": "object"
+   },
+   "RefundOut": {
+    "properties": {
+     "amount": {
+      "title": "Amount",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "credit_note_id": {
+      "title": "Credit Note Id",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "journal_entry_id": {
+      "title": "Journal Entry Id",
+      "type": "string"
+     },
+     "method": {
+      "title": "Method",
+      "type": "string"
+     },
+     "reference": {
+      "title": "Reference",
+      "type": "string"
+     },
+     "refund_date": {
+      "format": "date",
+      "title": "Refund Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "credit_note_id",
+     "refund_date",
+     "amount",
+     "method",
+     "reference",
+     "journal_entry_id",
+     "created_at"
+    ],
+    "title": "RefundOut",
     "type": "object"
    },
    "RegisterIn": {
@@ -4366,6 +6143,34 @@
      }
     },
     "title": "SettingsUpdate",
+    "type": "object"
+   },
+   "StatementLine": {
+    "properties": {
+     "account_id": {
+      "title": "Account Id",
+      "type": "string"
+     },
+     "amount": {
+      "title": "Amount",
+      "type": "string"
+     },
+     "code": {
+      "title": "Code",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "account_id",
+     "code",
+     "name",
+     "amount"
+    ],
+    "title": "StatementLine",
     "type": "object"
    },
    "StepOut": {
@@ -5101,6 +6906,166 @@
      "matches_ledger"
     ],
     "title": "ValuationOut",
+    "type": "object"
+   },
+   "VendorIn": {
+    "properties": {
+     "address_line": {
+      "default": "",
+      "maxLength": 300,
+      "title": "Address Line",
+      "type": "string"
+     },
+     "city": {
+      "default": "",
+      "maxLength": 100,
+      "title": "City",
+      "type": "string"
+     },
+     "commercial_registration": {
+      "default": "",
+      "maxLength": 40,
+      "title": "Commercial Registration",
+      "type": "string"
+     },
+     "country": {
+      "default": "",
+      "pattern": "^([A-Z]{2})?$",
+      "title": "Country",
+      "type": "string"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "format": "email",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "kind": {
+      "default": "company",
+      "pattern": "^(company|individual)$",
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "notes": {
+      "default": "",
+      "maxLength": 5000,
+      "title": "Notes",
+      "type": "string"
+     },
+     "phone": {
+      "default": "",
+      "maxLength": 40,
+      "title": "Phone",
+      "type": "string"
+     },
+     "postal_code": {
+      "default": "",
+      "maxLength": 20,
+      "title": "Postal Code",
+      "type": "string"
+     },
+     "tax_number": {
+      "default": "",
+      "maxLength": 40,
+      "title": "Tax Number",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "VendorIn",
+    "type": "object"
+   },
+   "VendorOut": {
+    "properties": {
+     "active": {
+      "title": "Active",
+      "type": "boolean"
+     },
+     "address_line": {
+      "title": "Address Line",
+      "type": "string"
+     },
+     "city": {
+      "title": "City",
+      "type": "string"
+     },
+     "commercial_registration": {
+      "title": "Commercial Registration",
+      "type": "string"
+     },
+     "country": {
+      "title": "Country",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "email": {
+      "title": "Email",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "notes": {
+      "title": "Notes",
+      "type": "string"
+     },
+     "phone": {
+      "title": "Phone",
+      "type": "string"
+     },
+     "postal_code": {
+      "title": "Postal Code",
+      "type": "string"
+     },
+     "tax_number": {
+      "title": "Tax Number",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "kind",
+     "email",
+     "phone",
+     "tax_number",
+     "commercial_registration",
+     "address_line",
+     "city",
+     "postal_code",
+     "country",
+     "notes",
+     "active",
+     "created_at"
+    ],
+    "title": "VendorOut",
     "type": "object"
    },
    "VersionIn": {
@@ -6531,6 +8496,70 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/accounting/balance-sheet": {
+   "get": {
+    "operationId": "get_balance_sheet_api_v1_orgs__org_id__accounting_balance_sheet_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BalanceSheetOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Balance Sheet",
+    "tags": [
+     "accounting"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/accounting/journal-entries": {
    "get": {
     "operationId": "list_journal_entries_api_v1_orgs__org_id__accounting_journal_entries_get",
@@ -6703,6 +8732,190 @@
     "summary": "Export Journal",
     "tags": [
      "import-export"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/accounting/lock": {
+   "get": {
+    "operationId": "get_lock_api_v1_orgs__org_id__accounting_lock_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LockOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Lock",
+    "tags": [
+     "accounting"
+    ]
+   },
+   "put": {
+    "description": "Close the books up to a date: no invoice, payment, stock move or other entry can be dated on or before it.",
+    "operationId": "set_lock_api_v1_orgs__org_id__accounting_lock_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LockIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LockOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Set Lock",
+    "tags": [
+     "accounting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/accounting/profit-and-loss": {
+   "get": {
+    "operationId": "get_profit_and_loss_api_v1_orgs__org_id__accounting_profit_and_loss_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "date_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Date To"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProfitAndLossOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Profit And Loss",
+    "tags": [
+     "accounting"
     ]
    }
   },
@@ -8117,6 +10330,598 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/bills": {
+   "get": {
+    "operationId": "list_bills_api_v1_orgs__org_id__bills_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "vendor_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Vendor Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BillSummary"
+         },
+         "title": "Response List Bills Api V1 Orgs  Org Id  Bills Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Bills",
+    "tags": [
+     "purchases"
+    ]
+   },
+   "post": {
+    "description": "A bill without a purchase order: services and expenses (rent, utilities...).",
+    "operationId": "create_bill_api_v1_orgs__org_id__bills_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BillIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BillOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Bill",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bills/{bill_id}": {
+   "delete": {
+    "operationId": "delete_bill_api_v1_orgs__org_id__bills__bill_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "bill_id",
+      "required": true,
+      "schema": {
+       "title": "Bill Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete Bill",
+    "tags": [
+     "purchases"
+    ]
+   },
+   "get": {
+    "operationId": "read_bill_api_v1_orgs__org_id__bills__bill_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "bill_id",
+      "required": true,
+      "schema": {
+       "title": "Bill Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BillOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Read Bill",
+    "tags": [
+     "purchases"
+    ]
+   },
+   "put": {
+    "operationId": "replace_bill_api_v1_orgs__org_id__bills__bill_id__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "bill_id",
+      "required": true,
+      "schema": {
+       "title": "Bill Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BillIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BillOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Replace Bill",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bills/{bill_id}/cancel": {
+   "post": {
+    "operationId": "cancel_bill_api_v1_orgs__org_id__bills__bill_id__cancel_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "bill_id",
+      "required": true,
+      "schema": {
+       "title": "Bill Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BillCancelIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BillOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Cancel Bill",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bills/{bill_id}/payments": {
+   "get": {
+    "operationId": "list_bill_payments_api_v1_orgs__org_id__bills__bill_id__payments_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "bill_id",
+      "required": true,
+      "schema": {
+       "title": "Bill Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BillPaymentOut"
+         },
+         "title": "Response List Bill Payments Api V1 Orgs  Org Id  Bills  Bill Id  Payments Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Bill Payments",
+    "tags": [
+     "purchases"
+    ]
+   },
+   "post": {
+    "operationId": "pay_bill_api_v1_orgs__org_id__bills__bill_id__payments_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "bill_id",
+      "required": true,
+      "schema": {
+       "title": "Bill Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BillPaymentIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BillPaymentOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Pay Bill",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bills/{bill_id}/post": {
+   "post": {
+    "operationId": "post_bill_api_v1_orgs__org_id__bills__bill_id__post_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "bill_id",
+      "required": true,
+      "schema": {
+       "title": "Bill Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BillOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Post Bill",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/creative/brand-kits": {
    "get": {
     "operationId": "list_kits_api_v1_orgs__org_id__creative_brand_kits_get",
@@ -8914,6 +11719,310 @@
     "summary": "Preview Palette",
     "tags": [
      "creative-studio"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/credit-notes": {
+   "get": {
+    "operationId": "list_credit_notes_api_v1_orgs__org_id__credit_notes_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "invoice_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Invoice Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "customer_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Customer Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/CreditNoteSummary"
+         },
+         "title": "Response List Credit Notes Api V1 Orgs  Org Id  Credit Notes Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Credit Notes",
+    "tags": [
+     "credit notes"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/credit-notes/{note_id}": {
+   "get": {
+    "operationId": "read_credit_note_api_v1_orgs__org_id__credit_notes__note_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "note_id",
+      "required": true,
+      "schema": {
+       "title": "Note Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CreditNoteOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Read Credit Note",
+    "tags": [
+     "credit notes"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/credit-notes/{note_id}/refunds": {
+   "get": {
+    "operationId": "list_refunds_api_v1_orgs__org_id__credit_notes__note_id__refunds_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "note_id",
+      "required": true,
+      "schema": {
+       "title": "Note Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RefundOut"
+         },
+         "title": "Response List Refunds Api V1 Orgs  Org Id  Credit Notes  Note Id  Refunds Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Refunds",
+    "tags": [
+     "credit notes"
+    ]
+   },
+   "post": {
+    "description": "Pay back what a credit note owes the customer (the part that didn't reduce an open invoice).",
+    "operationId": "refund_api_v1_orgs__org_id__credit_notes__note_id__refunds_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "note_id",
+      "required": true,
+      "schema": {
+       "title": "Note Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RefundIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RefundOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Refund",
+    "tags": [
+     "credit notes"
     ]
    }
   },
@@ -10871,6 +13980,90 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/invoices/{invoice_id}/credit-notes": {
+   "post": {
+    "description": "Credit some or all of a posted invoice; optionally take returned goods back into stock.",
+    "operationId": "create_credit_note_api_v1_orgs__org_id__invoices__invoice_id__credit_notes_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "invoice_id",
+      "required": true,
+      "schema": {
+       "title": "Invoice Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CreditNoteIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CreditNoteOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Credit Note",
+    "tags": [
+     "credit notes"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/invoices/{invoice_id}/payments": {
    "get": {
     "operationId": "list_payments_api_v1_orgs__org_id__invoices__invoice_id__payments_get",
@@ -11885,6 +15078,615 @@
     "summary": "Update Product",
     "tags": [
      "products"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/purchase-orders": {
+   "get": {
+    "operationId": "list_orders_api_v1_orgs__org_id__purchase_orders_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "vendor_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Vendor Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PurchaseOrderSummary"
+         },
+         "title": "Response List Orders Api V1 Orgs  Org Id  Purchase Orders Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Orders",
+    "tags": [
+     "purchases"
+    ]
+   },
+   "post": {
+    "operationId": "create_order_api_v1_orgs__org_id__purchase_orders_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PurchaseOrderIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PurchaseOrderOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Order",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/purchase-orders/{order_id}": {
+   "get": {
+    "operationId": "read_order_api_v1_orgs__org_id__purchase_orders__order_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "order_id",
+      "required": true,
+      "schema": {
+       "title": "Order Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PurchaseOrderOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Read Order",
+    "tags": [
+     "purchases"
+    ]
+   },
+   "put": {
+    "operationId": "replace_order_api_v1_orgs__org_id__purchase_orders__order_id__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "order_id",
+      "required": true,
+      "schema": {
+       "title": "Order Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PurchaseOrderIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PurchaseOrderOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Replace Order",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/purchase-orders/{order_id}/bill": {
+   "post": {
+    "description": "A draft bill for received goods and ordered services not billed yet, at the order's prices.",
+    "operationId": "bill_order_api_v1_orgs__org_id__purchase_orders__order_id__bill_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "order_id",
+      "required": true,
+      "schema": {
+       "title": "Order Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BillFromOrderIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BillOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Bill Order",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/purchase-orders/{order_id}/cancel": {
+   "post": {
+    "operationId": "cancel_order_api_v1_orgs__org_id__purchase_orders__order_id__cancel_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "order_id",
+      "required": true,
+      "schema": {
+       "title": "Order Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PurchaseOrderOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Cancel Order",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/purchase-orders/{order_id}/confirm": {
+   "post": {
+    "operationId": "confirm_order_api_v1_orgs__org_id__purchase_orders__order_id__confirm_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "order_id",
+      "required": true,
+      "schema": {
+       "title": "Order Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PurchaseOrderOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Confirm Order",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/purchase-orders/{order_id}/receipts": {
+   "post": {
+    "description": "Receive goods into the order's warehouse at the order's unit cost.",
+    "operationId": "receive_order_api_v1_orgs__org_id__purchase_orders__order_id__receipts_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "order_id",
+      "required": true,
+      "schema": {
+       "title": "Order Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "header",
+      "name": "idempotency-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReceiveIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StockOperationOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Receive Order",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/reports/payables": {
+   "get": {
+    "description": "What is owed to each vendor, by how many days past the due date.",
+    "operationId": "payables_aging_api_v1_orgs__org_id__reports_payables_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "As Of"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PayablesOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Payables Aging",
+    "tags": [
+     "purchases"
     ]
    }
   },
@@ -14331,6 +18133,282 @@
     "summary": "Update Tax",
     "tags": [
      "accounting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/vendors": {
+   "get": {
+    "operationId": "list_vendors_api_v1_orgs__org_id__vendors_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "include_archived",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Archived",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 500,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/VendorOut"
+         },
+         "title": "Response List Vendors Api V1 Orgs  Org Id  Vendors Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Vendors",
+    "tags": [
+     "purchases"
+    ]
+   },
+   "post": {
+    "operationId": "create_vendor_api_v1_orgs__org_id__vendors_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VendorIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VendorOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Vendor",
+    "tags": [
+     "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/vendors/{vendor_id}": {
+   "get": {
+    "operationId": "read_vendor_api_v1_orgs__org_id__vendors__vendor_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "vendor_id",
+      "required": true,
+      "schema": {
+       "title": "Vendor Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VendorOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Read Vendor",
+    "tags": [
+     "purchases"
+    ]
+   },
+   "patch": {
+    "operationId": "update_vendor_api_v1_orgs__org_id__vendors__vendor_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "vendor_id",
+      "required": true,
+      "schema": {
+       "title": "Vendor Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CustomerUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VendorOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Vendor",
+    "tags": [
+     "purchases"
     ]
    }
   },

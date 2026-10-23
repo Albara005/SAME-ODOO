@@ -1,4 +1,4 @@
-"""Customer invoices and payments."""
+"""Customer invoices, payments, credit notes and refunds."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ from novara.db import Base, IdMixin, TimestampMixin
 from novara.money import ExactDecimal
 from novara.tenancy import TenantScoped, org_unique_id, same_org_fk
 
-INVOICE_STATUSES = ("draft", "posted", "partially_paid", "paid", "cancelled")
+# "credited": settled entirely by credit notes, nothing paid.
+INVOICE_STATUSES = ("draft", "posted", "partially_paid", "paid", "credited", "cancelled")
 
 
 class Invoice(IdMixin, TimestampMixin, TenantScoped, Base):
@@ -23,7 +24,8 @@ class Invoice(IdMixin, TimestampMixin, TenantScoped, Base):
         same_org_fk("customer_id", "customers"),
         same_org_fk("journal_entry_id", "journal_entries"),
         same_org_fk("reversal_entry_id", "journal_entries"),
-        CheckConstraint("amount_paid_minor >= 0 AND amount_paid_minor <= total_minor", name="ck_invoice_paid_range"),
+        CheckConstraint("amount_paid_minor >= 0 AND amount_credited_minor >= 0 "
+                        "AND amount_paid_minor + amount_credited_minor <= total_minor", name="ck_invoice_paid_range"),
     )
 
     # Assigned when posted, so numbering is gap-free (drafts can be deleted).
@@ -38,6 +40,8 @@ class Invoice(IdMixin, TimestampMixin, TenantScoped, Base):
     tax_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     total_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     amount_paid_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    # The part of credit notes that reduced what the customer owes on this invoice.
+    amount_credited_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     journal_entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     reversal_entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -45,10 +49,17 @@ class Invoice(IdMixin, TimestampMixin, TenantScoped, Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
 
+    @property
+    def amount_due_minor(self) -> int:
+        if self.status in ("draft", "cancelled"):
+            return 0
+        return self.total_minor - self.amount_paid_minor - self.amount_credited_minor
+
 
 class InvoiceLine(IdMixin, TenantScoped, Base):
     __tablename__ = "invoice_lines"
     __table_args__ = (
+        org_unique_id(),  # credit note lines point at the invoice line they credit
         same_org_fk("invoice_id", "invoices", ondelete="CASCADE"),
         same_org_fk("product_id", "products"),
         same_org_fk("tax_id", "taxes"),
@@ -84,6 +95,104 @@ class Payment(IdMixin, TimestampMixin, TenantScoped, Base):
 
     invoice_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)
+    amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    method: Mapped[str] = mapped_column(String(20), nullable=False)  # bank | cash
+    reference: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class CreditNote(IdMixin, TimestampMixin, TenantScoped, Base):
+    """Credits part or all of a posted invoice: fewer units, a price allowance, or goods returned.
+
+    The amount first reduces what is still due on the invoice (``applied_minor``); anything beyond
+    that is owed back to the customer and paid out with refunds (``refunded_minor``).
+    """
+
+    __tablename__ = "credit_notes"
+    __table_args__ = (
+        org_unique_id(),
+        UniqueConstraint("organization_id", "number", name="uq_credit_note_org_number"),
+        same_org_fk("invoice_id", "invoices"),
+        same_org_fk("customer_id", "customers"),
+        same_org_fk("journal_entry_id", "journal_entries"),
+        CheckConstraint("total_minor > 0", name="ck_credit_note_total_positive"),
+        CheckConstraint("applied_minor >= 0 AND refunded_minor >= 0 AND applied_minor + refunded_minor <= total_minor",
+                        name="ck_credit_note_settled_range"),
+    )
+
+    number: Mapped[str] = mapped_column(String(40), nullable=False)
+    invoice_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    customer_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    issue_date: Mapped[date] = mapped_column(Date, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    subtotal_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tax_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    total_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    applied_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    refunded_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    stock_reference: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # goods returned
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class CreditNoteLine(IdMixin, TenantScoped, Base):
+    __tablename__ = "credit_note_lines"
+    __table_args__ = (
+        same_org_fk("credit_note_id", "credit_notes", ondelete="CASCADE"),
+        same_org_fk("invoice_line_id", "invoice_lines"),
+        same_org_fk("product_id", "products"),
+        same_org_fk("tax_id", "taxes"),
+        CheckConstraint("CAST(quantity AS NUMERIC) > 0", name="ck_credit_line_qty_positive"),
+        CheckConstraint("CAST(returned_quantity AS NUMERIC) >= 0 AND CAST(returned_quantity AS NUMERIC) <= CAST(quantity AS NUMERIC)",
+                        name="ck_credit_line_returned_range"),
+    )
+
+    credit_note_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    invoice_line_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    product_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    description: Mapped[str] = mapped_column(String(500), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(ExactDecimal(18, 4), nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(ExactDecimal(18, 6), nullable=False)
+    discount_percent: Mapped[Decimal] = mapped_column(ExactDecimal(7, 4), default=Decimal(0), nullable=False)
+    tax_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    tax_rate: Mapped[Decimal] = mapped_column(ExactDecimal(7, 4), default=Decimal(0), nullable=False)
+    net_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    returned_quantity: Mapped[Decimal] = mapped_column(ExactDecimal(18, 4), default=Decimal(0), nullable=False)
+
+
+class CreditNoteTax(IdMixin, TenantScoped, Base):
+    """Tax credited per rate, kept so the last credit note of an invoice can credit the exact remainder."""
+
+    __tablename__ = "credit_note_taxes"
+    __table_args__ = (
+        same_org_fk("credit_note_id", "credit_notes", ondelete="CASCADE"),
+        same_org_fk("tax_id", "taxes"),
+    )
+
+    credit_note_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    tax_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    rate: Mapped[Decimal] = mapped_column(ExactDecimal(7, 4), nullable=False)
+    base_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tax_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class Refund(IdMixin, TimestampMixin, TenantScoped, Base):
+    """Money paid back to a customer for a credit note."""
+
+    __tablename__ = "refunds"
+    __table_args__ = (
+        same_org_fk("credit_note_id", "credit_notes"),
+        same_org_fk("journal_entry_id", "journal_entries"),
+        UniqueConstraint("organization_id", "idempotency_key", name="uq_refund_org_idempotency"),
+        CheckConstraint("amount_minor > 0", name="ck_refund_amount_positive"),
+    )
+
+    credit_note_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    refund_date: Mapped[date] = mapped_column(Date, nullable=False)
     amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
     method: Mapped[str] = mapped_column(String(20), nullable=False)  # bank | cash
     reference: Mapped[str] = mapped_column(String(120), default="", nullable=False)
