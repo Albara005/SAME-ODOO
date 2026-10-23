@@ -679,6 +679,13 @@ textarea.code {
 .mfa-qr { display: grid; place-items: center; padding: var(--space-3); background: #fff; border-radius: var(--radius); border: 1px solid var(--color-border); inline-size: max-content; margin-inline: auto; }
 .mfa-qr img { display: block; }
 .mfa-secret { display: block; text-align: center; margin-block-start: var(--space-2); font-size: 1rem; letter-spacing: 0.06em; word-break: break-all; user-select: all; }
+/* Projects: figures across the top, and hours used against the budget. */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); }
+.stat-row .card { display: grid; gap: 4px; }
+.stat-row strong { font-size: 1.25rem; }
+.budget { block-size: 6px; border-radius: 999px; background: color-mix(in srgb, var(--color-text) 10%, transparent); overflow: hidden; }
+.budget-fill { block-size: 100%; border-radius: inherit; background: var(--hue, var(--color-primary)); }
+.budget-fill.over { background: var(--color-warning); }
 /* An order request from a published site, waiting in Sales. */
 .web-order { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); }
 .web-order ul { margin: 0; padding-inline-start: 1.2em; }

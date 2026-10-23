@@ -55,6 +55,9 @@ WORKFLOWS_MANAGE = "workflows.manage"
 BRAND_READ = "brand.read"
 BRAND_MANAGE = "brand.manage"
 HOSTING_MANAGE = "hosting.manage"
+PROJECTS_READ = "projects.read"
+PROJECTS_MANAGE = "projects.manage"
+TIMESHEETS_WRITE = "timesheets.write"
 
 CATALOG: dict[str, str] = {
     ORG_MANAGE: "Edit organization settings",
@@ -97,6 +100,9 @@ CATALOG: dict[str, str] = {
     BRAND_READ: "View brand kits, logos and design tokens",
     BRAND_MANAGE: "Create and edit brand kits and logos, use the design agent",
     HOSTING_MANAGE: "Request dedicated hosting (an owner approves the cost)",
+    PROJECTS_READ: "View projects, their tasks and the hours logged on them",
+    PROJECTS_MANAGE: "Create and change projects and their tasks, log anyone's hours, invoice billable hours",
+    TIMESHEETS_WRITE: "Log your own hours on projects",
 }
 
 OWNER_ROLE = "owner"
@@ -114,12 +120,16 @@ _WAREHOUSE = [PRODUCTS_READ, SALES_READ, INVENTORY_READ, INVENTORY_WRITE, PURCHA
 SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     OWNER_ROLE: ("Owner", sorted(CATALOG)),
     "admin": ("Administrator", sorted(set(CATALOG) - {ORG_MANAGE})),
-    "accountant": ("Accountant", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, *_ACCOUNTING})),
-    "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, *_SALES})),
+    "accountant": ("Accountant", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, PROJECTS_READ,
+                                         *_ACCOUNTING})),
+    "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, PROJECTS_READ, TIMESHEETS_WRITE,
+                               *_SALES})),
     "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, AI_USE, AGENTS_RUN, *_WAREHOUSE})),
     # Builds apps and publishes previews; production needs someone with apps.deploy.
-    "developer": ("Developer", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, BRAND_READ, APPS_READ, APPS_WRITE})),
-    "member": ("Member", [AGENTS_RUN, AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ]),
+    "developer": ("Developer", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, BRAND_READ, APPS_READ, APPS_WRITE,
+                                       PROJECTS_READ, TIMESHEETS_WRITE})),
+    "member": ("Member", [AGENTS_RUN, AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ,
+                          PROJECTS_READ, TIMESHEETS_WRITE]),
     "viewer": ("Viewer", [FILES_READ]),
 }
 

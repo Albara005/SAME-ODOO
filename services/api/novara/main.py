@@ -29,6 +29,7 @@ from novara.modules.inventory.router import router as inventory_router
 from novara.modules.invoicing.credit_router import router as credit_router
 from novara.modules.invoicing.router import router as invoicing_router
 from novara.modules.partners.router import router as partners_router
+from novara.modules.projects.router import router as projects_router
 from novara.modules.purchasing.credit_router import router as vendor_credit_router
 from novara.modules.purchasing.router import router as purchasing_router
 from novara.modules.sales.router import router as sales_router
@@ -105,7 +106,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     for r in (identity_router, organizations_router, access_router, audit_router, files_router,
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router, credit_router,
-              inventory_router, sales_router, web_orders_router, purchasing_router, vendor_credit_router, assistant_router, studio_router, agents_router, automation_router,
+              inventory_router, sales_router, web_orders_router, purchasing_router, vendor_credit_router, projects_router, assistant_router, studio_router, agents_router, automation_router,
               creative_router, hosting_router, live_router, data_keys_router, public_data_router, inbound_hooks_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(sites_router)  # public, unauthenticated: published App Studio sites

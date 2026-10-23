@@ -2029,6 +2029,118 @@ export interface paths {
         patch: operations["update_product_api_v1_orgs__org_id__products__product_id__patch"];
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Projects */
+        get: operations["list_projects_api_v1_orgs__org_id__projects_get"];
+        put?: never;
+        /** Create Project */
+        post: operations["create_project_api_v1_orgs__org_id__projects_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Project */
+        get: operations["read_project_api_v1_orgs__org_id__projects__project_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Project */
+        patch: operations["update_project_api_v1_orgs__org_id__projects__project_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/projects/{project_id}/invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invoice Hours
+         * @description A draft invoice for the customer with the project's unbilled billable hours (one line per task).
+         */
+        post: operations["invoice_hours_api_v1_orgs__org_id__projects__project_id__invoice_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/projects/{project_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Project Tasks */
+        get: operations["list_project_tasks_api_v1_orgs__org_id__projects__project_id__tasks_get"];
+        put?: never;
+        /** Add Project Task */
+        post: operations["add_project_task_api_v1_orgs__org_id__projects__project_id__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/projects/{project_id}/time": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Time */
+        get: operations["list_time_api_v1_orgs__org_id__projects__project_id__time_get"];
+        put?: never;
+        /**
+         * Log Time
+         * @description Log hours on a project (your own; project managers can log for any member).
+         */
+        post: operations["log_time_api_v1_orgs__org_id__projects__project_id__time_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/projects/{project_id}/time/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Time */
+        delete: operations["delete_time_api_v1_orgs__org_id__projects__project_id__time__entry_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/purchase-orders": {
         parameters: {
             query?: never;
@@ -4089,6 +4201,16 @@ export interface components {
              */
             issue_date: string;
         };
+        /** InvoiceHoursIn */
+        InvoiceHoursIn: {
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Up To */
+            up_to?: string | null;
+        };
         /** InvoiceIn */
         InvoiceIn: {
             /** Customer Id */
@@ -4201,6 +4323,13 @@ export interface components {
             status: string;
             /** Total */
             total: string;
+        };
+        /** InvoicedOut */
+        InvoicedOut: {
+            /** Hours */
+            hours: string;
+            /** Invoice Id */
+            invoice_id: string;
         };
         /** JournalEntryOut */
         JournalEntryOut: {
@@ -5088,6 +5217,36 @@ export interface components {
             /** Template */
             template: string;
         };
+        /** ProjectTaskOut */
+        ProjectTaskOut: {
+            /** Assignee User Id */
+            assignee_user_id: string | null;
+            /** Description */
+            description: string;
+            /** Due Date */
+            due_date: string | null;
+            /** Hours */
+            hours: string;
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string;
+        };
+        /** ProjectUpdate */
+        ProjectUpdate: {
+            /** Budget Hours */
+            budget_hours?: number | string | null;
+            /** Description */
+            description?: string | null;
+            /** Hourly Rate */
+            hourly_rate?: number | string | null;
+            /** Name */
+            name?: string | null;
+            /** Status */
+            status?: string | null;
+        };
         /** PurchaseLineIn */
         PurchaseLineIn: {
             /** Account Id */
@@ -5608,6 +5767,20 @@ export interface components {
             /** Reference */
             reference: string;
         };
+        /** TaskIn */
+        TaskIn: {
+            /** Assignee User Id */
+            assignee_user_id?: string | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Due Date */
+            due_date?: string | null;
+            /** Title */
+            title: string;
+        };
         /** TaskOut */
         TaskOut: {
             /** Assignee User Id */
@@ -5706,6 +5879,58 @@ export interface components {
             name: string;
             /** Reply Contains */
             reply_contains?: string[];
+        };
+        /** TimeIn */
+        TimeIn: {
+            /**
+             * Billable
+             * @default true
+             */
+            billable: boolean;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Hours */
+            hours: number | string;
+            /** Task Id */
+            task_id?: string | null;
+            /** User Id */
+            user_id?: string | null;
+        };
+        /** TimeOut */
+        TimeOut: {
+            /** Billable */
+            billable: boolean;
+            /** Billed */
+            billed: boolean;
+            /** Description */
+            description: string;
+            /**
+             * Entry Date
+             * Format: date
+             */
+            entry_date: string;
+            /** Hours */
+            hours: string;
+            /** Id */
+            id: string;
+            /** Invoice Id */
+            invoice_id: string | null;
+            /** Task Id */
+            task_id: string | null;
+            /** User Email */
+            user_email: string;
+            /** User Id */
+            user_id: string;
+            /** User Name */
+            user_name: string;
         };
         /** TokenIn */
         TokenIn: {
@@ -6187,6 +6412,62 @@ export interface components {
         WebhookSecretOut: {
             /** Secret */
             secret: string;
+        };
+        /** WorkProjectIn */
+        WorkProjectIn: {
+            /** Budget Hours */
+            budget_hours?: number | string | null;
+            /** Customer Id */
+            customer_id?: string | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Hourly Rate */
+            hourly_rate?: number | string | null;
+            /** Name */
+            name: string;
+            /** Tax Id */
+            tax_id?: string | null;
+        };
+        /** WorkProjectOut */
+        WorkProjectOut: {
+            /** Billable Hours */
+            billable_hours: string;
+            /** Budget Hours */
+            budget_hours: string | null;
+            /** Budget Used Percent */
+            budget_used_percent: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Customer Id */
+            customer_id: string | null;
+            /** Customer Name */
+            customer_name: string | null;
+            /** Description */
+            description: string;
+            /** Hourly Rate */
+            hourly_rate: string | null;
+            /** Hours */
+            hours: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Tax Id */
+            tax_id: string | null;
+            /** Unbilled Amount */
+            unbilled_amount: string | null;
+            /** Unbilled Hours */
+            unbilled_hours: string;
         };
         /** WorkflowIn */
         WorkflowIn: {
@@ -11055,6 +11336,345 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ProductOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_projects_api_v1_orgs__org_id__projects_get: {
+        parameters: {
+            query?: {
+                status_filter?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_project_api_v1_orgs__org_id__projects_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkProjectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_project_api_v1_orgs__org_id__projects__project_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project_api_v1_orgs__org_id__projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invoice_hours_api_v1_orgs__org_id__projects__project_id__invoice_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceHoursIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_tasks_api_v1_orgs__org_id__projects__project_id__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectTaskOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_project_task_api_v1_orgs__org_id__projects__project_id__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectTaskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_time_api_v1_orgs__org_id__projects__project_id__time_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    log_time_api_v1_orgs__org_id__projects__project_id__time_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TimeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_time_api_v1_orgs__org_id__projects__project_id__time__entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                entry_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

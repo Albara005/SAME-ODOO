@@ -2537,6 +2537,32 @@
     "title": "InvoiceFromOrderIn",
     "type": "object"
    },
+   "InvoiceHoursIn": {
+    "properties": {
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "up_to": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Up To"
+     }
+    },
+    "required": [
+     "issue_date"
+    ],
+    "title": "InvoiceHoursIn",
+    "type": "object"
+   },
    "InvoiceIn": {
     "properties": {
      "customer_id": {
@@ -2841,6 +2867,24 @@
      "amount_due"
     ],
     "title": "InvoiceSummary",
+    "type": "object"
+   },
+   "InvoicedOut": {
+    "properties": {
+     "hours": {
+      "title": "Hours",
+      "type": "string"
+     },
+     "invoice_id": {
+      "title": "Invoice Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "invoice_id",
+     "hours"
+    ],
+    "title": "InvoicedOut",
     "type": "object"
    },
    "JournalEntryOut": {
@@ -5214,6 +5258,137 @@
     "title": "ProjectOut",
     "type": "object"
    },
+   "ProjectTaskOut": {
+    "properties": {
+     "assignee_user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assignee User Id"
+     },
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "due_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due Date"
+     },
+     "hours": {
+      "title": "Hours",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "title",
+     "description",
+     "assignee_user_id",
+     "due_date",
+     "status",
+     "hours"
+    ],
+    "title": "ProjectTaskOut",
+    "type": "object"
+   },
+   "ProjectUpdate": {
+    "properties": {
+     "budget_hours": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Budget Hours"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "maxLength": 5000,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "hourly_rate": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hourly Rate"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "pattern": "^(active|closed)$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     }
+    },
+    "title": "ProjectUpdate",
+    "type": "object"
+   },
    "PurchaseLineIn": {
     "properties": {
      "account_id": {
@@ -6645,6 +6820,50 @@
     "title": "StockOperationOut",
     "type": "object"
    },
+   "TaskIn": {
+    "properties": {
+     "assignee_user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assignee User Id"
+     },
+     "description": {
+      "default": "",
+      "maxLength": 5000,
+      "title": "Description",
+      "type": "string"
+     },
+     "due_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due Date"
+     },
+     "title": {
+      "maxLength": 300,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "title"
+    ],
+    "title": "TaskIn",
+    "type": "object"
+   },
    "TaskOut": {
     "properties": {
      "assignee_user_id": {
@@ -6953,6 +7172,145 @@
      "id"
     ],
     "title": "TestCaseOut",
+    "type": "object"
+   },
+   "TimeIn": {
+    "properties": {
+     "billable": {
+      "default": true,
+      "title": "Billable",
+      "type": "boolean"
+     },
+     "description": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Description",
+      "type": "string"
+     },
+     "entry_date": {
+      "format": "date",
+      "title": "Entry Date",
+      "type": "string"
+     },
+     "hours": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "maximum": 24.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Hours"
+     },
+     "task_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Task Id"
+     },
+     "user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Id"
+     }
+    },
+    "required": [
+     "entry_date",
+     "hours"
+    ],
+    "title": "TimeIn",
+    "type": "object"
+   },
+   "TimeOut": {
+    "properties": {
+     "billable": {
+      "title": "Billable",
+      "type": "boolean"
+     },
+     "billed": {
+      "title": "Billed",
+      "type": "boolean"
+     },
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "entry_date": {
+      "format": "date",
+      "title": "Entry Date",
+      "type": "string"
+     },
+     "hours": {
+      "title": "Hours",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "invoice_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Invoice Id"
+     },
+     "task_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Task Id"
+     },
+     "user_email": {
+      "title": "User Email",
+      "type": "string"
+     },
+     "user_id": {
+      "title": "User Id",
+      "type": "string"
+     },
+     "user_name": {
+      "title": "User Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "user_id",
+     "user_email",
+     "user_name",
+     "entry_date",
+     "hours",
+     "description",
+     "billable",
+     "task_id",
+     "invoice_id",
+     "billed"
+    ],
+    "title": "TimeOut",
     "type": "object"
    },
    "TokenIn": {
@@ -8104,6 +8462,217 @@
      "secret"
     ],
     "title": "WebhookSecretOut",
+    "type": "object"
+   },
+   "WorkProjectIn": {
+    "properties": {
+     "budget_hours": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Budget Hours"
+     },
+     "customer_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Customer Id"
+     },
+     "description": {
+      "default": "",
+      "maxLength": 5000,
+      "title": "Description",
+      "type": "string"
+     },
+     "hourly_rate": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hourly Rate"
+     },
+     "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "tax_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tax Id"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "WorkProjectIn",
+    "type": "object"
+   },
+   "WorkProjectOut": {
+    "properties": {
+     "billable_hours": {
+      "title": "Billable Hours",
+      "type": "string"
+     },
+     "budget_hours": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Budget Hours"
+     },
+     "budget_used_percent": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Budget Used Percent"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "customer_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Customer Id"
+     },
+     "customer_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Customer Name"
+     },
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "hourly_rate": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hourly Rate"
+     },
+     "hours": {
+      "title": "Hours",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "tax_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tax Id"
+     },
+     "unbilled_amount": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unbilled Amount"
+     },
+     "unbilled_hours": {
+      "title": "Unbilled Hours",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "description",
+     "status",
+     "customer_id",
+     "customer_name",
+     "hourly_rate",
+     "tax_id",
+     "budget_hours",
+     "hours",
+     "billable_hours",
+     "unbilled_hours",
+     "unbilled_amount",
+     "budget_used_percent",
+     "currency",
+     "created_at"
+    ],
+    "title": "WorkProjectOut",
     "type": "object"
    },
    "WorkflowIn": {
@@ -16956,6 +17525,622 @@
     "summary": "Update Product",
     "tags": [
      "products"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/projects": {
+   "get": {
+    "operationId": "list_projects_api_v1_orgs__org_id__projects_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status_filter",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status Filter"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/WorkProjectOut"
+         },
+         "title": "Response List Projects Api V1 Orgs  Org Id  Projects Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Projects",
+    "tags": [
+     "projects"
+    ]
+   },
+   "post": {
+    "operationId": "create_project_api_v1_orgs__org_id__projects_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WorkProjectIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WorkProjectOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Project",
+    "tags": [
+     "projects"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/projects/{project_id}": {
+   "get": {
+    "operationId": "read_project_api_v1_orgs__org_id__projects__project_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WorkProjectOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Read Project",
+    "tags": [
+     "projects"
+    ]
+   },
+   "patch": {
+    "operationId": "update_project_api_v1_orgs__org_id__projects__project_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WorkProjectOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Project",
+    "tags": [
+     "projects"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/projects/{project_id}/invoice": {
+   "post": {
+    "description": "A draft invoice for the customer with the project's unbilled billable hours (one line per task).",
+    "operationId": "invoice_hours_api_v1_orgs__org_id__projects__project_id__invoice_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/InvoiceHoursIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InvoicedOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Invoice Hours",
+    "tags": [
+     "projects"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/projects/{project_id}/tasks": {
+   "get": {
+    "operationId": "list_project_tasks_api_v1_orgs__org_id__projects__project_id__tasks_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ProjectTaskOut"
+         },
+         "title": "Response List Project Tasks Api V1 Orgs  Org Id  Projects  Project Id  Tasks Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Project Tasks",
+    "tags": [
+     "projects"
+    ]
+   },
+   "post": {
+    "operationId": "add_project_task_api_v1_orgs__org_id__projects__project_id__tasks_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TaskIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectTaskOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Add Project Task",
+    "tags": [
+     "projects"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/projects/{project_id}/time": {
+   "get": {
+    "operationId": "list_time_api_v1_orgs__org_id__projects__project_id__time_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/TimeOut"
+         },
+         "title": "Response List Time Api V1 Orgs  Org Id  Projects  Project Id  Time Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Time",
+    "tags": [
+     "projects"
+    ]
+   },
+   "post": {
+    "description": "Log hours on a project (your own; project managers can log for any member).",
+    "operationId": "log_time_api_v1_orgs__org_id__projects__project_id__time_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TimeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TimeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Log Time",
+    "tags": [
+     "projects"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/projects/{project_id}/time/{entry_id}": {
+   "delete": {
+    "operationId": "delete_time_api_v1_orgs__org_id__projects__project_id__time__entry_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "entry_id",
+      "required": true,
+      "schema": {
+       "title": "Entry Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete Time",
+    "tags": [
+     "projects"
     ]
    }
   },

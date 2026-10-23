@@ -21,6 +21,7 @@ from novara.modules.invoicing.models import CreditNote, Invoice, InvoiceLine, Pa
 from novara.modules.invoicing.zatca import qr_payload
 from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
+from novara.modules.projects import service as project_hours
 from novara.modules.sales.service import order_has_invoice_links, order_of_invoice
 from novara.money import fmt_decimal, from_minor, to_minor
 
@@ -287,6 +288,9 @@ def replace_draft(invoice_id: str, body: InvoiceIn, request: Request,
     if order_has_invoice_links(db, inv):
         raise HTTPException(status.HTTP_409_CONFLICT,
                             "this draft was created from a sales order; change the order or delete the draft and re-invoice")
+    if project_hours.has_hours(db, inv.id):
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "this draft bills a project's hours; delete it and invoice the hours again")
     _apply_header(db, inv, body)
     new_lines = _build_lines(db, body)
     for old in svc.lines_of(db, inv):
@@ -308,6 +312,7 @@ def delete_draft(invoice_id: str, request: Request, ctx: OrgContext = Depends(re
     inv = _get_invoice(db, invoice_id, lock=True)
     if inv.status != "draft":
         raise HTTPException(status.HTTP_409_CONFLICT, "posted invoices cannot be deleted; cancel them instead")
+    project_hours.release_invoice(db, inv.id)  # its hours become billable again
     for line in svc.lines_of(db, inv):
         db.delete(line)
     db.flush()  # lines first: there is no ORM relationship to order the deletes

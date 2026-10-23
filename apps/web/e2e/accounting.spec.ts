@@ -223,3 +223,47 @@ test("accounting: a manual entry, a new account, closing the year and reversing"
   await expect(page.getByText(/عُكس JE-2026-/)).toBeVisible();
   await expect(entry.getByText("معكوس", { exact: true })).toBeVisible();
 });
+
+test("projects: a task, hours logged, and the billable hours invoiced", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("projects"));
+  await createOrg(page, "استوديو التصميم");
+  const call = await apiFor(page);
+  const tax = await call("POST", "/taxes", { name: "ضريبة القيمة المضافة", rate: "15" });
+  await call("POST", "/customers", { name: "متاجر هلا" });
+  void tax;
+
+  await nav(page, "المشاريع");
+  await page.getByRole("button", { name: "مشروع جديد" }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByLabel("الاسم", { exact: true }).fill("موقع متاجر هلا");
+  await dialog.getByLabel(/العميل/).selectOption({ label: "متاجر هلا" });
+  await dialog.getByLabel(/سعر الساعة/).fill("250");
+  await dialog.getByLabel(/الضريبة/).selectOption({ label: "ضريبة القيمة المضافة" });
+  await dialog.getByLabel(/الميزانية/).fill("40");
+  await dialog.getByRole("button", { name: "إنشاء" }).click();
+  await expect(page.getByRole("heading", { name: "موقع متاجر هلا" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "المهام" }).click();
+  await page.getByRole("button", { name: "إضافة مهمة" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("العنوان").fill("الصفحة الرئيسية");
+  await dialog.getByRole("button", { name: "إنشاء" }).click();
+  await expect(page.getByRole("cell", { name: "الصفحة الرئيسية" })).toBeVisible();
+
+  for (const [hours, task] of [["3", "الصفحة الرئيسية"], ["1.5", null]] as const) {
+    await page.getByRole("button", { name: "تسجيل ساعات" }).first().click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel(/^الساعات/).fill(hours);
+    if (task) await dialog.getByLabel(/المهام/).selectOption({ label: task });
+    await dialog.getByRole("button", { name: "تسجيل ساعات" }).click();
+    await expect(dialog).toHaveCount(0);
+  }
+  await page.getByRole("tab", { name: "الساعات" }).click();
+  await expect(page.getByRole("cell", { name: "4.5" }).or(page.getByText("4.5").first())).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/project-ar.png", fullPage: true });
+
+  await page.getByRole("button", { name: "فوترة الساعات" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "إنشاء مسودة الفاتورة" }).click();
+  await expect(page.getByRole("cell", { name: "موقع متاجر هلا: الصفحة الرئيسية" })).toBeVisible();
+  await expect(page.getByText("1,293.75").first()).toBeVisible();   // 4.5 h x 250 = 1,125 + 15%
+});

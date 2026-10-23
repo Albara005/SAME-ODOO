@@ -50,6 +50,9 @@ const PurchaseOrderEditorPage = page(purchases, "PurchaseOrderEditorPage");
 const PurchasesPage = page(purchases, "PurchasesPage");
 const VendorCreditPage = page(() => import("./pages/VendorCredits"), "VendorCreditPage");
 const AccountingPage = page(() => import("./pages/Accounting"), "AccountingPage");
+const projects = () => import("./pages/Projects");
+const ProjectsPage = page(projects, "ProjectsPage");
+const ProjectWorkPage = page(projects, "ProjectPage");
 const ReportsPage = page(() => import("./pages/Reports"), "ReportsPage");
 const sales = () => import("./pages/Sales");
 const SalesOrderDetailPage = page(sales, "SalesOrderDetailPage");
@@ -165,6 +168,8 @@ export function App() {
             <Route path="purchases/bills/:billId/edit" element={<BillEditorPage />} />
             <Route path="purchases/credits/:creditId" element={<VendorCreditPage />} />
             <Route path="accounting" element={<AccountingPage />} />
+            <Route path="projects" element={<ProjectsPage />} />
+            <Route path="projects/:projectId" element={<ProjectWorkPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="assistant" element={<AssistantPage />} />
