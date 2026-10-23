@@ -1328,6 +1328,24 @@
     "title": "ConversationOut",
     "type": "object"
    },
+   "ConvertedOut": {
+    "properties": {
+     "customer_id": {
+      "title": "Customer Id",
+      "type": "string"
+     },
+     "sales_order_id": {
+      "title": "Sales Order Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "sales_order_id",
+     "customer_id"
+    ],
+    "title": "ConvertedOut",
+    "type": "object"
+   },
    "CreditLineIn": {
     "properties": {
      "invoice_line_id": {
@@ -2007,7 +2025,7 @@
       "items": {
        "type": "string"
       },
-      "maxItems": 2,
+      "maxItems": 3,
       "minItems": 1,
       "title": "Scopes",
       "type": "array"
@@ -7936,6 +7954,143 @@
      "active"
     ],
     "title": "WarehouseOut",
+    "type": "object"
+   },
+   "WebOrderLineOut": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "product_id": {
+      "title": "Product Id",
+      "type": "string"
+     },
+     "quantity": {
+      "title": "Quantity",
+      "type": "string"
+     },
+     "sku": {
+      "title": "Sku",
+      "type": "string"
+     },
+     "tax_rate": {
+      "title": "Tax Rate",
+      "type": "string"
+     },
+     "unit_price": {
+      "title": "Unit Price",
+      "type": "string"
+     }
+    },
+    "required": [
+     "product_id",
+     "name",
+     "sku",
+     "quantity",
+     "unit_price",
+     "tax_rate"
+    ],
+    "title": "WebOrderLineOut",
+    "type": "object"
+   },
+   "WebOrderOut": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "customer_name": {
+      "title": "Customer Name",
+      "type": "string"
+     },
+     "email": {
+      "title": "Email",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/WebOrderLineOut"
+      },
+      "title": "Lines",
+      "type": "array"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "phone": {
+      "title": "Phone",
+      "type": "string"
+     },
+     "project_id": {
+      "title": "Project Id",
+      "type": "string"
+     },
+     "project_name": {
+      "title": "Project Name",
+      "type": "string"
+     },
+     "sales_order_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sales Order Id"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "subtotal": {
+      "title": "Subtotal",
+      "type": "string"
+     },
+     "tax": {
+      "title": "Tax",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "status",
+     "project_id",
+     "project_name",
+     "customer_name",
+     "email",
+     "phone",
+     "note",
+     "lines",
+     "currency",
+     "subtotal",
+     "tax",
+     "total",
+     "sales_order_id",
+     "created_at"
+    ],
+    "title": "WebOrderOut",
     "type": "object"
    },
    "WebhookSecretOut": {
@@ -20736,6 +20891,187 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/web-orders": {
+   "get": {
+    "operationId": "list_web_orders_api_v1_orgs__org_id__web_orders_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^(new|converted|dismissed)$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/WebOrderOut"
+         },
+         "title": "Response List Web Orders Api V1 Orgs  Org Id  Web Orders Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Web Orders",
+    "tags": [
+     "web orders"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/web-orders/{web_order_id}/convert": {
+   "post": {
+    "description": "Make a quotation from the request: the customer is found by email, or created.",
+    "operationId": "convert_web_order_api_v1_orgs__org_id__web_orders__web_order_id__convert_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "web_order_id",
+      "required": true,
+      "schema": {
+       "title": "Web Order Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConvertedOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Convert Web Order",
+    "tags": [
+     "web orders"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/web-orders/{web_order_id}/dismiss": {
+   "post": {
+    "operationId": "dismiss_web_order_api_v1_orgs__org_id__web_orders__web_order_id__dismiss_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "web_order_id",
+      "required": true,
+      "schema": {
+       "title": "Web Order Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebOrderOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Dismiss Web Order",
+    "tags": [
+     "web orders"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/workflow-runs/{run_id}/approve": {
    "post": {
     "operationId": "approve_step_api_v1_orgs__org_id__workflow_runs__run_id__approve_post",
@@ -21342,6 +21678,100 @@
      }
     },
     "summary": "Catalog Preflight",
+    "tags": [
+     "public data"
+    ]
+   }
+  },
+  "/api/v1/public/orders": {
+   "options": {
+    "operationId": "orders_preflight_api_v1_public_orders_options",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Orders Preflight",
+    "tags": [
+     "public data"
+    ]
+   },
+   "post": {
+    "description": "An order request from a published site (a key with the \"orders\" scope). It waits in Sales for a person.\nBody: name, email and/or phone, note, lines [{product_id, quantity}]; prices come from the catalog.",
+    "operationId": "public_order_api_v1_public_orders_post",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Key"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-novara-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Novara-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "title": "Payload",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Public Order",
     "tags": [
      "public data"
     ]

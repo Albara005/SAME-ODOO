@@ -1187,6 +1187,17 @@ export const en = {
   "wf.hook.rotateConfirm": "Make a new address? The current one stops working at once.",
   "wf.hook.rotated": "New address ready: update the systems that call it",
   "audit.a.workflow.hook_rotated": "Workflow webhook address replaced",
+  "dataKeys.scope.orders": "Orders",
+  "dataKeys.scope.ordersLong": "Receive order requests from the site (they wait in Sales; needs access to sales)",
+  "webOrders.title": "Order requests from your sites ({n})",
+  "webOrders.hint": "Sent by visitors of a published site. Prices are today's catalog prices; nothing is reserved or charged until you turn a request into a quotation.",
+  "webOrders.convert": "Make a quotation",
+  "webOrders.dismiss": "Dismiss",
+  "webOrders.dismissConfirm": "Dismiss {number}? It won't be shown again.",
+  "audit.a.web_order.received": "Order request received from a site",
+  "audit.a.web_order.converted": "Site order request made into a quotation",
+  "audit.a.web_order.dismissed": "Site order request dismissed",
+  "wf.trigger.web_order.received": "An order request arrives from a site",
 } as const;
 
 export type MessageKey = keyof typeof en;

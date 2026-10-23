@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, CheckCircle2, FileText, Pencil, Plus, Truck } from "lucide-react";
+import { Ban, CheckCircle2, FileText, Globe, Pencil, Plus, Truck, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
@@ -9,7 +9,8 @@ import {
   type LineDraft,
 } from "../components/business";
 import {
-  Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
+  Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, errorText,
+  useToast,
 } from "../components/ui";
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
@@ -17,6 +18,7 @@ import { isPositive } from "../lib/decimal";
 import { today } from "../lib/format";
 
 type Order = Schemas["OrderOut"];
+type WebOrder = Schemas["WebOrderOut"];
 const STATUSES = ["quotation", "confirmed", "cancelled"] as const;
 
 function useOrder(id: string) {
@@ -51,6 +53,7 @@ export function SalesOrdersPage() {
           )
         }
       />
+      <WebOrders />
       <div style={{ maxWidth: 240 }}>
         <Select aria-label={t("common.status")} value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">{t("common.all")}</option>
@@ -100,6 +103,77 @@ export function SalesOrdersPage() {
         }
       </QueryView>
     </div>
+  );
+}
+
+/** Order requests sent by a published App Studio site: a person turns each into a quotation, or dismisses it. */
+function WebOrders() {
+  const { t, money, date, amount } = useI18n();
+  const { org, can, path } = useOrg();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const requests = useQuery({
+    queryKey: ["web-orders", org.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/web-orders", { params: { path: { org_id: org.id }, query: { status: "new" } } })),
+  });
+  const onError = (e: Error) => toast(errorText(e, t("common.error")), "error");
+  const convert = useMutation({
+    mutationFn: (id: string) => unwrap(api.POST("/api/v1/orgs/{org_id}/web-orders/{web_order_id}/convert", { params: { path: { org_id: org.id, web_order_id: id } } })),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: ["web-orders", org.id] });
+      void qc.invalidateQueries({ queryKey: ["orders", org.id] });
+      navigate(path(`sales/${r.sales_order_id}`));
+    },
+    onError,
+  });
+  const dismiss = useMutation({
+    mutationFn: (id: string) => unwrap(api.POST("/api/v1/orgs/{org_id}/web-orders/{web_order_id}/dismiss", { params: { path: { org_id: org.id, web_order_id: id } } })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["web-orders", org.id] }),
+    onError,
+  });
+  const list = requests.data ?? [];
+  if (list.length === 0) return null;
+  const act = can("sales.write") && can("customers.write");
+  return (
+    <Card title={t("webOrders.title", { n: list.length })}>
+      <p className="muted small">{t("webOrders.hint")}</p>
+      <div className="stack-sm">
+        {list.map((w: WebOrder) => (
+          <div key={w.id} className="web-order">
+            <div className="row-between">
+              <span className="row">
+                <Globe size={16} aria-hidden className="muted" />
+                <strong className="mono">{w.number}</strong>
+                <span dir="auto">{w.customer_name}</span>
+                <span className="muted small" dir="ltr">{[w.email, w.phone].filter(Boolean).join(" · ")}</span>
+                <Badge>{w.project_name}</Badge>
+              </span>
+              <span className="muted small num">{date(w.created_at)}</span>
+            </div>
+            <ul className="small">
+              {w.lines.map((l, i) => <li key={i}><span className="num">{amount(l.quantity)}</span> × <span dir="auto">{l.name}</span></li>)}
+            </ul>
+            {w.note && <p className="small" dir="auto">{w.note}</p>}
+            <div className="row-between">
+              <strong className="num">{money(w.total, w.currency)}</strong>
+              {act && (
+                <span className="row">
+                  <Button size="sm" icon={<X size={14} />} loading={dismiss.isPending && dismiss.variables === w.id}
+                    onClick={() => window.confirm(t("webOrders.dismissConfirm", { number: w.number })) && dismiss.mutate(w.id)}>
+                    {t("webOrders.dismiss")}
+                  </Button>
+                  <Button size="sm" variant="primary" icon={<FileText size={14} />} loading={convert.isPending && convert.variables === w.id}
+                    onClick={() => convert.mutate(w.id)}>
+                    {t("webOrders.convert")}
+                  </Button>
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 

@@ -31,6 +31,7 @@ EVENT_TYPES: dict[str, str] = {
     "purchase_order.confirmed": "A purchase order was confirmed",
     "purchase_order.received": "Goods were received for a purchase order",
     "bill.posted": "A vendor bill was posted (details: number, total)",
+    "web_order.received": "An order request arrived from a published site (details: number, site, customer_name, total)",
     "sales_order.created": "A quotation was created",
     "sales_order.confirmed": "A quotation was confirmed as a sales order",
     "sales_order.delivered": "Goods were delivered for a sales order",

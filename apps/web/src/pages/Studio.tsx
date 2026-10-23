@@ -741,11 +741,12 @@ function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; on
   const { org, can } = useOrg();
   const [name, setName] = useState(t("dataKeys.defaultName"));
   const [availability, setAvailability] = useState(false);
+  const [orders, setOrders] = useState(false);
   const create = useMutation({
     mutationFn: () =>
       unwrap(api.POST("/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys", {
         params: { path: { org_id: org.id, project_id: p.id } },
-        body: { name: name.trim(), scopes: availability ? ["catalog", "availability"] : ["catalog"] },
+        body: { name: name.trim(), scopes: ["catalog", ...(availability ? ["availability"] : []), ...(orders ? ["orders"] : [])] },
       })),
     onSuccess: onCreated,
   });
@@ -761,6 +762,8 @@ function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; on
           <Checkbox label={t("dataKeys.scope.catalogLong")} checked disabled readOnly />
           <Checkbox label={t("dataKeys.scope.availabilityLong")} checked={availability} disabled={!can("inventory.read")}
             onChange={(e) => setAvailability(e.target.checked)} />
+          <Checkbox label={t("dataKeys.scope.ordersLong")} checked={orders} disabled={!can("sales.write")}
+            onChange={(e) => setOrders(e.target.checked)} />
         </fieldset>
         <p className="muted small">{t("dataKeys.publicWarning")}</p>
         <div className="form-actions">
@@ -782,7 +785,16 @@ function NewKeyCard({ dataKey, secret, onClose }: { dataKey: DataKey; secret: st
     `  headers: { "X-Novara-Key": "${secret}" },`,
     `});`,
     `const { currency, products } = await res.json();`,
-    `// products: [{ name, sku, price, price_with_tax${dataKey.scopes.includes("availability") ? ", available" : ""}, ... }]`,
+    `// products: [{ id, name, sku, price, price_with_tax${dataKey.scopes.includes("availability") ? ", available" : ""}, ... }]`,
+    ...(dataKey.scopes.includes("orders") ? [
+      ``,
+      `// An order request (it waits for your team in Sales):`,
+      `await fetch("${window.location.origin}/api/v1/public/orders", {`,
+      `  method: "POST",`,
+      `  headers: { "X-Novara-Key": "${secret}", "Content-Type": "application/json" },`,
+      `  body: JSON.stringify({ name, email, phone, note, lines: [{ product_id, quantity: 2 }] }),`,
+      `});`,
+    ] : []),
   ].join("\n");
   return (
     <div className="notice notice-success" role="status">

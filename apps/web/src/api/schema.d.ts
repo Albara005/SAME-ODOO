@@ -2834,6 +2834,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/web-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Web Orders */
+        get: operations["list_web_orders_api_v1_orgs__org_id__web_orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/web-orders/{web_order_id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convert Web Order
+         * @description Make a quotation from the request: the customer is found by email, or created.
+         */
+        post: operations["convert_web_order_api_v1_orgs__org_id__web_orders__web_order_id__convert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/web-orders/{web_order_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Web Order */
+        post: operations["dismiss_web_order_api_v1_orgs__org_id__web_orders__web_order_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/workflow-runs/{run_id}/approve": {
         parameters: {
             query?: never;
@@ -3011,6 +3065,28 @@ export interface paths {
         delete?: never;
         /** Catalog Preflight */
         options: operations["catalog_preflight_api_v1_public_catalog_options"];
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Public Order
+         * @description An order request from a published site (a key with the "orders" scope). It waits in Sales for a person.
+         *     Body: name, email and/or phone, note, lines [{product_id, quantity}]; prices come from the catalog.
+         */
+        post: operations["public_order_api_v1_public_orders_post"];
+        delete?: never;
+        /** Orders Preflight */
+        options: operations["orders_preflight_api_v1_public_orders_options"];
         head?: never;
         patch?: never;
         trace?: never;
@@ -3544,6 +3620,13 @@ export interface components {
             id: string;
             /** Title */
             title: string;
+        };
+        /** ConvertedOut */
+        ConvertedOut: {
+            /** Customer Id */
+            customer_id: string;
+            /** Sales Order Id */
+            sales_order_id: string;
         };
         /** CreditLineIn */
         CreditLineIn: {
@@ -6046,6 +6129,59 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+        };
+        /** WebOrderLineOut */
+        WebOrderLineOut: {
+            /** Name */
+            name: string;
+            /** Product Id */
+            product_id: string;
+            /** Quantity */
+            quantity: string;
+            /** Sku */
+            sku: string;
+            /** Tax Rate */
+            tax_rate: string;
+            /** Unit Price */
+            unit_price: string;
+        };
+        /** WebOrderOut */
+        WebOrderOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Customer Name */
+            customer_name: string;
+            /** Email */
+            email: string;
+            /** Id */
+            id: string;
+            /** Lines */
+            lines: components["schemas"]["WebOrderLineOut"][];
+            /** Note */
+            note: string;
+            /** Number */
+            number: string;
+            /** Phone */
+            phone: string;
+            /** Project Id */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
+            /** Sales Order Id */
+            sales_order_id: string | null;
+            /** Status */
+            status: string;
+            /** Subtotal */
+            subtotal: string;
+            /** Tax */
+            tax: string;
+            /** Total */
+            total: string;
         };
         /** WebhookSecretOut */
         WebhookSecretOut: {
@@ -12969,6 +13105,103 @@ export interface operations {
             };
         };
     };
+    list_web_orders_api_v1_orgs__org_id__web_orders_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebOrderOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    convert_web_order_api_v1_orgs__org_id__web_orders__web_order_id__convert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                web_order_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConvertedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_web_order_api_v1_orgs__org_id__web_orders__web_order_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                web_order_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     approve_step_api_v1_orgs__org_id__workflow_runs__run_id__approve_post: {
         parameters: {
             query?: never;
@@ -13318,6 +13551,63 @@ export interface operations {
         };
     };
     catalog_preflight_api_v1_public_catalog_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    public_order_api_v1_public_orders_post: {
+        parameters: {
+            query?: {
+                key?: string | null;
+            };
+            header?: {
+                "x-novara-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, unknown>;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    orders_preflight_api_v1_public_orders_options: {
         parameters: {
             query?: never;
             header?: never;

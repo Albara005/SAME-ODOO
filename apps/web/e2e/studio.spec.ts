@@ -211,3 +211,44 @@ test("Hosting: quote, request, approve the exact price", async ({ page }) => {
   await expect(page.getByRole("cell", { name: "تمت الموافقة" })).toBeVisible();
   await page.screenshot({ path: "test-results/screens/hosting-ar.png", fullPage: true });
 });
+
+test("App Studio: an order request from the site becomes a quotation in Sales", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("siteorder"));
+  await createOrg(page, "محمصة الموقع");
+  const orgId = page.url().match(/\/o\/([0-9a-f-]+)/)![1]!;
+  const token = await page.evaluate(() => localStorage.getItem("novara.token"));
+  const call = async (path: string, data: object) => {
+    const res = await page.request.post(`/api/v1/orgs/${orgId}${path}`, { headers: { Authorization: `Bearer ${token}` }, data });
+    expect(res.ok(), await res.text()).toBeTruthy();
+    return res.json();
+  };
+  const tax = await call("/taxes", { name: "ضريبة القيمة المضافة", rate: "15" });
+  const coffee = await call("/products", { name: "قهوة عربية", sku: "CF-1", kind: "goods", sale_price: "40", default_tax_id: tax.id });
+  const app = await call("/studio/projects", { name: "Roastery", slug: "roastery" });
+
+  await page.goto(`/o/${orgId}/studio/${app.id}`);
+  await page.getByRole("tab", { name: "البيانات" }).click();
+  await page.getByRole("button", { name: "مفتاح بيانات جديد" }).click();
+  await page.getByRole("dialog").getByLabel(/استقبال طلبات من الموقع/).check();
+  await page.getByRole("dialog").getByRole("button", { name: "إنشاء المفتاح" }).click();
+  await expect(page.getByLabel("مثال الشيفرة")).toContainText("/api/v1/public/orders");
+  const key = (await page.getByLabel("المفتاح", { exact: true }).textContent())!.trim();
+
+  // What a visitor's browser sends from the published site.
+  const sent = await page.request.post("/api/v1/public/orders", {
+    headers: { "X-Novara-Key": key },
+    data: { name: "مقهى الندى", email: "orders@nada.example.com", note: "التوصيل صباحاً", lines: [{ product_id: coffee.id, quantity: 3 }] },
+  });
+  expect(sent.status()).toBe(201);
+  const { reference } = await sent.json();
+
+  await page.getByRole("complementary").getByRole("navigation").getByRole("link", { name: /^أوامر البيع/ }).click();
+  await expect(page.getByText("طلبات من مواقعك (1)")).toBeVisible();
+  await expect(page.getByText(reference)).toBeVisible();
+  await expect(page.getByText("التوصيل صباحاً")).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/site-orders-ar.png", fullPage: true });
+  await page.getByRole("button", { name: "تحويل إلى عرض سعر" }).click();
+  await expect(page.getByRole("heading", { name: /^SO-\d{4}-\d{5}$/ })).toBeVisible();
+  await expect(page.getByText("مقهى الندى").first()).toBeVisible();
+  await expect(page.getByRole("cell", { name: "قهوة عربية" })).toBeVisible();
+});

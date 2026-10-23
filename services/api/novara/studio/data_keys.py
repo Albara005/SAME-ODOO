@@ -4,8 +4,12 @@
 
 returns the organization's active products: name, SKU, description, unit, price with and
 without tax and, with the "availability" scope, whether each is in stock (stock left after
-what confirmed orders hold). Answers carry CORS headers for any origin, because sites run in
-a sandbox with an opaque origin and the data is public by the owner's choice.
+what confirmed orders hold). With the "orders" scope the site can also send order requests:
+
+    POST /api/v1/public/orders                    (see novara/modules/sales/web_orders.py)
+
+Answers carry CORS headers for any origin, because sites run in a sandbox with an opaque
+origin and the data is public by the owner's choice.
 """
 
 from __future__ import annotations
@@ -15,9 +19,10 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
@@ -30,6 +35,7 @@ from novara.modules.audit import service as audit
 from novara.modules.catalog.models import Product
 from novara.modules.inventory.models import StockLevel
 from novara.modules.organizations.models import Organization
+from novara.modules.sales import web_orders
 from novara.money import fmt_decimal, from_minor, to_minor
 from novara.studio.models import AppDataKey, AppProject
 from novara.tenancy import bind_tenant, system_scope
@@ -41,13 +47,16 @@ public_router = APIRouter(tags=["public data"])
 SCOPES: dict[str, tuple[str, ...]] = {
     "catalog": (P.PRODUCTS_READ,),
     "availability": (P.PRODUCTS_READ, P.INVENTORY_READ),
+    # Order requests wait in Sales for a person: taking them is a sales decision.
+    "orders": (P.PRODUCTS_READ, P.SALES_WRITE),
 }
 PUBLIC_HEADERS = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "X-Novara-Key",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "X-Novara-Key, Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Cache-Control": "public, max-age=60",
 }
+NO_STORE = {**PUBLIC_HEADERS, "Cache-Control": "no-store"}
 
 
 class DataKeyIn(BaseModel):
@@ -98,8 +107,8 @@ def create_key(project_id: str, body: DataKeyIn, request: Request, ctx: OrgConte
         missing = [p for p in SCOPES[scope] if not ctx.has(p)]
         if missing:
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"publishing '{scope}' needs {', '.join(missing)}")
-    if "availability" in scopes and "catalog" not in scopes:
-        scopes = sorted({*scopes, "catalog"})
+    if {"availability", "orders"} & set(scopes) and "catalog" not in scopes:
+        scopes = sorted({*scopes, "catalog"})  # a site needs the catalog to show stock or to order
     raw = "nvpk_" + secrets.token_urlsafe(24)
     key = AppDataKey(project_id=project.id, name=body.name, key_hash=crypto.token_hash(raw), hint=raw[:12],
                      scopes=scopes, created_by=ctx.user.id)
@@ -190,3 +199,37 @@ def public_catalog(key: str | None = Query(default=None, max_length=100),
         data_key.last_used_at = now  # at most one write a minute, however busy the site is
         db.commit()
     return JSONResponse({"organization": org.name, "currency": c, "products": products}, headers=PUBLIC_HEADERS)
+
+
+@public_router.options("/public/orders")
+def orders_preflight() -> Response:
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=NO_STORE)
+
+
+@public_router.post("/public/orders", status_code=status.HTTP_201_CREATED)
+def public_order(request: Request, payload: dict = Body(...), key: str | None = Query(default=None, max_length=100),
+                 x_novara_key: str | None = Header(default=None, max_length=100), db: Session = Depends(get_db)):
+    """An order request from a published site (a key with the "orders" scope). It waits in Sales for a person.
+    Body: name, email and/or phone, note, lines [{product_id, quantity}]; prices come from the catalog."""
+    raw = x_novara_key or key
+    data_key = _key_for(db, raw) if raw else None
+    if data_key is None or "orders" not in data_key.scopes:
+        return JSONResponse({"detail": "invalid or revoked key"}, status_code=status.HTTP_401_UNAUTHORIZED, headers=NO_STORE)
+    try:
+        body = web_orders.PublicOrderIn.model_validate(payload)
+    except ValidationError as e:  # answered here, so the site's browser can read why (CORS)
+        return JSONResponse({"detail": jsonable_encoder(e.errors(include_url=False, include_context=False))},
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, headers=NO_STORE)
+    if body.website:  # the hidden field people leave empty: a bot. Say yes, keep nothing.
+        return JSONResponse({"received": True, "reference": ""}, status_code=status.HTTP_201_CREATED, headers=NO_STORE)
+    try:
+        order = web_orders.receive(db, data_key, body, ip=client_ip(request))
+    except web_orders.RateLimited as e:
+        return JSONResponse({"detail": str(e)}, status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            headers={**NO_STORE, "Retry-After": "600"})
+    except web_orders.WebOrderInvalid as e:
+        return JSONResponse({"detail": str(e)}, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, headers=NO_STORE)
+    db.commit()
+    return JSONResponse({"received": True, "reference": order.number, "currency": order.currency,
+                         "total": str(from_minor(order.total_minor, order.currency))},
+                        status_code=status.HTTP_201_CREATED, headers=NO_STORE)
