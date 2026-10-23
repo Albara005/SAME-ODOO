@@ -1045,6 +1045,7 @@ export const en = {
   "tool.list_sales_orders": "sales orders",
   "tool.search_files": "files",
   "assistant.tool.remember": "Remember a note",
+  "forgot.badEmail": "Enter the email address of your account.",
 } as const;
 
 export type MessageKey = keyof typeof en;

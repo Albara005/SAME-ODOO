@@ -16,6 +16,8 @@ test("confirm the email, forget the password, choose a new one", async ({ page }
 
   await page.getByRole("button", { name: "تسجيل الخروج" }).click();
   await page.getByRole("link", { name: "نسيت كلمة المرور؟" }).click();
+  // The login page has an email field too: wait for the new page before filling.
+  await expect(page.getByRole("heading", { name: "استعادة كلمة المرور" })).toBeVisible();
   await page.getByLabel("البريد الإلكتروني").fill(email);
   await page.getByRole("button", { name: "أرسل الرابط" }).click();
   await expect(page.getByText("الرابط في طريقه إليك")).toBeVisible();

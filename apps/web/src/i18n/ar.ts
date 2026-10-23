@@ -1047,4 +1047,5 @@ export const ar: Record<MessageKey, string> = {
   "tool.list_sales_orders": "أوامر البيع",
   "tool.search_files": "الملفات",
   "assistant.tool.remember": "حفظ ملاحظة",
+  "forgot.badEmail": "أدخل البريد الإلكتروني لحسابك.",
 };

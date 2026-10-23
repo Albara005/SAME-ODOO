@@ -207,6 +207,7 @@ export function ForgotPasswordPage() {
   const state = useLocation().state as AuthState;
   const [email, setEmail] = useState(state?.email ?? "");
   const send = useMutation({ mutationFn: () => unwrap(api.POST("/api/v1/auth/password-reset", { body: { email } })) });
+  const badEmail = send.error instanceof ApiError && Boolean(send.error.fields["email"]);
   function submit(e: FormEvent) {
     e.preventDefault();
     send.mutate();
@@ -222,8 +223,8 @@ export function ForgotPasswordPage() {
         ) : (
           <>
             <p className="muted">{t("forgot.body")}</p>
-            {send.isError && <ErrorNotice error={send.error} />}
-            <Field label={t("common.email")}>
+            {send.isError && !badEmail && <ErrorNotice error={send.error} />}
+            <Field label={t("common.email")} error={badEmail ? t("forgot.badEmail") : undefined}>
               <Input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required ltr />
             </Field>
             <Button type="submit" variant="primary" loading={send.isPending}>
