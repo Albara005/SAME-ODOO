@@ -1,8 +1,8 @@
-import { Languages, LogOut, Menu, Moon } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Languages, LogOut, MailWarning, Menu, Moon, X } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Suspense, useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { api, unwrap } from "../api/client";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { api, ApiError, unwrap } from "../api/client";
 import { useAuth } from "../auth/Auth";
 import { useOrg } from "../auth/Org";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
@@ -10,7 +10,7 @@ import { useLiveCounts } from "../lib/live";
 import { useTheme } from "../lib/theme";
 import { StarLattice, StarMark } from "./Art";
 import { visibleNav } from "./nav";
-import { IconButton, Loading, useToast } from "./ui";
+import { Button, IconButton, Loading, useToast } from "./ui";
 
 export function BrandMark() {
   const { t } = useI18n();
@@ -37,6 +37,16 @@ export function TopActions() {
         <Moon size={18} />
       </IconButton>
     </>
+  );
+}
+
+export function SignOutButton() {
+  const { t } = useI18n();
+  const { logout } = useAuth();
+  return (
+    <IconButton label={t("auth.logout")} onClick={() => void logout()}>
+      <LogOut size={18} />
+    </IconButton>
   );
 }
 
@@ -69,12 +79,56 @@ function useCounts(): Record<string, number | undefined> {
   };
 }
 
+const DISMISSED_KEY = "novara.verify-dismissed";
+
+/** Reminds a user who hasn't confirmed their email yet; can be hidden until the next visit. */
+function VerifyBanner() {
+  const { t } = useI18n();
+  const { user } = useAuth();
+  const toast = useToast();
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return sessionStorage.getItem(DISMISSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const resend = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/me/verify-email")),
+    onSuccess: () => toast(t("verify.resent")),
+    onError: (e) => toast(e instanceof ApiError && e.status === 429 ? t("verify.wait") : t("common.error"), "error"),
+  });
+  if (!user || user.email_verified || hidden) return null;
+  return (
+    <div className="verify-banner">
+      <MailWarning size={18} aria-hidden />
+      <span className="grow">{t("verify.banner", { email: user.email })}</span>
+      <Button size="sm" loading={resend.isPending} onClick={() => resend.mutate()}>
+        {t("verify.resend")}
+      </Button>
+      <IconButton
+        label={t("verify.later")}
+        onClick={() => {
+          setHidden(true);
+          try {
+            sessionStorage.setItem(DISMISSED_KEY, "1");
+          } catch {
+            /* storage unavailable: hidden until reload */
+          }
+        }}
+      >
+        <X size={16} />
+      </IconButton>
+    </div>
+  );
+}
+
 export function Layout() {
   const { t } = useI18n();
   const roleLabel = useRoleLabel();
   const counts = useCounts();
   const { org, can, path } = useOrg();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const location = useLocation();
   useEffect(() => setOpen(false), [location.pathname]);
@@ -120,16 +174,15 @@ export function Layout() {
             <Menu size={20} />
           </IconButton>
           <span className="grow" />
-          <span className="user-chip">
+          <Link to="/account" className="user-chip" title={t("account.title")}>
             <span className="user-avatar" aria-hidden>{initials(user?.full_name || user?.email || "")}</span>
             <span className="small">{user?.full_name || user?.email}</span>
-          </span>
+          </Link>
           <TopActions />
-          <IconButton label={t("auth.logout")} onClick={() => void logout()}>
-            <LogOut size={18} />
-          </IconButton>
+          <SignOutButton />
         </header>
         <main className="content" id="main">
+          <VerifyBanner />
           <Suspense fallback={<Loading />}>
             <Outlet />
           </Suspense>

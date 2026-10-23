@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, UserMinus } from "lucide-react";
+import { Mail, Plus, RotateCw, UserMinus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { api, ApiError, unwrap } from "../api/client";
 import { useOrg } from "../auth/Org";
@@ -26,7 +26,7 @@ export function MembersPage() {
   const { org, can } = useOrg();
   const qc = useQueryClient();
   const toast = useToast();
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<"add" | "invite" | null>(null);
   const roles = useRoles();
   const members = useQuery({
     queryKey: ["members", org.id],
@@ -54,9 +54,14 @@ export function MembersPage() {
         title={t("members.title")}
         actions={
           manage && (
-            <Button variant="primary" icon={<Plus size={16} />} onClick={() => setAdding(true)}>
-              {t("members.add")}
-            </Button>
+            <>
+              <Button icon={<Plus size={16} />} onClick={() => setAdding("add")}>
+                {t("members.add")}
+              </Button>
+              <Button variant="primary" icon={<Mail size={16} />} onClick={() => setAdding("invite")}>
+                {t("invite.send")}
+              </Button>
+            </>
           )
         }
       />
@@ -132,21 +137,104 @@ export function MembersPage() {
           </div>
         )}
       </QueryView>
-      {adding && <AddMemberDialog roles={(roles.data ?? []).map((r) => ({ key: r.key, name: roleLabel(r.key, r.name) }))} onClose={() => setAdding(false)} />}
+      <Invitations />
+      {adding && (
+        <AddMemberDialog
+          mode={adding}
+          roles={(roles.data ?? []).map((r) => ({ key: r.key, name: roleLabel(r.key, r.name) }))}
+          onClose={() => setAdding(null)}
+        />
+      )}
     </div>
   );
 }
 
-function AddMemberDialog({ roles, onClose }: { roles: { key: string; name: string }[]; onClose: () => void }) {
+/** Invitations waiting to be accepted; sending again replaces the emailed link. */
+function Invitations() {
+  const { t, date } = useI18n();
+  const roleLabel = useRoleLabel();
+  const { org, can } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const params = { path: { org_id: org.id } };
+  const list = useQuery({
+    queryKey: ["invitations", org.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/invitations", { params })),
+  });
+  const done = () => qc.invalidateQueries({ queryKey: ["invitations", org.id] });
+  const onError = (e: Error) => toast(e instanceof ApiError ? e.message : t("common.error"), "error");
+  const resend = useMutation({
+    mutationFn: (body: { email: string; role: string }) => unwrap(api.POST("/api/v1/orgs/{org_id}/invitations", { params, body })),
+    onSuccess: (inv) => {
+      void done();
+      toast(t("invite.sent", { email: inv.email }));
+    },
+    onError,
+  });
+  const revoke = useMutation({
+    mutationFn: (id: string) =>
+      unwrap(api.DELETE("/api/v1/orgs/{org_id}/invitations/{invitation_id}", { params: { path: { ...params.path, invitation_id: id } } })),
+    onSuccess: done,
+    onError,
+  });
+  const manage = can("members.manage");
+  if (!list.data?.length) return null;
+  return (
+    <Card title={t("invite.pending")}>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>{t("common.email")}</th>
+              <th>{t("members.role")}</th>
+              <th>{t("invite.expires")}</th>
+              {manage && <th className="end">{t("common.actions")}</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {list.data.map((i) => (
+              <tr key={i.id}>
+                <td className="mono">{i.email}</td>
+                <td>{roleLabel(i.role)}</td>
+                <td className="small">{date(i.expires_at)}</td>
+                {manage && (
+                  <td className="end">
+                    <div className="row" style={{ justifyContent: "flex-end" }}>
+                      <Button size="sm" icon={<RotateCw size={14} />} onClick={() => resend.mutate({ email: i.email, role: i.role })}>
+                        {t("invite.resend")}
+                      </Button>
+                      <IconButton label={`${t("invite.revoke")} ${i.email}`} onClick={() => revoke.mutate(i.id)}>
+                        <X size={16} />
+                      </IconButton>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/** "add" puts someone who already has an account straight in; "invite" emails a link to anyone. */
+function AddMemberDialog({ mode, roles, onClose }: { mode: "add" | "invite"; roles: { key: string; name: string }[]; onClose: () => void }) {
   const { t } = useI18n();
   const { org } = useOrg();
   const qc = useQueryClient();
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("member");
   const add = useMutation({
-    mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/members", { params: { path: { org_id: org.id } }, body: { email, role } })),
+    mutationFn: async () => {
+      const params = { path: { org_id: org.id } };
+      if (mode === "invite") await unwrap(api.POST("/api/v1/orgs/{org_id}/invitations", { params, body: { email, role } }));
+      else await unwrap(api.POST("/api/v1/orgs/{org_id}/members", { params, body: { email, role } }));
+    },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["members", org.id] });
+      void qc.invalidateQueries({ queryKey: [mode === "invite" ? "invitations" : "members", org.id] });
+      if (mode === "invite") toast(t("invite.sent", { email }));
       onClose();
     },
   });
@@ -155,10 +243,10 @@ function AddMemberDialog({ roles, onClose }: { roles: { key: string; name: strin
     add.mutate();
   }
   return (
-    <Dialog open onClose={onClose} title={t("members.add")}>
+    <Dialog open onClose={onClose} title={mode === "invite" ? t("invite.send") : t("members.add")}>
       <form className="stack" onSubmit={submit}>
         {add.isError && <ErrorNotice error={add.error} />}
-        <Field label={t("common.email")} hint={t("members.addHint")}>
+        <Field label={t("common.email")} hint={mode === "invite" ? t("invite.hint") : t("members.addHint")}>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required ltr />
         </Field>
         <Field label={t("members.role")}>
@@ -173,7 +261,7 @@ function AddMemberDialog({ roles, onClose }: { roles: { key: string; name: strin
         <div className="form-actions">
           <Button onClick={onClose}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" loading={add.isPending}>
-            {t("common.add")}
+            {mode === "invite" ? t("invite.sendShort") : t("common.add")}
           </Button>
         </div>
       </form>

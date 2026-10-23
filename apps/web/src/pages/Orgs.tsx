@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Plus } from "lucide-react";
+import { Building2, CircleUserRound, Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, ApiError, unwrap } from "../api/client";
 import { rememberOrg } from "../auth/Org";
-import { BrandMark, TopActions } from "../components/Layout";
+import { BrandMark, SignOutButton, TopActions } from "../components/Layout";
 import { Button, Card, Dialog, Empty, ErrorNotice, Field, Input, QueryView, Select } from "../components/ui";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
 
@@ -24,7 +24,11 @@ export function OrgsPage() {
       <div className="row-between" style={{ marginBlockEnd: "var(--space-5)" }}>
         <BrandMark />
         <div className="row">
+          <Link to="/account" className="btn btn-ghost icon-btn" aria-label={t("account.title")} title={t("account.title")}>
+            <CircleUserRound size={18} />
+          </Link>
           <TopActions />
+          <SignOutButton />
         </div>
       </div>
       <Card

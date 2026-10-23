@@ -647,3 +647,25 @@ textarea.code {
 .seg button[aria-selected="true"] { background: var(--color-primary-subtle); color: var(--color-link); font-weight: 600; }
 .quick-preview { flex: 1; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) var(--space-3) var(--space-3); }
 .quick-preview iframe { flex: 1; min-block-size: 440px; border: 1px solid var(--color-border); border-radius: var(--radius); background: #fff; }
+
+/* ---------------------------------------------------------------- account security */
+.link-btn { background: none; border: none; padding: 0; font: inherit; color: var(--color-link); cursor: pointer; align-self: flex-start; }
+.link-btn:hover { text-decoration: underline; }
+.auth-card .stack > a:not(.btn) { align-self: flex-start; }
+[dir="ltr"] .back-arrow { transform: scaleX(-1); }
+.verify-banner {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-block-end: var(--space-4);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
+  background: color-mix(in srgb, var(--gold) 10%, var(--color-surface));
+}
+.verify-banner > svg { color: var(--gold-deep); flex-shrink: 0; }
+.mfa-qr { display: grid; place-items: center; padding: var(--space-3); background: #fff; border-radius: var(--radius); border: 1px solid var(--color-border); inline-size: max-content; margin-inline: auto; }
+.mfa-qr img { display: block; }
+.mfa-secret { display: block; text-align: center; margin-block-start: var(--space-2); font-size: 1rem; letter-spacing: 0.06em; word-break: break-all; user-select: all; }
+.recovery-codes {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-5); margin: 0;
+  padding: var(--space-3) var(--space-5); border: 1px dashed var(--color-border); border-radius: var(--radius); background: var(--color-bg);
+}
+.recovery-codes li { font-size: 0.95rem; letter-spacing: 0.05em; }
+a.user-chip { color: inherit; border-radius: var(--radius); }
+a.user-chip:hover { text-decoration: none; background: var(--color-primary-subtle); }

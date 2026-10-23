@@ -283,6 +283,7 @@ def delete_draft(invoice_id: str, request: Request, ctx: OrgContext = Depends(re
         raise HTTPException(status.HTTP_409_CONFLICT, "posted invoices cannot be deleted; cancel them instead")
     for line in svc.lines_of(db, inv):
         db.delete(line)
+    db.flush()  # lines first: there is no ORM relationship to order the deletes
     audit.record(db, actor_user_id=ctx.user.id, action="invoice.deleted", target_type="invoice", target_id=inv.id,
                  details={}, ip_address=client_ip(request))
     db.delete(inv)

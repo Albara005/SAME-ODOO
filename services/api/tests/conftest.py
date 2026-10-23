@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 
 from novara.config import Settings
+from novara.mail import MemoryMailer
 from novara.main import create_app
 from novara.migrate import migrate
 from novara.modules.files.storage import LocalObjectStorage
@@ -80,7 +81,8 @@ def app(tmp_path, database_url):
         storage_root=str(tmp_path / "storage"),
         max_upload_bytes=1024,
     )
-    app = create_app(settings, storage=LocalObjectStorage(settings.storage_root), create_schema=create_schema)
+    app = create_app(settings, storage=LocalObjectStorage(settings.storage_root), create_schema=create_schema,
+                     mailer=MemoryMailer())
     yield app
     app.state.engine.dispose()
 

@@ -1267,6 +1267,94 @@
     "title": "ImportResult",
     "type": "object"
    },
+   "InvitationIn": {
+    "properties": {
+     "email": {
+      "format": "email",
+      "title": "Email",
+      "type": "string"
+     },
+     "role": {
+      "title": "Role",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email",
+     "role"
+    ],
+    "title": "InvitationIn",
+    "type": "object"
+   },
+   "InvitationInfo": {
+    "properties": {
+     "email": {
+      "title": "Email",
+      "type": "string"
+     },
+     "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+     },
+     "organization_name": {
+      "title": "Organization Name",
+      "type": "string"
+     },
+     "role": {
+      "title": "Role",
+      "type": "string"
+     },
+     "role_name": {
+      "title": "Role Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "organization_name",
+     "role",
+     "role_name",
+     "email",
+     "expires_at"
+    ],
+    "title": "InvitationInfo",
+    "type": "object"
+   },
+   "InvitationOut": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "email": {
+      "title": "Email",
+      "type": "string"
+     },
+     "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "role": {
+      "title": "Role",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "email",
+     "role",
+     "expires_at",
+     "created_at"
+    ],
+    "title": "InvitationOut",
+    "type": "object"
+   },
    "InvoiceFromOrderIn": {
     "properties": {
      "due_date": {
@@ -2106,6 +2194,57 @@
     "title": "LoginIn",
     "type": "object"
    },
+   "LoginOut": {
+    "description": "Either a session (access_token) or, for accounts with two-factor sign-in, an mfa_token to finish it.",
+    "properties": {
+     "access_token": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Access Token"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "mfa_required": {
+      "default": false,
+      "title": "Mfa Required",
+      "type": "boolean"
+     },
+     "mfa_token": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mfa Token"
+     },
+     "token_type": {
+      "default": "bearer",
+      "title": "Token Type",
+      "type": "string"
+     }
+    },
+    "title": "LoginOut",
+    "type": "object"
+   },
    "LogoOut": {
     "properties": {
      "created_at": {
@@ -2317,6 +2456,60 @@
      "content"
     ],
     "title": "MessageIn",
+    "type": "object"
+   },
+   "MfaCodeIn": {
+    "properties": {
+     "code": {
+      "maxLength": 20,
+      "minLength": 6,
+      "title": "Code",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code"
+    ],
+    "title": "MfaCodeIn",
+    "type": "object"
+   },
+   "MfaLoginIn": {
+    "properties": {
+     "code": {
+      "description": "6-digit app code or a recovery code",
+      "maxLength": 20,
+      "minLength": 6,
+      "title": "Code",
+      "type": "string"
+     },
+     "mfa_token": {
+      "title": "Mfa Token",
+      "type": "string"
+     }
+    },
+    "required": [
+     "mfa_token",
+     "code"
+    ],
+    "title": "MfaLoginIn",
+    "type": "object"
+   },
+   "MfaSetupOut": {
+    "properties": {
+     "otpauth_uri": {
+      "title": "Otpauth Uri",
+      "type": "string"
+     },
+     "secret": {
+      "title": "Secret",
+      "type": "string"
+     }
+    },
+    "required": [
+     "secret",
+     "otpauth_uri"
+    ],
+    "title": "MfaSetupOut",
     "type": "object"
    },
    "MoveOut": {
@@ -2948,6 +3141,60 @@
     "title": "PaletteIn",
     "type": "object"
    },
+   "PasswordAndCodeIn": {
+    "description": "Turning two-factor off or replacing recovery codes needs the password and a current code.",
+    "properties": {
+     "code": {
+      "maxLength": 20,
+      "minLength": 6,
+      "title": "Code",
+      "type": "string"
+     },
+     "password": {
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code",
+     "password"
+    ],
+    "title": "PasswordAndCodeIn",
+    "type": "object"
+   },
+   "PasswordChangeIn": {
+    "properties": {
+     "current_password": {
+      "title": "Current Password",
+      "type": "string"
+     },
+     "new_password": {
+      "maxLength": 256,
+      "minLength": 10,
+      "title": "New Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "current_password",
+     "new_password"
+    ],
+    "title": "PasswordChangeIn",
+    "type": "object"
+   },
+   "PasswordIn": {
+    "properties": {
+     "password": {
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "password"
+    ],
+    "title": "PasswordIn",
+    "type": "object"
+   },
    "PaymentIn": {
     "properties": {
      "amount": {
@@ -3526,6 +3773,22 @@
     "title": "ReceivablesOut",
     "type": "object"
    },
+   "RecoveryCodesOut": {
+    "properties": {
+     "recovery_codes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Recovery Codes",
+      "type": "array"
+     }
+    },
+    "required": [
+     "recovery_codes"
+    ],
+    "title": "RecoveryCodesOut",
+    "type": "object"
+   },
    "RegisterIn": {
     "properties": {
      "email": {
@@ -3682,6 +3945,42 @@
      "created_at"
     ],
     "title": "RequestOut",
+    "type": "object"
+   },
+   "ResetConfirmIn": {
+    "properties": {
+     "password": {
+      "maxLength": 256,
+      "minLength": 10,
+      "title": "Password",
+      "type": "string"
+     },
+     "token": {
+      "maxLength": 200,
+      "minLength": 10,
+      "title": "Token",
+      "type": "string"
+     }
+    },
+    "required": [
+     "token",
+     "password"
+    ],
+    "title": "ResetConfirmIn",
+    "type": "object"
+   },
+   "ResetRequestIn": {
+    "properties": {
+     "email": {
+      "format": "email",
+      "title": "Email",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email"
+    ],
+    "title": "ResetRequestIn",
     "type": "object"
    },
    "RoleIn": {
@@ -4438,6 +4737,21 @@
      "id"
     ],
     "title": "TestCaseOut",
+    "type": "object"
+   },
+   "TokenIn": {
+    "properties": {
+     "token": {
+      "maxLength": 200,
+      "minLength": 10,
+      "title": "Token",
+      "type": "string"
+     }
+    },
+    "required": [
+     "token"
+    ],
+    "title": "TokenIn",
     "type": "object"
    },
    "TokenOut": {
@@ -5281,7 +5595,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/TokenOut"
+         "$ref": "#/components/schemas/LoginOut"
         }
        }
       },
@@ -5304,6 +5618,47 @@
     ]
    }
   },
+  "/api/v1/auth/login/mfa": {
+   "post": {
+    "operationId": "login_mfa_api_v1_auth_login_mfa_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MfaLoginIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TokenOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Login Mfa",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
   "/api/v1/auth/logout": {
    "post": {
     "operationId": "logout_api_v1_auth_logout_post",
@@ -5318,6 +5673,91 @@
      }
     ],
     "summary": "Logout",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/auth/password-reset": {
+   "post": {
+    "description": "Always answers the same way, so it can't be used to find out which emails have accounts.",
+    "operationId": "request_password_reset_api_v1_auth_password_reset_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ResetRequestIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Request Password Reset Api V1 Auth Password Reset Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Request Password Reset",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/auth/password-reset/confirm": {
+   "post": {
+    "operationId": "confirm_password_reset_api_v1_auth_password_reset_confirm_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ResetConfirmIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Confirm Password Reset Api V1 Auth Password Reset Confirm Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Confirm Password Reset",
     "tags": [
      "identity"
     ]
@@ -5364,6 +5804,138 @@
     ]
    }
   },
+  "/api/v1/auth/verify-email": {
+   "post": {
+    "operationId": "verify_email_api_v1_auth_verify_email_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TokenIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Verify Email Api V1 Auth Verify Email Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Verify Email",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/invitations/{token}": {
+   "get": {
+    "description": "What an invitation link is for, shown before signing in. Reveals nothing without the token.",
+    "operationId": "invitation_info_api_v1_invitations__token__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "token",
+      "required": true,
+      "schema": {
+       "title": "Token",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InvitationInfo"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Invitation Info",
+    "tags": [
+     "organizations"
+    ]
+   }
+  },
+  "/api/v1/invitations/{token}/accept": {
+   "post": {
+    "operationId": "accept_invitation_api_v1_invitations__token__accept_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "token",
+      "required": true,
+      "schema": {
+       "title": "Token",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MyOrgOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Accept Invitation",
+    "tags": [
+     "organizations"
+    ]
+   }
+  },
   "/api/v1/me": {
    "get": {
     "operationId": "me_api_v1_me_get",
@@ -5385,6 +5957,251 @@
      }
     ],
     "summary": "Me",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/me/mfa/disable": {
+   "post": {
+    "operationId": "mfa_disable_api_v1_me_mfa_disable_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasswordAndCodeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mfa Disable",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/me/mfa/enable": {
+   "post": {
+    "operationId": "mfa_enable_api_v1_me_mfa_enable_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MfaCodeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RecoveryCodesOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mfa Enable",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/me/mfa/recovery-codes": {
+   "post": {
+    "description": "Replace all recovery codes (the old ones stop working).",
+    "operationId": "mfa_new_recovery_codes_api_v1_me_mfa_recovery_codes_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasswordAndCodeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RecoveryCodesOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mfa New Recovery Codes",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/me/mfa/recovery-codes/remaining": {
+   "get": {
+    "operationId": "mfa_remaining_api_v1_me_mfa_recovery_codes_remaining_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Mfa Remaining Api V1 Me Mfa Recovery Codes Remaining Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mfa Remaining",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/me/mfa/setup": {
+   "post": {
+    "description": "Start two-factor setup: scan the secret into an authenticator app, then confirm with a code.",
+    "operationId": "mfa_setup_api_v1_me_mfa_setup_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasswordIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MfaSetupOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mfa Setup",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/me/password": {
+   "post": {
+    "operationId": "change_password_api_v1_me_password_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasswordChangeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Change Password",
     "tags": [
      "identity"
     ]
@@ -5455,6 +6272,33 @@
      }
     ],
     "summary": "Revoke Session",
+    "tags": [
+     "identity"
+    ]
+   }
+  },
+  "/api/v1/me/verify-email": {
+   "post": {
+    "operationId": "resend_verification_api_v1_me_verify_email_post",
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Resend Verification Api V1 Me Verify Email Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Resend Verification",
     "tags": [
      "identity"
     ]
@@ -9394,6 +10238,162 @@
     "summary": "Valuation",
     "tags": [
      "inventory"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/invitations": {
+   "get": {
+    "operationId": "list_invitations_api_v1_orgs__org_id__invitations_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/InvitationOut"
+         },
+         "title": "Response List Invitations Api V1 Orgs  Org Id  Invitations Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Invitations",
+    "tags": [
+     "organizations"
+    ]
+   },
+   "post": {
+    "description": "Invite anyone by email, with or without an account. Inviting the same email again replaces the link.",
+    "operationId": "invite_api_v1_orgs__org_id__invitations_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/InvitationIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InvitationOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Invite",
+    "tags": [
+     "organizations"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/invitations/{invitation_id}": {
+   "delete": {
+    "operationId": "revoke_invitation_api_v1_orgs__org_id__invitations__invitation_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "invitation_id",
+      "required": true,
+      "schema": {
+       "title": "Invitation Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Revoke Invitation",
+    "tags": [
+     "organizations"
     ]
    }
   },

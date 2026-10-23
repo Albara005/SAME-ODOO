@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from novara.ai.provider import AnthropicProvider, ModelProvider
+from novara.mail import Mailer, mailer_from_settings
 from novara.ai.router import router as assistant_router
 from novara.agents.router import router as agents_router
 from novara.automation.live import router as live_router
@@ -53,7 +54,8 @@ from novara.modules.organizations import models as _org_models  # noqa: F401
 
 
 def create_app(settings: Settings | None = None, storage: ObjectStorage | None = None,
-               create_schema: bool | None = None, ai_provider: ModelProvider | None = None) -> FastAPI:
+               create_schema: bool | None = None, ai_provider: ModelProvider | None = None,
+               mailer: Mailer | None = None) -> FastAPI:
     settings = settings or load_settings()
     settings.validate()
     engine = make_engine(settings.database_url)
@@ -70,6 +72,8 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     app.state.storage = storage or LocalObjectStorage(settings.storage_root)
     # Claude via the Anthropic SDK; credentials come from the environment when first used.
     app.state.ai_provider = ai_provider or AnthropicProvider()
+    # SMTP when NOVARA_SMTP_HOST is set; otherwise emails go to the log (development).
+    app.state.mailer = mailer or mailer_from_settings(settings)
 
     if settings.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=True,

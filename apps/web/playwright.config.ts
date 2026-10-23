@@ -35,6 +35,7 @@ export default defineConfig({
         NOVARA_STORAGE_ROOT: storage,
         NOVARA_JWT_SECRET: "e2e-only-secret-not-for-production-0123456789",
         NOVARA_LIVE_INTERVAL_SECONDS: "0.5",
+        NOVARA_APP_BASE_URL: "http://127.0.0.1:4173",
       },
       url: "http://127.0.0.1:8000/health",
       reuseExistingServer: false,

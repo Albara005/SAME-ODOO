@@ -1,11 +1,11 @@
-import { Component, lazy, type ComponentType, type ReactNode } from "react";
+import { Component, lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "./auth/Auth";
 import { lastOrg, OrgProvider, rememberOrg, useOrgQuery } from "./auth/Org";
 import { Layout } from "./components/Layout";
 import { ErrorNotice, Loading } from "./components/ui";
 import { useI18n } from "./i18n/I18n";
-import { LoginPage, RegisterPage } from "./pages/Auth";
+import { ForgotPasswordPage, InvitePage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from "./pages/Auth";
 import { HomePage } from "./pages/Home";
 import { OrgsPage, useMyOrgs } from "./pages/Orgs";
 
@@ -13,6 +13,7 @@ import { OrgsPage, useMyOrgs } from "./pages/Orgs";
 function page<K extends string, M extends Record<K, ComponentType>>(load: () => Promise<M>, name: K) {
   return lazy(() => load().then((m) => ({ default: m[name] })));
 }
+const AccountPage = page(() => import("./pages/Account"), "AccountPage");
 const admin = () => import("./pages/Admin");
 const AuditPage = page(admin, "AuditPage");
 const MembersPage = page(admin, "MembersPage");
@@ -62,17 +63,19 @@ class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode
 }
 
 function RequireAuth() {
-  const { user, loading } = useAuth();
+  const { user, loading, signedOut } = useAuth();
   const location = useLocation();
   if (loading) return <Loading />;
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  // After an expired session, come back here once signed in. After signing out, whoever signs in next starts at home.
+  if (!user) return <Navigate to="/login" replace state={signedOut ? null : { from: location.pathname + location.search }} />;
   return <Outlet />;
 }
 
 function GuestOnly() {
   const { user, loading } = useAuth();
+  const from = (useLocation().state as { from?: string } | null)?.from;
   if (loading) return <Loading />;
-  return user ? <Navigate to="/" replace /> : <Outlet />;
+  return user ? <Navigate to={from ?? "/"} replace /> : <Outlet />;
 }
 
 function RootRedirect() {
@@ -110,10 +113,23 @@ export function App() {
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         </Route>
+        {/* Links from emails: they work signed in or not. */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/invite" element={<InvitePage />} />
         <Route element={<RequireAuth />}>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/orgs" element={<OrgsPage />} />
+          <Route
+            path="/account"
+            element={
+              <Suspense fallback={<Loading />}>
+                <AccountPage />
+              </Suspense>
+            }
+          />
           <Route path="/o/:orgId" element={<OrgRoute />}>
             <Route index element={<HomePage />} />
             <Route path="customers" element={<CustomersPage />} />

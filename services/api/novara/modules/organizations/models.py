@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -32,3 +34,19 @@ class Membership(IdMixin, TimestampMixin, TenantScoped, Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
     role_id: Mapped[str] = mapped_column(String(36), ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)  # active | suspended
+
+
+class Invitation(IdMixin, TimestampMixin, TenantScoped, Base):
+    """An invitation by email to join an organization with a role; works for people without an account.
+    The link carries a random token; only its hash is stored."""
+
+    __tablename__ = "invitations"
+
+    email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    role_id: Mapped[str] = mapped_column(String(36), ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    invited_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    accepted_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

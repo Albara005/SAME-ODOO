@@ -8,6 +8,7 @@ Never used outside tests: the stand-in answers from fixed rules and calls no ext
 from __future__ import annotations
 
 from novara.ai.provider import ModelReply, text_reply, tool_reply
+from novara.mail import MemoryMailer
 from novara.main import create_app as _create_app
 
 ADD_CUSTOMER = "أضف عميل"
@@ -28,4 +29,12 @@ class DemoProvider:
 
 
 def create_app():
-    return _create_app(ai_provider=DemoProvider())
+    mailer = MemoryMailer()
+    app = _create_app(ai_provider=DemoProvider(), mailer=mailer)
+
+    @app.get("/api/e2e/mail", include_in_schema=False)
+    def mail_to(to: str) -> list[dict]:
+        """The browser tests read the emailed links here (password reset, verification, invitations)."""
+        return [{"subject": m.subject, "text": m.text} for m in mailer.sent if m.to == to]
+
+    return app

@@ -25,12 +25,26 @@ class Settings:
     # stream stays open before the client reconnects (keeps proxies and stale connections in check).
     live_interval_seconds: float = 3.0
     live_max_seconds: int = 300
+    # Links in emails (verification, password reset, invitations) point here.
+    app_base_url: str = "http://localhost:5173"
+    # Outgoing email. Without an SMTP host, emails are written to the log (development).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_starttls: bool = True
+    mail_from: str = "NOVARA <no-reply@localhost>"
+    # Key for secrets stored encrypted in the database (two-factor secrets). Defaults to one
+    # derived from the JWT secret; set it separately in production so the two can rotate apart.
+    encryption_key: str = ""
 
     def validate(self) -> None:
         if self.env == "production" and self.jwt_secret == _DEV_SECRET:
             raise RuntimeError("NOVARA_JWT_SECRET must be set in production")
         if len(self.jwt_secret) < 32:
             raise RuntimeError("NOVARA_JWT_SECRET must be at least 32 characters")
+        if self.env == "production" and len(self.encryption_key) < 32:
+            raise RuntimeError("NOVARA_ENCRYPTION_KEY must be set (at least 32 characters) in production")
 
 
 def load_settings() -> Settings:
@@ -46,6 +60,14 @@ def load_settings() -> Settings:
         sites_base_url=env.get("NOVARA_SITES_BASE_URL", "").rstrip("/"),
         live_interval_seconds=float(env.get("NOVARA_LIVE_INTERVAL_SECONDS", Settings.live_interval_seconds)),
         live_max_seconds=int(env.get("NOVARA_LIVE_MAX_SECONDS", Settings.live_max_seconds)),
+        app_base_url=env.get("NOVARA_APP_BASE_URL", Settings.app_base_url).rstrip("/"),
+        smtp_host=env.get("NOVARA_SMTP_HOST", ""),
+        smtp_port=int(env.get("NOVARA_SMTP_PORT", Settings.smtp_port)),
+        smtp_user=env.get("NOVARA_SMTP_USER", ""),
+        smtp_password=env.get("NOVARA_SMTP_PASSWORD", ""),
+        smtp_starttls=env.get("NOVARA_SMTP_STARTTLS", "true").lower() != "false",
+        mail_from=env.get("NOVARA_MAIL_FROM", Settings.mail_from),
+        encryption_key=env.get("NOVARA_ENCRYPTION_KEY", ""),
     )
     settings.validate()
     return settings
