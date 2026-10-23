@@ -1241,6 +1241,413 @@
     "title": "BillSummary",
     "type": "object"
    },
+   "BookableServiceIn": {
+    "properties": {
+     "description": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Description",
+      "type": "string"
+     },
+     "duration_minutes": {
+      "exclusiveMinimum": 0.0,
+      "maximum": 720.0,
+      "title": "Duration Minutes",
+      "type": "integer"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     }
+    },
+    "required": [
+     "name",
+     "duration_minutes"
+    ],
+    "title": "BookableServiceIn",
+    "type": "object"
+   },
+   "BookableServiceOut": {
+    "properties": {
+     "active": {
+      "title": "Active",
+      "type": "boolean"
+     },
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "duration_minutes": {
+      "title": "Duration Minutes",
+      "type": "integer"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "description",
+     "duration_minutes",
+     "price",
+     "active"
+    ],
+    "title": "BookableServiceOut",
+    "type": "object"
+   },
+   "BookableServiceUpdate": {
+    "properties": {
+     "active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Active"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "maxLength": 2000,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "duration_minutes": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "maximum": 720.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Duration Minutes"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "maxLength": 120,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "price": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price"
+     }
+    },
+    "title": "BookableServiceUpdate",
+    "type": "object"
+   },
+   "BookingDecisionIn": {
+    "properties": {
+     "note": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "title": "BookingDecisionIn",
+    "type": "object"
+   },
+   "BookingIn": {
+    "properties": {
+     "customer_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Customer Id"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "format": "email",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "note": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Note",
+      "type": "string"
+     },
+     "outside_hours": {
+      "default": false,
+      "title": "Outside Hours",
+      "type": "boolean"
+     },
+     "phone": {
+      "default": "",
+      "maxLength": 40,
+      "title": "Phone",
+      "type": "string"
+     },
+     "service_id": {
+      "title": "Service Id",
+      "type": "string"
+     },
+     "starts_at": {
+      "format": "date-time",
+      "title": "Starts At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "service_id",
+     "starts_at",
+     "name"
+    ],
+    "title": "BookingIn",
+    "type": "object"
+   },
+   "BookingOut": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "customer_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Customer Id"
+     },
+     "decision_note": {
+      "title": "Decision Note",
+      "type": "string"
+     },
+     "email": {
+      "title": "Email",
+      "type": "string"
+     },
+     "ends_at": {
+      "format": "date-time",
+      "title": "Ends At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "phone": {
+      "title": "Phone",
+      "type": "string"
+     },
+     "service_id": {
+      "title": "Service Id",
+      "type": "string"
+     },
+     "service_name": {
+      "title": "Service Name",
+      "type": "string"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "starts_at": {
+      "format": "date-time",
+      "title": "Starts At",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "service_id",
+     "service_name",
+     "starts_at",
+     "ends_at",
+     "status",
+     "name",
+     "email",
+     "phone",
+     "note",
+     "customer_id",
+     "source",
+     "decision_note",
+     "created_at"
+    ],
+    "title": "BookingOut",
+    "type": "object"
+   },
+   "BookingSettingsIn": {
+    "properties": {
+     "days_ahead": {
+      "default": 60,
+      "exclusiveMinimum": 0.0,
+      "maximum": 366.0,
+      "title": "Days Ahead",
+      "type": "integer"
+     },
+     "hours": {
+      "items": {
+       "$ref": "#/components/schemas/OpeningHoursIn"
+      },
+      "maxItems": 50,
+      "title": "Hours",
+      "type": "array"
+     },
+     "notice_hours": {
+      "default": 2,
+      "maximum": 720.0,
+      "minimum": 0.0,
+      "title": "Notice Hours",
+      "type": "integer"
+     },
+     "slot_minutes": {
+      "default": 30,
+      "title": "Slot Minutes",
+      "type": "integer"
+     },
+     "timezone": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Timezone",
+      "type": "string"
+     }
+    },
+    "required": [
+     "timezone"
+    ],
+    "title": "BookingSettingsIn",
+    "type": "object"
+   },
+   "BookingSettingsOut": {
+    "properties": {
+     "days_ahead": {
+      "title": "Days Ahead",
+      "type": "integer"
+     },
+     "hours": {
+      "items": {
+       "$ref": "#/components/schemas/OpeningHoursIn"
+      },
+      "title": "Hours",
+      "type": "array"
+     },
+     "notice_hours": {
+      "title": "Notice Hours",
+      "type": "integer"
+     },
+     "slot_minutes": {
+      "title": "Slot Minutes",
+      "type": "integer"
+     },
+     "timezone": {
+      "title": "Timezone",
+      "type": "string"
+     }
+    },
+    "required": [
+     "timezone",
+     "slot_minutes",
+     "notice_hours",
+     "days_ahead",
+     "hours"
+    ],
+    "title": "BookingSettingsOut",
+    "type": "object"
+   },
    "BuilderIn": {
     "properties": {
      "content": {
@@ -2125,7 +2532,7 @@
       "items": {
        "type": "string"
       },
-      "maxItems": 3,
+      "maxItems": 4,
       "minItems": 1,
       "title": "Scopes",
       "type": "array"
@@ -2818,6 +3225,28 @@
      "created_at"
     ],
     "title": "FileOut",
+    "type": "object"
+   },
+   "FreeTimesOut": {
+    "properties": {
+     "times": {
+      "items": {
+       "format": "date-time",
+       "type": "string"
+      },
+      "title": "Times",
+      "type": "array"
+     },
+     "timezone": {
+      "title": "Timezone",
+      "type": "string"
+     }
+    },
+    "required": [
+     "timezone",
+     "times"
+    ],
+    "title": "FreeTimesOut",
     "type": "object"
    },
    "HTTPValidationError": {
@@ -4919,6 +5348,31 @@
      "created_at"
     ],
     "title": "NotificationOut",
+    "type": "object"
+   },
+   "OpeningHoursIn": {
+    "properties": {
+     "closes_at": {
+      "title": "Closes At",
+      "type": "string"
+     },
+     "opens_at": {
+      "title": "Opens At",
+      "type": "string"
+     },
+     "weekday": {
+      "maximum": 6.0,
+      "minimum": 0.0,
+      "title": "Weekday",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "weekday",
+     "opens_at",
+     "closes_at"
+    ],
+    "title": "OpeningHoursIn",
     "type": "object"
    },
    "OrderIn": {
@@ -14210,6 +14664,749 @@
     "summary": "Post Bill",
     "tags": [
      "purchases"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bookings": {
+   "get": {
+    "description": "Bookings starting between two days (inclusive, in the booking time zone); this week by default.",
+    "operationId": "list_bookings_api_v1_orgs__org_id__bookings_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "start",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Start"
+      }
+     },
+     {
+      "in": "query",
+      "name": "end",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "End"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^(requested|confirmed|declined|cancelled)$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BookingOut"
+         },
+         "title": "Response List Bookings Api V1 Orgs  Org Id  Bookings Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Bookings",
+    "tags": [
+     "bookings"
+    ]
+   },
+   "post": {
+    "description": "The team books someone in: confirmed at once.",
+    "operationId": "book_api_v1_orgs__org_id__bookings_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BookingIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BookingOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Book",
+    "tags": [
+     "bookings"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bookings/free-times": {
+   "get": {
+    "operationId": "staff_free_times_api_v1_orgs__org_id__bookings_free_times_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "service_id",
+      "required": true,
+      "schema": {
+       "title": "Service Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "day",
+      "required": true,
+      "schema": {
+       "format": "date",
+       "title": "Day",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FreeTimesOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Staff Free Times",
+    "tags": [
+     "bookings"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bookings/requests": {
+   "get": {
+    "description": "Requests from sites still waiting for someone, soonest first.",
+    "operationId": "waiting_requests_api_v1_orgs__org_id__bookings_requests_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BookingOut"
+         },
+         "title": "Response Waiting Requests Api V1 Orgs  Org Id  Bookings Requests Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Waiting Requests",
+    "tags": [
+     "bookings"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bookings/services": {
+   "get": {
+    "operationId": "list_services_api_v1_orgs__org_id__bookings_services_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BookableServiceOut"
+         },
+         "title": "Response List Services Api V1 Orgs  Org Id  Bookings Services Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Services",
+    "tags": [
+     "bookings"
+    ]
+   },
+   "post": {
+    "operationId": "create_service_api_v1_orgs__org_id__bookings_services_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BookableServiceIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BookableServiceOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Service",
+    "tags": [
+     "bookings"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bookings/services/{service_id}": {
+   "patch": {
+    "description": "A new length applies to new bookings; existing ones keep their times.",
+    "operationId": "update_service_api_v1_orgs__org_id__bookings_services__service_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "service_id",
+      "required": true,
+      "schema": {
+       "title": "Service Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BookableServiceUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BookableServiceOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Service",
+    "tags": [
+     "bookings"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bookings/settings": {
+   "get": {
+    "operationId": "get_settings_api_v1_orgs__org_id__bookings_settings_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BookingSettingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Settings",
+    "tags": [
+     "bookings"
+    ]
+   },
+   "put": {
+    "description": "The booking time zone, how often bookings may start, the notice and window for sites, and the\nweekly opening hours (replaced as a whole). Bookings already made keep their times.",
+    "operationId": "put_settings_api_v1_orgs__org_id__bookings_settings_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BookingSettingsIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BookingSettingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Settings",
+    "tags": [
+     "bookings"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bookings/{booking_id}/cancel": {
+   "post": {
+    "description": "Cancel a request or a confirmed booking; its time is free again.",
+    "operationId": "cancel_api_v1_orgs__org_id__bookings__booking_id__cancel_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "booking_id",
+      "required": true,
+      "schema": {
+       "title": "Booking Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BookingDecisionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BookingOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Cancel",
+    "tags": [
+     "bookings"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bookings/{booking_id}/confirm": {
+   "post": {
+    "operationId": "confirm_api_v1_orgs__org_id__bookings__booking_id__confirm_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "booking_id",
+      "required": true,
+      "schema": {
+       "title": "Booking Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BookingOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Confirm",
+    "tags": [
+     "bookings"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bookings/{booking_id}/decline": {
+   "post": {
+    "description": "Turn down a site's request; its time is free again.",
+    "operationId": "decline_api_v1_orgs__org_id__bookings__booking_id__decline_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "booking_id",
+      "required": true,
+      "schema": {
+       "title": "Booking Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/BookingDecisionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BookingOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Decline",
+    "tags": [
+     "bookings"
     ]
    }
   },
@@ -25100,6 +26297,183 @@
     ]
    }
   },
+  "/api/v1/public/booking-services": {
+   "get": {
+    "description": "Services a visitor can book (a key with the \"bookings\" scope).",
+    "operationId": "public_booking_services_api_v1_public_booking_services_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Key"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-novara-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Novara-Key"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Public Booking Services",
+    "tags": [
+     "public data"
+    ]
+   },
+   "options": {
+    "operationId": "bookings_preflight_api_v1_public_booking_services_options",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Bookings Preflight",
+    "tags": [
+     "public data"
+    ]
+   }
+  },
+  "/api/v1/public/bookings": {
+   "options": {
+    "operationId": "bookings_preflight_api_v1_public_bookings_options",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Bookings Preflight",
+    "tags": [
+     "public data"
+    ]
+   },
+   "post": {
+    "description": "Ask for one of the free times. Body: service_id, starts_at (as listed), name, email and/or phone, note.\nThe time is held until the team confirms or declines it.",
+    "operationId": "public_booking_api_v1_public_bookings_post",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Key"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-novara-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Novara-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "title": "Payload",
+        "type": "object"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Public Booking",
+    "tags": [
+     "public data"
+    ]
+   }
+  },
   "/api/v1/public/catalog": {
    "get": {
     "operationId": "public_catalog_api_v1_public_catalog_get",
@@ -25177,6 +26551,109 @@
      }
     },
     "summary": "Catalog Preflight",
+    "tags": [
+     "public data"
+    ]
+   }
+  },
+  "/api/v1/public/free-times": {
+   "get": {
+    "description": "Times on a day (in the business's time zone) when the service can be booked.",
+    "operationId": "public_free_times_api_v1_public_free_times_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "service",
+      "required": true,
+      "schema": {
+       "maxLength": 36,
+       "title": "Service",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "day",
+      "required": true,
+      "schema": {
+       "format": "date",
+       "title": "Day",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Key"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-novara-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Novara-Key"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Public Free Times",
+    "tags": [
+     "public data"
+    ]
+   },
+   "options": {
+    "operationId": "bookings_preflight_api_v1_public_free_times_options",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Bookings Preflight",
     "tags": [
      "public data"
     ]

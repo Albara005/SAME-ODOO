@@ -95,7 +95,8 @@ class AppDataKey(IdMixin, TimestampMixin, TenantScoped, Base):
     Published sites are public, so a key embedded in one is public too: it can only ever read
     the scopes chosen here (the product catalog, optionally whether each product is in stock),
     never costs, quantities, customers or anything else; with the "orders" scope it can also
-    send order requests, which wait for a person in Sales. Only its SHA-256 is stored.
+    send order requests, which wait for a person in Sales, and with "bookings" ask for a free
+    time, which waits for the team to confirm it. Only its SHA-256 is stored.
     """
 
     __tablename__ = "app_data_keys"

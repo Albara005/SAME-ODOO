@@ -54,6 +54,7 @@ const projects = () => import("./pages/Projects");
 const ProjectsPage = page(projects, "ProjectsPage");
 const ProjectWorkPage = page(projects, "ProjectPage");
 const HrPage = page(() => import("./pages/Hr"), "HrPage");
+const BookingsPage = page(() => import("./pages/Bookings"), "BookingsPage");
 const ReportsPage = page(() => import("./pages/Reports"), "ReportsPage");
 const sales = () => import("./pages/Sales");
 const SalesOrderDetailPage = page(sales, "SalesOrderDetailPage");
@@ -172,6 +173,7 @@ export function App() {
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="projects/:projectId" element={<ProjectWorkPage />} />
             <Route path="hr" element={<HrPage />} />
+            <Route path="bookings" element={<BookingsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="assistant" element={<AssistantPage />} />

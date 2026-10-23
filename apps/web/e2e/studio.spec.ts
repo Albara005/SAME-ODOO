@@ -252,3 +252,68 @@ test("App Studio: an order request from the site becomes a quotation in Sales", 
   await expect(page.getByText("مقهى الندى").first()).toBeVisible();
   await expect(page.getByRole("cell", { name: "قهوة عربية" })).toBeVisible();
 });
+
+/** A day `ahead` days from now on the business's calendar (Riyadh). */
+function riyadhDay(ahead: number): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit" })
+    .format(new Date(Date.now() + ahead * 86_400_000));
+}
+
+test("Bookings: hours and a service, a site asks, the team confirms and books someone in", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("bookings"));
+  await createOrg(page, "عيادة الواحة");
+  const orgId = page.url().match(/\/o\/([0-9a-f-]+)/)![1]!;
+  const token = await page.evaluate(() => localStorage.getItem("novara.token"));
+
+  await nav(page, "الحجوزات");
+  await page.getByRole("tab", { name: "الخدمات والمواعيد" }).click();
+  await page.getByLabel("اسم الخدمة").fill("استشارة");
+  await page.getByLabel(/^السعر/).fill("200");
+  await page.getByRole("button", { name: "إضافة خدمة" }).click();
+  await expect(page.getByText("استشارة", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "إضافة فترة إلى الأحد" }).click();
+  await page.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByText("تم الحفظ")).toBeVisible();
+
+  // The next Sunday, then what a visitor's browser does on the published site.
+  let ahead = 1;
+  while (new Date(`${riyadhDay(ahead)}T12:00:00Z`).getUTCDay() !== 0) ahead++;
+  const day = riyadhDay(ahead);
+  const app = await (await page.request.post(`/api/v1/orgs/${orgId}/studio/projects`, {
+    headers: { Authorization: `Bearer ${token}` }, data: { name: "Clinic", slug: "clinic" } })).json();
+  const created = await page.request.post(`/api/v1/orgs/${orgId}/studio/projects/${app.id}/data-keys`, {
+    headers: { Authorization: `Bearer ${token}` }, data: { name: "Bookings", scopes: ["catalog", "bookings"] } });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const h = { "X-Novara-Key": (await created.json()).key as string };
+  const { services } = await (await page.request.get("/api/v1/public/booking-services", { headers: h })).json();
+  const { times } = await (await page.request.get(`/api/v1/public/free-times?service=${services[0].id}&day=${day}`, { headers: h })).json();
+  expect(times[0]).toBe(`${day}T09:00:00+03:00`);
+  const sent = await page.request.post("/api/v1/public/bookings", {
+    headers: h, data: { service_id: services[0].id, starts_at: times[2], name: "ريم", phone: "+966500000002", note: "الزيارة الأولى" } });
+  expect(sent.status()).toBe(201);
+
+  await page.reload();
+  await page.getByRole("tab", { name: "الطلبات (1)" }).click();
+  await expect(page.getByText("الزيارة الأولى")).toBeVisible();
+  await expect(page.getByText("10:00–11:00")).toBeVisible();
+  await page.getByRole("button", { name: "تأكيد" }).click();
+  await expect(page.getByText("لا طلبات بانتظار التأكيد.")).toBeVisible();
+
+  // The team books someone in at a free time on the same day.
+  await page.getByRole("button", { name: "حجز جديد" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/^الخدمة/).selectOption({ label: "استشارة" });
+  await dialog.getByLabel(/^اليوم/).fill(day);
+  await expect(dialog.getByLabel(/^الوقت/).locator("option", { hasText: "10:00" })).toHaveCount(0);   // held by Reem
+  await dialog.getByLabel(/^الوقت/).selectOption({ label: "11:00" });
+  await dialog.getByLabel("الاسم", { exact: true }).fill("سلمان");
+  await dialog.getByRole("button", { name: "حجز", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "الأسبوع" }).click();
+  if (ahead > 6) await page.getByRole("button", { name: "الأسبوع التالي" }).click();
+  await expect(page.getByText("ريم", { exact: true })).toBeVisible();
+  await expect(page.getByText("سلمان", { exact: true })).toBeVisible();
+  await expect(page.getByText("من Clinic")).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/bookings-ar.png", fullPage: true });
+});

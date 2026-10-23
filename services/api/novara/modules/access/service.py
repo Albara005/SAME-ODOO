@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from novara.modules.access.models import Role
-from novara.modules.access.permissions import OWNER_ROLE, SYSTEM_ROLES
+from novara.modules.access.permissions import OWNER_ROLE, SYSTEM_ROLES, effective_permissions
 from novara.modules.organizations.models import Membership
 
 
@@ -32,3 +32,10 @@ def active_owner_count(db: Session) -> int:
         .join(Role, Role.id == Membership.role_id)
         .where(Role.key == OWNER_ROLE, Membership.status == "active")
     )
+
+
+def holders(db: Session, permission: str) -> list[str]:
+    """Active members whose role grants the permission (e.g. who to tell about something to decide)."""
+    rows = db.execute(select(Membership.user_id, Role).join(Role, Role.id == Membership.role_id)
+                      .where(Membership.status == "active"))
+    return [user_id for user_id, role in rows if permission in effective_permissions(role)]

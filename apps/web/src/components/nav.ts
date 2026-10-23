@@ -1,6 +1,7 @@
 import {
   Bell,
   Bot,
+  CalendarClock,
   Boxes,
   CheckSquare,
   ClipboardCheck,
@@ -40,6 +41,7 @@ export const NAV: NavGroup[] = [
       { to: "customers", label: "nav.customers", icon: UsersRound, anyOf: ["customers.read"], hue: "lapis", desc: "app.customers" },
       { to: "products", label: "nav.products", icon: Package, anyOf: ["products.read"], hue: "teal", desc: "app.products" },
       { to: "sales", label: "nav.sales", icon: ShoppingCart, anyOf: ["sales.read"], hue: "amber", desc: "app.sales" },
+      { to: "bookings", label: "nav.bookings", icon: CalendarClock, anyOf: ["bookings.read"], hue: "teal", desc: "app.bookings" },
       { to: "invoices", label: "nav.invoices", icon: FileText, anyOf: ["invoices.read"], hue: "emerald", desc: "app.invoices" },
       { to: "purchases", label: "nav.purchases", icon: ShoppingBag, anyOf: ["purchases.read"], hue: "cyan", desc: "app.purchases" },
       { to: "inventory", label: "nav.inventory", icon: Boxes, anyOf: ["inventory.read"], hue: "terracotta", desc: "app.inventory" },

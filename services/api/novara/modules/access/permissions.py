@@ -61,6 +61,8 @@ TIMESHEETS_WRITE = "timesheets.write"
 HR_READ = "hr.read"
 HR_MANAGE = "hr.manage"
 LEAVE_REQUEST = "leave.request"
+BOOKINGS_READ = "bookings.read"
+BOOKINGS_MANAGE = "bookings.manage"
 
 CATALOG: dict[str, str] = {
     ORG_MANAGE: "Edit organization settings",
@@ -109,12 +111,14 @@ CATALOG: dict[str, str] = {
     HR_READ: "View the employee directory and departments",
     HR_MANAGE: "Add and edit employee records, departments, leave types, the weekend and public holidays; decide anyone's leave",
     LEAVE_REQUEST: "Ask for your own leave and see your balance",
+    BOOKINGS_READ: "View the booking calendar, services and opening hours",
+    BOOKINGS_MANAGE: "Book, confirm, decline and cancel bookings; set services, opening hours and booking rules",
 }
 
 OWNER_ROLE = "owner"
 
 _SALES = [CUSTOMERS_READ, CUSTOMERS_WRITE, PRODUCTS_READ, INVOICES_READ, INVOICES_WRITE,
-          SALES_READ, SALES_WRITE, INVENTORY_READ]
+          SALES_READ, SALES_WRITE, INVENTORY_READ, BOOKINGS_READ, BOOKINGS_MANAGE]
 _ACCOUNTING = [
     CUSTOMERS_READ, PRODUCTS_READ, INVOICES_READ, INVOICES_POST, INVOICES_CANCEL, INVOICES_CREDIT,
     PAYMENTS_WRITE, ACCOUNTING_READ, ACCOUNTING_CLOSE, ACCOUNTING_JOURNAL, TAXES_MANAGE, SALES_READ, INVENTORY_READ,
@@ -137,7 +141,7 @@ SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     "developer": ("Developer", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, BRAND_READ, APPS_READ, APPS_WRITE,
                                        PROJECTS_READ, TIMESHEETS_WRITE, *_PEOPLE})),
     "member": ("Member", sorted([AGENTS_RUN, AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ,
-                                 PROJECTS_READ, TIMESHEETS_WRITE, *_PEOPLE])),
+                                 PROJECTS_READ, TIMESHEETS_WRITE, BOOKINGS_READ, *_PEOPLE])),
     "viewer": ("Viewer", [FILES_READ]),
 }
 

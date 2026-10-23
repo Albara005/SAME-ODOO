@@ -34,6 +34,8 @@ EVENT_TYPES: dict[str, str] = {
     "web_order.received": "An order request arrived from a published site (details: number, site, customer_name, total)",
     "leave.requested": "Someone asked for leave (details: employee, leave_type, start, end, days)",
     "leave.approved": "A leave request was approved (details: employee, leave_type, start, end, days)",
+    "booking.requested": "A published site asked for a booking (details: number, service, starts_at, name, site)",
+    "booking.confirmed": "A booking was confirmed (details: number, service, starts_at, name)",
     "sales_order.created": "A quotation was created",
     "sales_order.confirmed": "A quotation was confirmed as a sales order",
     "sales_order.delivered": "Goods were delivered for a sales order",

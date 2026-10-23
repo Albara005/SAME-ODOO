@@ -104,6 +104,26 @@ await fetch("https://app.example.com/api/v1/public/orders", {
 - **الحماية من الإساءة:** يلزم بريد أو هاتف للرد. حقل مخفي `website` يتركه الناس فارغاً ويملؤه الروبوت، فيُرد عليه بالقبول ولا يُحفظ شيء. حد 30 طلباً في الساعة لكل مفتاح و5 في عشر دقائق لكل عنوان IP (429). حدود لطول كل حقل ولعدد البنود (50) وللكمية.
 - **إنشاء المفتاح بهذا النطاق** يتطلب `sales.write` إضافة إلى `apps.deploy`، والتحويل إلى عرض سعر يتطلب `sales.write` و`customers.write`.
 
+### الحجوزات من الموقع (نطاق `bookings`)
+
+مفتاح بنطاق `bookings` يتيح للموقع عرض الخدمات والأوقات المتاحة وطلب موعد:
+
+```js
+const h = { "X-Novara-Key": "nvpk_..." };
+const { services, timezone } = await (await fetch("https://app.example.com/api/v1/public/booking-services", { headers: h })).json();
+const { times } = await (await fetch(`https://app.example.com/api/v1/public/free-times?service=${id}&day=2026-11-01`, { headers: h })).json();
+await fetch("https://app.example.com/api/v1/public/bookings", {
+  method: "POST",
+  headers: { ...h, "Content-Type": "application/json" },
+  body: JSON.stringify({ service_id: id, starts_at: times[0], name, email, phone, note }),
+});   // 201 { reference: "BK-2026-00001", status: "requested" }
+```
+
+- **الطلب يحجز وقته** حتى يؤكده الفريق أو يرفضه من صفحة «الحجوزات»، ويُشعَر من يملك `bookings.manage` بوصوله. وصوله حدث `booking.requested` وتأكيد أي حجز حدث `booking.confirmed`.
+- **الموقع لا يحجز إلا وقتاً من القائمة:** داخل ساعات العمل، غير محجوز، بعد المهلة (ساعتان افتراضياً) وقبل نهاية نافذة الحجز (60 يوماً). الوقت المأخوذ للتو يُرد عليه بـ 409، وأي وقت آخر بـ 422.
+- **الحماية من الإساءة** كما في الطلبات: بريد أو هاتف إلزامي، والحقل المخفي `website`، و30 طلباً في الساعة لكل مفتاح و5 في عشر دقائق لكل عنوان.
+- **إنشاء المفتاح بهذا النطاق** يتطلب `bookings.manage` إضافة إلى `apps.deploy`.
+
 ## الأدوار
 
 | الدور | يستطيع |
@@ -116,5 +136,5 @@ await fetch("https://app.example.com/api/v1/public/orders", {
 - **بيئة التنفيذ المعزولة (MicroVM)** لقوالب فيها كود خادم. هذا الشرط الأساسي قبل توسيع القوالب.
 - **نطاقات مخصصة للعملاء** (custom domains) وشهادات TLS.
 - **اختبارات واجهة حقيقية في متصفح** (Playwright) للتطبيقات المولّدة. الفحوص الحالية ثابتة (static) فقط.
-- **الدفع من الموقع والحجوزات:** الموقع يرسل طلب شراء ينتظر موافقة الفريق، ولا يوجد دفع إلكتروني ولا حجز مواعيد بعد.
+- **الدفع من الموقع:** الموقع يرسل طلب شراء أو طلب حجز ينتظر الفريق، ولا يوجد دفع إلكتروني بعد.
 - **التحقق البشري (CAPTCHA)** للطلبات العامة: الحماية الحالية حقل مخفي وحدود للمعدل.

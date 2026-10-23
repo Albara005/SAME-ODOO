@@ -8,10 +8,8 @@ from datetime import date, timedelta
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from novara.modules.access.models import Role
-from novara.modules.access.permissions import effective_permissions
+from novara.modules.access.service import holders
 from novara.modules.hr.models import DEFAULT_WEEKEND, Department, Employee, Holiday, HrPolicy, LeaveRequest, LeaveType
-from novara.modules.organizations.models import Membership
 
 LIVE = ("pending", "approved")  # requests that hold their days
 MAX_SPAN_DAYS = 366
@@ -129,9 +127,4 @@ def deciders(db: Session, employee: Employee) -> list[str]:
         dept = db.get(Department, employee.department_id)
         if dept and dept.manager_user_id and dept.manager_user_id != employee.user_id:
             return [dept.manager_user_id]
-    out = []
-    for m, role in db.execute(select(Membership, Role).join(Role, Role.id == Membership.role_id)
-                              .where(Membership.status == "active")):
-        if "hr.manage" in effective_permissions(role) and m.user_id != employee.user_id:
-            out.append(m.user_id)
-    return out
+    return [u for u in holders(db, "hr.manage") if u != employee.user_id]

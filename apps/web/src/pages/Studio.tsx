@@ -742,11 +742,15 @@ function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; on
   const [name, setName] = useState(t("dataKeys.defaultName"));
   const [availability, setAvailability] = useState(false);
   const [orders, setOrders] = useState(false);
+  const [bookings, setBookings] = useState(false);
   const create = useMutation({
     mutationFn: () =>
       unwrap(api.POST("/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys", {
         params: { path: { org_id: org.id, project_id: p.id } },
-        body: { name: name.trim(), scopes: ["catalog", ...(availability ? ["availability"] : []), ...(orders ? ["orders"] : [])] },
+        body: {
+          name: name.trim(),
+          scopes: ["catalog", ...(availability ? ["availability"] : []), ...(orders ? ["orders"] : []), ...(bookings ? ["bookings"] : [])],
+        },
       })),
     onSuccess: onCreated,
   });
@@ -764,6 +768,8 @@ function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; on
             onChange={(e) => setAvailability(e.target.checked)} />
           <Checkbox label={t("dataKeys.scope.ordersLong")} checked={orders} disabled={!can("sales.write")}
             onChange={(e) => setOrders(e.target.checked)} />
+          <Checkbox label={t("dataKeys.scope.bookingsLong")} checked={bookings} disabled={!can("bookings.manage")}
+            onChange={(e) => setBookings(e.target.checked)} />
         </fieldset>
         <p className="muted small">{t("dataKeys.publicWarning")}</p>
         <div className="form-actions">
@@ -793,6 +799,17 @@ function NewKeyCard({ dataKey, secret, onClose }: { dataKey: DataKey; secret: st
       `  method: "POST",`,
       `  headers: { "X-Novara-Key": "${secret}", "Content-Type": "application/json" },`,
       `  body: JSON.stringify({ name, email, phone, note, lines: [{ product_id, quantity: 2 }] }),`,
+      `});`,
+    ] : []),
+    ...(dataKey.scopes.includes("bookings") ? [
+      ``,
+      `// Bookings: services, the free times on a day, then a request (your team confirms it):`,
+      `const { services, timezone } = await (await fetch("${window.location.origin}/api/v1/public/booking-services", { headers: { "X-Novara-Key": "${secret}" } })).json();`,
+      `const { times } = await (await fetch(\`${window.location.origin}/api/v1/public/free-times?service=\${service_id}&day=2026-11-01\`, { headers: { "X-Novara-Key": "${secret}" } })).json();`,
+      `await fetch("${window.location.origin}/api/v1/public/bookings", {`,
+      `  method: "POST",`,
+      `  headers: { "X-Novara-Key": "${secret}", "Content-Type": "application/json" },`,
+      `  body: JSON.stringify({ service_id, starts_at: times[0], name, email, phone, note }),`,
       `});`,
     ] : []),
   ].join("\n");

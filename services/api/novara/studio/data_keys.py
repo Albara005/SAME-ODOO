@@ -8,6 +8,12 @@ what confirmed orders hold). With the "orders" scope the site can also send orde
 
     POST /api/v1/public/orders                    (see novara/modules/sales/web_orders.py)
 
+With the "bookings" scope it can list bookable services and their free times, and ask for one:
+
+    GET  /api/v1/public/booking-services
+    GET  /api/v1/public/free-times?service=...&day=YYYY-MM-DD
+    POST /api/v1/public/bookings                  (see novara/modules/bookings/router.py)
+
 Answers carry CORS headers for any origin, because sites run in a sandbox with an opaque
 origin and the data is public by the owner's choice.
 """
@@ -16,7 +22,7 @@ from __future__ import annotations
 
 import secrets
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response, status
@@ -31,6 +37,8 @@ from novara.db import utcnow
 from novara.deps import OrgContext, client_ip, get_db, require
 from novara.modules.access import permissions as P
 from novara.modules.accounting.models import Tax
+from novara.modules.bookings import router as bookings
+from novara.modules.bookings import service as booking_rules
 from novara.modules.audit import service as audit
 from novara.modules.catalog.models import Product
 from novara.modules.inventory.models import StockLevel
@@ -49,6 +57,8 @@ SCOPES: dict[str, tuple[str, ...]] = {
     "availability": (P.PRODUCTS_READ, P.INVENTORY_READ),
     # Order requests wait in Sales for a person: taking them is a sales decision.
     "orders": (P.PRODUCTS_READ, P.SALES_WRITE),
+    # Booking requests hold a time until someone confirms them: a booking decision.
+    "bookings": (P.BOOKINGS_MANAGE,),
 }
 PUBLIC_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -232,4 +242,83 @@ def public_order(request: Request, payload: dict = Body(...), key: str | None = 
     db.commit()
     return JSONResponse({"received": True, "reference": order.number, "currency": order.currency,
                          "total": str(from_minor(order.total_minor, order.currency))},
+                        status_code=status.HTTP_201_CREATED, headers=NO_STORE)
+
+
+# ---------------------------------------------------------------- bookings
+
+
+def _scoped(db: Session, raw: str | None, scope: str) -> AppDataKey | None:
+    key = _key_for(db, raw) if raw else None
+    return key if key is not None and scope in key.scopes else None
+
+
+def _refused() -> JSONResponse:
+    return JSONResponse({"detail": "invalid or revoked key"}, status_code=status.HTTP_401_UNAUTHORIZED, headers=NO_STORE)
+
+
+@public_router.options("/public/booking-services")
+@public_router.options("/public/free-times")
+@public_router.options("/public/bookings")
+def bookings_preflight() -> Response:
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=NO_STORE)
+
+
+@public_router.get("/public/booking-services")
+def public_booking_services(key: str | None = Query(default=None, max_length=100),
+                            x_novara_key: str | None = Header(default=None, max_length=100),
+                            db: Session = Depends(get_db)):
+    """Services a visitor can book (a key with the "bookings" scope)."""
+    data_key = _scoped(db, x_novara_key or key, "bookings")
+    if data_key is None:
+        return _refused()
+    org = db.get(Organization, data_key.organization_id)
+    return JSONResponse({"organization": org.name, "currency": org.default_currency,
+                         "timezone": booking_rules.current(db).timezone, "services": bookings.public_services(db)},
+                        headers=PUBLIC_HEADERS)
+
+
+@public_router.get("/public/free-times")
+def public_free_times(service: str = Query(max_length=36), day: date = Query(),
+                      key: str | None = Query(default=None, max_length=100),
+                      x_novara_key: str | None = Header(default=None, max_length=100), db: Session = Depends(get_db)):
+    """Times on a day (in the business's time zone) when the service can be booked."""
+    data_key = _scoped(db, x_novara_key or key, "bookings")
+    if data_key is None:
+        return _refused()
+    try:
+        tz, times = bookings.public_free_times(db, service, day)
+    except booking_rules.BookingError as e:
+        return JSONResponse({"detail": str(e)}, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, headers=NO_STORE)
+    return JSONResponse({"timezone": tz, "times": [t.isoformat() for t in times]}, headers=NO_STORE)
+
+
+@public_router.post("/public/bookings", status_code=status.HTTP_201_CREATED)
+def public_booking(request: Request, payload: dict = Body(...), key: str | None = Query(default=None, max_length=100),
+                   x_novara_key: str | None = Header(default=None, max_length=100), db: Session = Depends(get_db)):
+    """Ask for one of the free times. Body: service_id, starts_at (as listed), name, email and/or phone, note.
+    The time is held until the team confirms or declines it."""
+    data_key = _scoped(db, x_novara_key or key, "bookings")
+    if data_key is None:
+        return _refused()
+    try:
+        body = bookings.PublicBookingIn.model_validate(payload)
+    except ValidationError as e:
+        return JSONResponse({"detail": jsonable_encoder(e.errors(include_url=False, include_context=False))},
+                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, headers=NO_STORE)
+    if body.website:  # the hidden field people leave empty: a bot. Say yes, keep nothing.
+        return JSONResponse({"received": True, "reference": "", "status": "requested"},
+                            status_code=status.HTTP_201_CREATED, headers=NO_STORE)
+    try:
+        booking = bookings.receive(db, data_key, body, ip=client_ip(request))
+    except bookings.RateLimited as e:
+        return JSONResponse({"detail": str(e)}, status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            headers={**NO_STORE, "Retry-After": "600"})
+    except booking_rules.SlotTaken as e:
+        return JSONResponse({"detail": str(e)}, status_code=status.HTTP_409_CONFLICT, headers=NO_STORE)
+    except booking_rules.BookingError as e:
+        return JSONResponse({"detail": str(e)}, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, headers=NO_STORE)
+    db.commit()
+    return JSONResponse({"received": True, "reference": booking.number, "status": booking.status,
+                         "starts_at": booking_rules.utc(booking.starts_at).isoformat()},
                         status_code=status.HTTP_201_CREATED, headers=NO_STORE)

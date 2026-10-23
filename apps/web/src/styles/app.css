@@ -741,3 +741,14 @@ td.short { color: var(--color-warning-text); font-weight: 600; }
 .plain-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .plain-list li { padding-block: var(--space-2); border-block-end: 1px solid var(--color-border); }
 .plain-list li:last-child { border-block-end: 0; }
+
+/* Bookings: a day's bookings as rows, and the weekly opening hours editor. */
+.booking-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.booking { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border); border-inline-start: 4px solid var(--color-success); border-radius: var(--radius); }
+.booking.requested { border-inline-start-color: var(--gold); border-style: dashed; border-inline-start-style: solid; }
+.booking-time { font-weight: 600; min-inline-size: 7.5rem; }
+.hours-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; padding-block: var(--space-2);
+  border-block-end: 1px solid var(--color-border); }
+.hours-row:last-child { border-block-end: 0; }
+.hours-day { min-inline-size: 6rem; font-weight: 600; }

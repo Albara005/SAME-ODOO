@@ -1125,6 +1125,184 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Bookings
+         * @description Bookings starting between two days (inclusive, in the booking time zone); this week by default.
+         */
+        get: operations["list_bookings_api_v1_orgs__org_id__bookings_get"];
+        put?: never;
+        /**
+         * Book
+         * @description The team books someone in: confirmed at once.
+         */
+        post: operations["book_api_v1_orgs__org_id__bookings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bookings/free-times": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Staff Free Times */
+        get: operations["staff_free_times_api_v1_orgs__org_id__bookings_free_times_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bookings/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Waiting Requests
+         * @description Requests from sites still waiting for someone, soonest first.
+         */
+        get: operations["waiting_requests_api_v1_orgs__org_id__bookings_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bookings/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Services */
+        get: operations["list_services_api_v1_orgs__org_id__bookings_services_get"];
+        put?: never;
+        /** Create Service */
+        post: operations["create_service_api_v1_orgs__org_id__bookings_services_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bookings/services/{service_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Service
+         * @description A new length applies to new bookings; existing ones keep their times.
+         */
+        patch: operations["update_service_api_v1_orgs__org_id__bookings_services__service_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bookings/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings_api_v1_orgs__org_id__bookings_settings_get"];
+        /**
+         * Put Settings
+         * @description The booking time zone, how often bookings may start, the notice and window for sites, and the
+         *     weekly opening hours (replaced as a whole). Bookings already made keep their times.
+         */
+        put: operations["put_settings_api_v1_orgs__org_id__bookings_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bookings/{booking_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel
+         * @description Cancel a request or a confirmed booking; its time is free again.
+         */
+        post: operations["cancel_api_v1_orgs__org_id__bookings__booking_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bookings/{booking_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm */
+        post: operations["confirm_api_v1_orgs__org_id__bookings__booking_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/bookings/{booking_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline
+         * @description Turn down a site's request; its time is free again.
+         */
+        post: operations["decline_api_v1_orgs__org_id__bookings__booking_id__decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/creative/brand-kits": {
         parameters: {
             query?: never;
@@ -3486,6 +3664,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/booking-services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Booking Services
+         * @description Services a visitor can book (a key with the "bookings" scope).
+         */
+        get: operations["public_booking_services_api_v1_public_booking_services_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        /** Bookings Preflight */
+        options: operations["bookings_preflight_api_v1_public_booking_services_options"];
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Public Booking
+         * @description Ask for one of the free times. Body: service_id, starts_at (as listed), name, email and/or phone, note.
+         *     The time is held until the team confirms or declines it.
+         */
+        post: operations["public_booking_api_v1_public_bookings_post"];
+        delete?: never;
+        /** Bookings Preflight */
+        options: operations["bookings_preflight_api_v1_public_bookings_options"];
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/catalog": {
         parameters: {
             query?: never;
@@ -3500,6 +3721,27 @@ export interface paths {
         delete?: never;
         /** Catalog Preflight */
         options: operations["catalog_preflight_api_v1_public_catalog_options"];
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/free-times": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Free Times
+         * @description Times on a day (in the business's time zone) when the service can be booked.
+         */
+        get: operations["public_free_times_api_v1_public_free_times_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        /** Bookings Preflight */
+        options: operations["bookings_preflight_api_v1_public_free_times_options"];
         head?: never;
         patch?: never;
         trace?: never;
@@ -4016,6 +4258,164 @@ export interface components {
             vendor_name: string;
             /** Vendor Reference */
             vendor_reference: string;
+        };
+        /** BookableServiceIn */
+        BookableServiceIn: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /** Name */
+            name: string;
+            /** Price */
+            price?: number | string | null;
+        };
+        /** BookableServiceOut */
+        BookableServiceOut: {
+            /** Active */
+            active: boolean;
+            /** Description */
+            description: string;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Price */
+            price: string | null;
+        };
+        /** BookableServiceUpdate */
+        BookableServiceUpdate: {
+            /** Active */
+            active?: boolean | null;
+            /** Description */
+            description?: string | null;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Name */
+            name?: string | null;
+            /** Price */
+            price?: number | string | null;
+        };
+        /** BookingDecisionIn */
+        BookingDecisionIn: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** BookingIn */
+        BookingIn: {
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /**
+             * Outside Hours
+             * @default false
+             */
+            outside_hours: boolean;
+            /**
+             * Phone
+             * @default
+             */
+            phone: string;
+            /** Service Id */
+            service_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+        };
+        /** BookingOut */
+        BookingOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Customer Id */
+            customer_id: string | null;
+            /** Decision Note */
+            decision_note: string;
+            /** Email */
+            email: string;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Note */
+            note: string;
+            /** Number */
+            number: string;
+            /** Phone */
+            phone: string;
+            /** Service Id */
+            service_id: string;
+            /** Service Name */
+            service_name: string;
+            /** Source */
+            source: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Status */
+            status: string;
+        };
+        /** BookingSettingsIn */
+        BookingSettingsIn: {
+            /**
+             * Days Ahead
+             * @default 60
+             */
+            days_ahead: number;
+            /** Hours */
+            hours?: components["schemas"]["OpeningHoursIn"][];
+            /**
+             * Notice Hours
+             * @default 2
+             */
+            notice_hours: number;
+            /**
+             * Slot Minutes
+             * @default 30
+             */
+            slot_minutes: number;
+            /** Timezone */
+            timezone: string;
+        };
+        /** BookingSettingsOut */
+        BookingSettingsOut: {
+            /** Days Ahead */
+            days_ahead: number;
+            /** Hours */
+            hours: components["schemas"]["OpeningHoursIn"][];
+            /** Notice Hours */
+            notice_hours: number;
+            /** Slot Minutes */
+            slot_minutes: number;
+            /** Timezone */
+            timezone: string;
         };
         /** BuilderIn */
         BuilderIn: {
@@ -4587,6 +4987,13 @@ export interface components {
             sha256: string;
             /** Size Bytes */
             size_bytes: number;
+        };
+        /** FreeTimesOut */
+        FreeTimesOut: {
+            /** Times */
+            times: string[];
+            /** Timezone */
+            timezone: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -5397,6 +5804,15 @@ export interface components {
             read: boolean;
             /** Title */
             title: string;
+        };
+        /** OpeningHoursIn */
+        OpeningHoursIn: {
+            /** Closes At */
+            closes_at: string;
+            /** Opens At */
+            opens_at: string;
+            /** Weekday */
+            weekday: number;
         };
         /** OrderIn */
         OrderIn: {
@@ -9695,6 +10111,413 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BillOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bookings_api_v1_orgs__org_id__bookings_get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+                status?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    book_api_v1_orgs__org_id__bookings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    staff_free_times_api_v1_orgs__org_id__bookings_free_times_get: {
+        parameters: {
+            query: {
+                service_id: string;
+                day: string;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreeTimesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    waiting_requests_api_v1_orgs__org_id__bookings_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_services_api_v1_orgs__org_id__bookings_services_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookableServiceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_service_api_v1_orgs__org_id__bookings_services_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookableServiceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookableServiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_service_api_v1_orgs__org_id__bookings_services__service_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                service_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookableServiceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookableServiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_api_v1_orgs__org_id__bookings_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_orgs__org_id__bookings_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_api_v1_orgs__org_id__bookings__booking_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_api_v1_orgs__org_id__bookings__booking_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_api_v1_orgs__org_id__bookings__booking_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"];
                 };
             };
             /** @description Validation Error */
@@ -15555,6 +16378,116 @@ export interface operations {
             };
         };
     };
+    public_booking_services_api_v1_public_booking_services_get: {
+        parameters: {
+            query?: {
+                key?: string | null;
+            };
+            header?: {
+                "x-novara-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bookings_preflight_api_v1_public_booking_services_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    public_booking_api_v1_public_bookings_post: {
+        parameters: {
+            query?: {
+                key?: string | null;
+            };
+            header?: {
+                "x-novara-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, unknown>;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bookings_preflight_api_v1_public_bookings_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     public_catalog_api_v1_public_catalog_get: {
         parameters: {
             query?: {
@@ -15589,6 +16522,61 @@ export interface operations {
         };
     };
     catalog_preflight_api_v1_public_catalog_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    public_free_times_api_v1_public_free_times_get: {
+        parameters: {
+            query: {
+                service: string;
+                day: string;
+                key?: string | null;
+            };
+            header?: {
+                "x-novara-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bookings_preflight_api_v1_public_free_times_options: {
         parameters: {
             query?: never;
             header?: never;
