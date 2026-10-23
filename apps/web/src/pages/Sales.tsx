@@ -335,6 +335,7 @@ function OrderDetail({ order: o }: { order: Order }) {
               {confirmed && (
                 <>
                   <th className="end">{t("sales.delivered")}</th>
+                  <th className="end">{t("sales.reservedQty")}</th>
                   <th className="end">{t("sales.invoicedQty")}</th>
                 </>
               )}
@@ -350,6 +351,10 @@ function OrderDetail({ order: o }: { order: Order }) {
                 {confirmed && (
                   <>
                     <td className="end num">{amount(l.qty_delivered)}</td>
+                    <td className={`end num ${isPositive(l.qty_to_deliver) && l.qty_reserved !== l.qty_to_deliver ? "short" : ""}`}
+                      title={isPositive(l.qty_to_deliver) ? t("sales.reservedHint", { n: amount(l.qty_to_deliver) }) : undefined}>
+                      {isPositive(l.qty_to_deliver) ? amount(l.qty_reserved) : "—"}
+                    </td>
                     <td className="end num">{amount(l.qty_invoiced)}</td>
                   </>
                 )}

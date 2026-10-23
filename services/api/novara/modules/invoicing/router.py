@@ -16,6 +16,7 @@ from novara.modules.accounting.models import Tax
 from novara.modules.audit import service as audit
 from novara.modules.invoicing import service as svc
 from novara.modules.invoicing.lines import LineIn, resolve_lines
+from novara.modules.invoicing.credit import credited_so_far
 from novara.modules.invoicing.models import CreditNote, Invoice, InvoiceLine, Payment
 from novara.modules.invoicing.zatca import qr_payload
 from novara.modules.organizations.models import Organization
@@ -62,6 +63,8 @@ class LineOut(BaseModel):
     tax_id: str | None
     tax_rate: str
     net_amount: str
+    # Quantity already credited by credit notes.
+    qty_credited: str = "0"
 
 
 class TaxLineOut(BaseModel):
@@ -146,6 +149,7 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
     order = order_of_invoice(db, inv)
     org = db.get(Organization, inv.organization_id)
     notes = db.scalars(select(CreditNote).where(CreditNote.invoice_id == inv.id).order_by(CreditNote.number)).all()
+    credited = credited_so_far(db, inv) if notes else {}
     qr = None
     if org.vat_number and inv.status not in ("draft", "cancelled") and inv.posted_at is not None:
         qr = qr_payload(seller=org.name, vat_number=org.vat_number, issued_at=inv.posted_at,
@@ -166,7 +170,8 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
             LineOut(id=l.id, position=l.position, product_id=l.product_id, description=l.description,
                     quantity=fmt_decimal(l.quantity), unit_price=fmt_decimal(l.unit_price),
                     discount_percent=fmt_decimal(l.discount_percent), tax_id=l.tax_id,
-                    tax_rate=fmt_decimal(l.tax_rate), net_amount=_money(l.net_minor, c))
+                    tax_rate=fmt_decimal(l.tax_rate), net_amount=_money(l.net_minor, c),
+                    qty_credited=fmt_decimal(credited.get(l.id, (Decimal(0), 0))[0]))
             for l in lines
         ],
         taxes=[

@@ -94,3 +94,14 @@ export function isZero(text: string): boolean {
   const d = parseDec(text);
   return d !== null && d.n === 0n;
 }
+
+/** a - b for decimal strings (quantities), exact, without trailing zeros: "10" - "2.5" = "7.5". */
+export function subtractDec(a: string, b: string): string {
+  const x = parseDec(a);
+  const y = parseDec(b);
+  if (!x || !y) return "0";
+  const scale = Math.max(x.scale, y.scale);
+  const n = x.n * pow10(scale - x.scale) - y.n * pow10(scale - y.scale);
+  const s = formatUnits(n, scale);
+  return scale ? s.replace(/\.?0+$/, "") : s;
+}

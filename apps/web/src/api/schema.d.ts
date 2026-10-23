@@ -3840,6 +3840,11 @@ export interface components {
             position: number;
             /** Product Id */
             product_id: string | null;
+            /**
+             * Qty Credited
+             * @default 0
+             */
+            qty_credited: string;
             /** Quantity */
             quantity: string;
             /** Tax Id */

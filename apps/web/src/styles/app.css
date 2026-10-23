@@ -669,3 +669,27 @@ textarea.code {
 .recovery-codes li { font-size: 0.95rem; letter-spacing: 0.05em; }
 a.user-chip { color: inherit; border-radius: var(--radius); }
 a.user-chip:hover { text-decoration: none; background: var(--color-primary-subtle); }
+
+/* ---------------------------------------------------------------- statements, e-invoice QR, closed books */
+.statement { width: 100%; border-collapse: collapse; }
+.statement caption { text-align: start; font-weight: 700; font-size: 1rem; padding-block-end: var(--space-2); color: var(--color-text); }
+.statement td, .statement th { padding: var(--space-2) var(--space-1); border-block-end: 1px solid var(--color-border); }
+.statement tfoot th { border-block-end: none; border-block-start: 2px solid var(--color-text); font-weight: 700; }
+.statement .num { inline-size: 1%; }
+.statement-sheet { display: flex; flex-direction: column; gap: var(--space-5); max-width: 720px; }
+.statement-result {
+  display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--gold) 12%, var(--color-surface)); border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+}
+.statement-result strong { font-size: 1.25rem; }
+.statement-result.loss { background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface)); border-color: color-mix(in srgb, var(--color-danger) 45%, transparent); }
+.statement-columns { align-items: start; }
+.zatca-qr { margin: var(--space-4) 0 0; display: inline-flex; flex-direction: column; align-items: center; gap: var(--space-1); }
+.zatca-qr img, .zatca-qr-placeholder { inline-size: 132px; block-size: 132px; background: #fff; padding: 4px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); }
+.books-lock { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3); border-radius: 999px; border: 1px solid var(--color-border); background: var(--color-surface); }
+.books-lock > svg { color: var(--gold-deep); }
+td.short { color: var(--color-warning-text); font-weight: 600; }
+@media print {
+  .zatca-qr img { border: none; }
+}

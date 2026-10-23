@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, CheckCircle2, CreditCard, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { Ban, CheckCircle2, CreditCard, FileMinus, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
@@ -11,11 +11,14 @@ import {
 import {
   Button, Card, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
 } from "../components/ui";
+import { ZatcaQr } from "../components/ZatcaQr";
 import { useI18n } from "../i18n/I18n";
+import { isPositive, subtractDec } from "../lib/decimal";
 import { today } from "../lib/format";
 
 type Invoice = Schemas["InvoiceOut"];
-const STATUSES = ["draft", "posted", "partially_paid", "paid", "cancelled"] as const;
+const STATUSES = ["draft", "posted", "partially_paid", "paid", "credited", "cancelled"] as const;
+const CREDITABLE = ["posted", "partially_paid", "paid", "credited"];
 
 function useInvoice(id: string) {
   const { org } = useOrg();
@@ -216,6 +219,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
   const toast = useToast();
   const [paying, setPaying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [crediting, setCrediting] = useState(false);
   const ids = { org_id: org.id, invoice_id: inv.id };
   const refresh = (updated?: Invoice) => {
     if (updated) qc.setQueryData(["invoice", org.id, inv.id], updated);
@@ -246,6 +250,9 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
 
   const isDraft = inv.status === "draft";
   const canPay = can("payments.write") && (inv.status === "posted" || inv.status === "partially_paid");
+  const credited = isPositive(inv.amount_credited);
+  const canCredit = can("invoices.credit") && CREDITABLE.includes(inv.status)
+    && inv.lines.some((l) => isPositive(subtractDec(l.quantity, l.qty_credited)));
 
   return (
     <div className="stack">
@@ -283,7 +290,12 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
                 {t("invoices.pay")}
               </Button>
             )}
-            {inv.status === "posted" && can("invoices.cancel") && (
+            {canCredit && (
+              <Button icon={<FileMinus size={16} />} onClick={() => setCrediting(true)}>
+                {t("credit.new")}
+              </Button>
+            )}
+            {inv.status === "posted" && !credited && can("invoices.cancel") && (
               <Button variant="danger" icon={<Ban size={16} />} onClick={() => setCancelling(true)}>
                 {t("invoices.cancel")}
               </Button>
@@ -302,7 +314,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
             steps={journeySteps(
               [t("invoices.stepDraft"), t("invoices.stepPost"), t("invoices.stepPaid")],
               isDraft ? 0 : 2,
-              inv.status === "paid",
+              inv.status === "paid" || inv.status === "credited",
             )}
             />
           </Card>
@@ -336,6 +348,12 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
                 <>
                   <dt>{t("invoices.paid")}</dt>
                   <dd className="num" style={{ textAlign: "end" }}>{money(inv.amount_paid, inv.currency)}</dd>
+                  {credited && (
+                    <>
+                      <dt>{t("credit.credited")}</dt>
+                      <dd className="num" style={{ textAlign: "end" }}>{money(inv.amount_credited, inv.currency)}</dd>
+                    </>
+                  )}
                   <dt>{t("invoices.due")}</dt>
                   <dd className="num" style={{ textAlign: "end" }}><strong>{money(inv.amount_due, inv.currency)}</strong></dd>
                 </>
@@ -343,6 +361,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
             }
           />
         </div>
+        {inv.zatca_qr && <ZatcaQr payload={inv.zatca_qr} />}
       </Card>
       <div className="table-wrap">
         <table>
@@ -389,6 +408,19 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
           <p style={{ whiteSpace: "pre-wrap" }}>{inv.notes}</p>
         </Card>
       )}
+      {inv.credit_notes.length > 0 && (
+        <Card title={t("credit.title")} tight>
+          <ul className="stack-sm" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {inv.credit_notes.map((n) => (
+              <li key={n.id} className="row-between">
+                <Link className="mono" to={path(`credit-notes/${n.id}`)}>{n.number}</Link>
+                <span className="small muted num">{date(n.issue_date)}</span>
+                <span className="num">{money(n.total, inv.currency)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
       {!isDraft && (
         <Card title={t("invoices.payments")}>
           <QueryView query={payments}>
@@ -429,7 +461,95 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
         }} />
       )}
       {cancelling && <CancelDialog invoice={inv} onClose={() => setCancelling(false)} onDone={(u) => { setCancelling(false); refresh(u); }} />}
+      {crediting && (
+        <CreditNoteDialog invoice={inv} onClose={() => setCrediting(false)} onDone={(noteId) => {
+          refresh();
+          void qc.invalidateQueries({ queryKey: ["stock", org.id] });
+          navigate(path(`credit-notes/${noteId}`));
+        }} />
+      )}
     </div>
+  );
+}
+
+/** Credit some units of some lines; goods that came from a sales order can come back into stock. */
+function CreditNoteDialog({ invoice, onClose, onDone }: { invoice: Invoice; onClose: () => void; onDone: (noteId: string) => void }) {
+  const { t, amount } = useI18n();
+  const { org, can } = useOrg();
+  const [idempotencyKey] = useIdempotencyKey();
+  const open = invoice.lines
+    .map((l) => ({ ...l, open: subtractDec(l.quantity, l.qty_credited) }))
+    .filter((l) => isPositive(l.open));
+  const canReturn = Boolean(invoice.sales_order_id) && can("inventory.write");
+  const [form, setForm] = useState({ issue_date: today(), reason: "" });
+  const [qty, setQty] = useState<Record<string, string>>({});
+  const [back, setBack] = useState<Record<string, string>>({});
+  const create = useMutation({
+    mutationFn: () =>
+      unwrap(api.POST("/api/v1/orgs/{org_id}/invoices/{invoice_id}/credit-notes", {
+        params: { path: { org_id: org.id, invoice_id: invoice.id }, header: { "idempotency-key": idempotencyKey } },
+        body: {
+          ...form,
+          lines: open.filter((l) => isPositive(qty[l.id] ?? "")).map((l) => ({
+            invoice_line_id: l.id, quantity: qty[l.id] ?? "", returned_quantity: isPositive(back[l.id] ?? "") ? back[l.id]! : "0",
+          })),
+        },
+      })),
+    onSuccess: (n) => onDone(n.id),
+  });
+  const err = create.error instanceof ApiError ? create.error.fields : {};
+  return (
+    <Dialog open onClose={onClose} title={t("credit.new")} wide>
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
+        <p className="muted">{t("credit.hint")}</p>
+        {create.isError && !err["reason"] && <ErrorNotice error={create.error} />}
+        <div className="grid-2">
+          <Field label={t("credit.date")}>
+            <Input type="date" value={form.issue_date} min={invoice.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} required ltr />
+          </Field>
+          <Field label={t("credit.reason")} error={err["reason"]}>
+            <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required />
+          </Field>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{t("invoices.description")}</th>
+                <th className="end">{t("credit.openQty")}</th>
+                <th style={{ width: 120 }}>{t("credit.qty")}</th>
+                {canReturn && <th style={{ width: 120 }}>{t("credit.returned")}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {open.map((l) => (
+                <tr key={l.id}>
+                  <td>{l.description}</td>
+                  <td className="end num">{amount(l.open)}</td>
+                  <td>
+                    <Input aria-label={`${t("credit.qty")} ${l.description}`} inputMode="decimal" value={qty[l.id] ?? ""}
+                      placeholder="0" onChange={(e) => setQty({ ...qty, [l.id]: e.target.value })} ltr />
+                  </td>
+                  {canReturn && (
+                    <td>
+                      {l.product_id && (
+                        <Input aria-label={`${t("credit.returned")} ${l.description}`} inputMode="decimal" value={back[l.id] ?? ""}
+                          placeholder="0" onChange={(e) => setBack({ ...back, [l.id]: e.target.value })} ltr />
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {canReturn && <p className="small muted">{t("credit.returnHint")}</p>}
+        <div className="form-actions">
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" variant="primary" loading={create.isPending}>{t("credit.issue")}</Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 

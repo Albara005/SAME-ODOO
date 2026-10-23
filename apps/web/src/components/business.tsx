@@ -14,7 +14,8 @@ import { Badge, Button, IconButton, Input, Select, type Tone } from "./ui";
 const TONES: Record<string, Tone> = {
   draft: "neutral", quotation: "neutral", posted: "info", confirmed: "info", partially_paid: "warning", partial: "warning",
   paid: "success", delivered: "success", invoiced: "success", cancelled: "danger", pending: "neutral",
-  not_applicable: "neutral", nothing_to_invoice: "neutral",
+  not_applicable: "neutral", nothing_to_invoice: "neutral", credited: "success", received: "success", billed: "success",
+  nothing_to_bill: "neutral",
   approved: "success", rejected: "neutral", approval_failed: "danger", waiting_approval: "warning",
   completed: "success", failed: "danger", running: "info", queued: "neutral", skipped: "neutral", open: "info", done: "success",
   pending_approval: "warning", provisioning: "info", live: "success", superseded: "neutral", offline: "neutral",
@@ -131,6 +132,15 @@ export function useWarehouses() {
   });
 }
 
+export function useVendors() {
+  const { org, can } = useOrg();
+  return useQuery({
+    queryKey: ["vendors", org.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/vendors", { params: { path: { org_id: org.id }, query: { limit: 500 } } })),
+    enabled: can("purchases.read"),
+  });
+}
+
 export function useProducts() {
   const { org, can } = useOrg();
   return useQuery({
@@ -170,9 +180,27 @@ export function toLineIn(l: LineDraft): Schemas["LineIn"] {
   return out;
 }
 
-export function LinesEditor({ lines, onChange, currency }: { lines: LineDraft[]; onChange: (l: LineDraft[]) => void; currency: string }) {
+/** Lines as the purchasing API expects them: a cost (required), no discount. */
+export function toPurchaseLineIn(l: LineDraft): Schemas["PurchaseLineIn"] {
+  const out: Schemas["PurchaseLineIn"] = {
+    product_id: l.product_id || null,
+    description: l.description || null,
+    quantity: l.quantity,
+    unit_cost: l.unit_price,
+  };
+  if (l.tax !== "product") out.tax_id = l.tax || null;
+  return out;
+}
+
+/**
+ * Sales lines (price defaults to the product's, with discount) or, with `purchase`, purchase lines
+ * (a unit cost, no discount). `services` limits the products to services (direct vendor bills).
+ */
+export function LinesEditor({ lines, onChange, currency, purchase, services }: {
+  lines: LineDraft[]; onChange: (l: LineDraft[]) => void; currency: string; purchase?: boolean; services?: boolean;
+}) {
   const { t, money } = useI18n();
-  const productList = useProducts().data ?? [];
+  const productList = (useProducts().data ?? []).filter((p) => !services || p.kind === "service");
   const taxList = useTaxes().data ?? [];
   const productOf = (id: string) => productList.find((p) => p.id === id);
 
@@ -181,8 +209,8 @@ export function LinesEditor({ lines, onChange, currency }: { lines: LineDraft[];
     const taxId = l.tax === "product" ? (p?.default_tax_id ?? null) : l.tax || null;
     return {
       quantity: l.quantity,
-      unitPrice: l.unit_price !== "" ? l.unit_price : (p?.sale_price ?? ""),
-      discount: l.discount_percent,
+      unitPrice: l.unit_price !== "" || purchase ? l.unit_price : (p?.sale_price ?? ""),
+      discount: purchase ? "0" : l.discount_percent,
       taxKey: taxId,
       taxRate: taxList.find((x) => x.id === taxId)?.rate ?? "0",
     };
@@ -200,8 +228,8 @@ export function LinesEditor({ lines, onChange, currency }: { lines: LineDraft[];
               <th style={{ minWidth: 200 }}>{t("invoices.product")}</th>
               <th style={{ minWidth: 180 }}>{t("invoices.description")}</th>
               <th style={{ width: 90 }}>{t("invoices.qty")}</th>
-              <th style={{ width: 120 }}>{t("invoices.unitPrice")}</th>
-              <th style={{ width: 90 }}>{t("invoices.discount")}</th>
+              <th style={{ width: 120 }}>{purchase ? t("purchases.unitCost") : t("invoices.unitPrice")}</th>
+              {!purchase && <th style={{ width: 90 }}>{t("invoices.discount")}</th>}
               <th style={{ width: 160 }}>{t("invoices.taxCol")}</th>
               <th className="end">{t("invoices.net")}</th>
               <th />
@@ -241,17 +269,19 @@ export function LinesEditor({ lines, onChange, currency }: { lines: LineDraft[];
                   </td>
                   <td>
                     <Input
-                      aria-label={`${t("invoices.unitPrice")} ${i + 1}`}
+                      aria-label={`${purchase ? t("purchases.unitCost") : t("invoices.unitPrice")} ${i + 1}`}
                       inputMode="decimal"
                       value={l.unit_price}
-                      placeholder={p?.sale_price ?? ""}
+                      placeholder={purchase ? "" : (p?.sale_price ?? "")}
                       onChange={(e) => update(i, { unit_price: e.target.value })}
                       ltr
                     />
                   </td>
-                  <td>
-                    <Input aria-label={`${t("invoices.discount")} ${i + 1}`} inputMode="decimal" value={l.discount_percent} onChange={(e) => update(i, { discount_percent: e.target.value })} ltr />
-                  </td>
+                  {!purchase && (
+                    <td>
+                      <Input aria-label={`${t("invoices.discount")} ${i + 1}`} inputMode="decimal" value={l.discount_percent} onChange={(e) => update(i, { discount_percent: e.target.value })} ltr />
+                    </td>
+                  )}
                   <td>
                     <Select aria-label={`${t("invoices.taxCol")} ${i + 1}`} value={l.tax} onChange={(e) => update(i, { tax: e.target.value })}>
                       <option value="product">{t("invoices.productTax")}</option>

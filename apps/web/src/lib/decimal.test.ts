@@ -1,4 +1,4 @@
-import { computeTotals, formatUnits, parseDec } from "./decimal";
+import { computeTotals, formatUnits, parseDec, subtractDec } from "./decimal";
 
 const line = (quantity: string, unitPrice: string, taxRate = "0", discount = "0", taxKey: string | null = taxRate !== "0" ? "vat" : null) =>
   ({ quantity, unitPrice, discount, taxKey, taxRate });
@@ -31,4 +31,11 @@ describe("computeTotals mirrors the backend", () => {
 it("parses and formats", () => {
   expect(parseDec("-1.50")).toEqual({ n: -150n, scale: 2 });
   expect(formatUnits(-5n, 2)).toBe("-0.05");
+});
+
+it("subtracts quantities exactly", () => {
+  expect(subtractDec("10", "2.5")).toBe("7.5");
+  expect(subtractDec("3.0000", "3")).toBe("0");
+  expect(subtractDec("1", "1.25")).toBe("-0.25");
+  expect(subtractDec("5", "x")).toBe("0");
 });

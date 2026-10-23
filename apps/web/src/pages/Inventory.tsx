@@ -9,6 +9,7 @@ import {
 } from "../components/ui";
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
+import { isZero } from "../lib/decimal";
 import { today } from "../lib/format";
 
 type Tab = "levels" | "moves" | "warehouses";
@@ -106,6 +107,8 @@ function Levels() {
                   <th>{t("products.sku")}</th>
                   <th>{t("inventory.warehouse")}</th>
                   <th className="end">{t("inventory.quantity")}</th>
+                  <th className="end">{t("inventory.reserved")}</th>
+                  <th className="end">{t("inventory.available")}</th>
                   <th className="end">{t("inventory.avgCost")}</th>
                   <th className="end">{t("inventory.value")}</th>
                 </tr>
@@ -117,6 +120,8 @@ function Levels() {
                     <td className="mono">{l.sku ?? "—"}</td>
                     <td className="mono">{l.warehouse_code}</td>
                     <td className="end num">{amount(l.quantity)}</td>
+                    <td className="end num">{isZero(l.reserved) ? "—" : amount(l.reserved)}</td>
+                    <td className={`end num ${l.available.startsWith("-") ? "short" : ""}`}>{amount(l.available)}</td>
                     <td className="end num">{money(l.average_cost, org.default_currency)}</td>
                     <td className="end num">{money(l.value, org.default_currency)}</td>
                   </tr>

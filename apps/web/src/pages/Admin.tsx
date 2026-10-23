@@ -473,7 +473,9 @@ export function OrgSettingsPage() {
   const { org } = useOrg();
   const qc = useQueryClient();
   const toast = useToast();
-  const [form, setForm] = useState({ name: org.name, default_currency: org.default_currency, default_locale: org.default_locale });
+  const [form, setForm] = useState({
+    name: org.name, default_currency: org.default_currency, default_locale: org.default_locale, vat_number: org.vat_number,
+  });
   const save = useMutation({
     mutationFn: () => unwrap(api.PATCH("/api/v1/orgs/{org_id}", { params: { path: { org_id: org.id } }, body: form })),
     onSuccess: () => {
@@ -508,6 +510,10 @@ export function OrgSettingsPage() {
               </Select>
             </Field>
           </div>
+          <Field label={t("org.vatNumber")} hint={t("org.vatHint")} optional>
+            <Input value={form.vat_number} onChange={(e) => setForm({ ...form, vat_number: e.target.value.toUpperCase().replace(/\s/g, "") })}
+              maxLength={20} inputMode="numeric" ltr />
+          </Field>
           <dl className="kv small">
             <dt>ID</dt>
             <dd className="mono">{org.id}</dd>

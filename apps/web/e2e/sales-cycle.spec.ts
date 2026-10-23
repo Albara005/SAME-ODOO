@@ -76,7 +76,8 @@ test("full sales cycle: stock, quotation, delivery, invoice, payment, reports", 
 
   // Stock went down by 8 and still matches the ledger
   await nav(page, "المخزون");
-  await expect(page.getByRole("cell", { name: "2", exact: true })).toBeVisible();
+  // On hand and available are both 2: the order is fully delivered, so nothing is reserved.
+  await expect(page.getByRole("row", { name: /كرسي مكتب/ }).getByRole("cell", { name: "2", exact: true })).toHaveCount(2);
   await expect(page.getByText("مطابق للدفاتر")).toBeVisible();
 
   // Reports: sales chart, balanced trial balance

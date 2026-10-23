@@ -31,6 +31,7 @@ const WorkflowPage = page(automation, "WorkflowPage");
 const creative = () => import("./pages/Creative");
 const BrandKitPage = page(creative, "BrandKitPage");
 const CreativePage = page(creative, "CreativePage");
+const CreditNotePage = page(() => import("./pages/CreditNotes"), "CreditNotePage");
 const CustomersPage = page(() => import("./pages/Customers"), "CustomersPage");
 const HostingPage = page(() => import("./pages/Hosting"), "HostingPage");
 const invoices = () => import("./pages/Invoices");
@@ -39,6 +40,12 @@ const InvoiceEditorPage = page(invoices, "InvoiceEditorPage");
 const InvoicesPage = page(invoices, "InvoicesPage");
 const InventoryPage = page(() => import("./pages/Inventory"), "InventoryPage");
 const ProductsPage = page(() => import("./pages/Products"), "ProductsPage");
+const purchases = () => import("./pages/Purchases");
+const BillDetailPage = page(purchases, "BillDetailPage");
+const BillEditorPage = page(purchases, "BillEditorPage");
+const PurchaseOrderDetailPage = page(purchases, "PurchaseOrderDetailPage");
+const PurchaseOrderEditorPage = page(purchases, "PurchaseOrderEditorPage");
+const PurchasesPage = page(purchases, "PurchasesPage");
 const ReportsPage = page(() => import("./pages/Reports"), "ReportsPage");
 const sales = () => import("./pages/Sales");
 const SalesOrderDetailPage = page(sales, "SalesOrderDetailPage");
@@ -142,6 +149,14 @@ export function App() {
             <Route path="sales/new" element={<SalesOrderEditorPage />} />
             <Route path="sales/:orderId" element={<SalesOrderDetailPage />} />
             <Route path="sales/:orderId/edit" element={<SalesOrderEditorPage />} />
+            <Route path="credit-notes/:noteId" element={<CreditNotePage />} />
+            <Route path="purchases" element={<PurchasesPage />} />
+            <Route path="purchases/orders/new" element={<PurchaseOrderEditorPage />} />
+            <Route path="purchases/orders/:orderId" element={<PurchaseOrderDetailPage />} />
+            <Route path="purchases/orders/:orderId/edit" element={<PurchaseOrderEditorPage />} />
+            <Route path="purchases/bills/new" element={<BillEditorPage />} />
+            <Route path="purchases/bills/:billId" element={<BillDetailPage />} />
+            <Route path="purchases/bills/:billId/edit" element={<BillEditorPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="assistant" element={<AssistantPage />} />

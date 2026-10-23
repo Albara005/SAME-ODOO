@@ -3120,6 +3120,11 @@
       ],
       "title": "Product Id"
      },
+     "qty_credited": {
+      "default": "0",
+      "title": "Qty Credited",
+      "type": "string"
+     },
      "quantity": {
       "title": "Quantity",
       "type": "string"
