@@ -126,3 +126,82 @@ test("live: a new notification arrives without reloading", async ({ page }) => {
   await expect(page.getByText("إشعار جديد: عميل جديد: مؤسسة الضحى")).toBeVisible();
   await expect(sidebar.getByRole("link", { name: /^الإشعارات/ })).toContainText("1");
 });
+
+/** A Sunday-to-Saturday week at least two weeks ahead, inside one calendar year. */
+function leaveWeek() {
+  const start = new Date();
+  start.setUTCDate(start.getUTCDate() + 14);
+  while (start.getUTCDay() !== 0) start.setUTCDate(start.getUTCDate() + 1);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+  if (end.getUTCFullYear() !== start.getUTCFullYear()) {
+    start.setUTCDate(start.getUTCDate() + 7);
+    end.setUTCDate(end.getUTCDate() + 7);
+  }
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { start: iso(start), end: iso(end), year: String(start.getUTCFullYear()) };
+}
+
+test("leave: HR sets up a department, the employee asks, the manager approves", async ({ page, browser }) => {
+  const week = leaveWeek();
+  const employee = uniqueEmail("huda");
+  const empPage = await browser.newPage();
+  await signUpAndIn(empPage, employee, "Huda Saleh");
+
+  await signUpAndIn(page, uniqueEmail("hr-owner"));
+  await createOrg(page, "استوديو النخلة");
+  const call = await apiFor(page);
+  await call("POST", "/members", { email: employee, role: "member" });
+
+  await nav(page, "الموارد البشرية");
+  await page.getByRole("tab", { name: "الإعدادات" }).click();
+  await page.getByLabel("اسم القسم").fill("التصميم");
+  await page.getByLabel(/^المدير/).selectOption({ label: "Sara Ahmed" });
+  await page.getByRole("button", { name: "إضافة قسم" }).click();
+  await expect(page.getByText("التصميم", { exact: true })).toBeVisible();
+  await page.getByLabel("اسم النوع").fill("سنوية");
+  await page.getByLabel(/الأيام في السنة/).fill("21");
+  await page.getByRole("button", { name: "إضافة نوع" }).click();
+  await expect(page.getByText("سنوية", { exact: true })).toBeVisible();
+
+  await page.getByRole("tab", { name: "الموظفون" }).click();
+  await page.getByRole("button", { name: "إضافة موظف" }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByLabel("الاسم", { exact: true }).fill("هدى صالح");
+  await dialog.getByLabel(/المسمى الوظيفي/).fill("مصممة");
+  await dialog.getByLabel(/^القسم/).selectOption({ label: "التصميم" });
+  await dialog.getByLabel(/حساب العضو/).selectOption({ label: "Huda Saleh" });
+  await dialog.getByRole("button", { name: "إنشاء" }).click();
+  await expect(page.getByRole("cell", { name: /^هدى صالح/ })).toBeVisible();
+
+  // The employee asks for Sunday to Saturday: Friday and Saturday are the weekend.
+  await empPage.goto("/orgs");
+  await empPage.getByRole("link", { name: /استوديو النخلة/ }).click();
+  await nav(empPage, "الموارد البشرية");
+  await empPage.getByLabel("السنة").selectOption(week.year);
+  await expect(empPage.getByText("المتبقي 21 من 21 يوم")).toBeVisible();
+  await empPage.getByRole("button", { name: "طلب إجازة" }).click();
+  dialog = empPage.getByRole("dialog");
+  await dialog.getByLabel(/نوع الإجازة/).selectOption({ label: "سنوية" });
+  await dialog.getByLabel("من", { exact: true }).fill(week.start);
+  await dialog.getByLabel("إلى", { exact: true }).fill(week.end);
+  await expect(dialog.getByRole("status")).toContainText("5 يوم عمل");
+  await dialog.getByLabel(/السبب/).fill("سفر عائلي");
+  await dialog.getByRole("button", { name: "إرسال الطلب" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(empPage.getByText("بانتظار القرار", { exact: true })).toBeVisible();
+  await expect(empPage.getByText("5 يوم بانتظار القرار")).toBeVisible();
+
+  // The department's manager decides it.
+  await page.getByRole("tab", { name: "الطلبات" }).click();
+  await expect(page.getByRole("cell", { name: /^هدى صالح/ })).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/hr-ar.png", fullPage: true });
+  await page.getByRole("button", { name: "موافقة" }).click();
+  await expect(page.getByText("لا توجد طلبات هنا.")).toBeVisible();
+
+  await empPage.reload();
+  await empPage.getByLabel("السنة").selectOption(week.year);
+  await expect(empPage.getByText("موافق عليها", { exact: true })).toBeVisible();
+  await expect(empPage.getByText("المتبقي 16 من 21 يوم")).toBeVisible();
+  await empPage.close();
+});

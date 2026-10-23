@@ -58,6 +58,9 @@ HOSTING_MANAGE = "hosting.manage"
 PROJECTS_READ = "projects.read"
 PROJECTS_MANAGE = "projects.manage"
 TIMESHEETS_WRITE = "timesheets.write"
+HR_READ = "hr.read"
+HR_MANAGE = "hr.manage"
+LEAVE_REQUEST = "leave.request"
 
 CATALOG: dict[str, str] = {
     ORG_MANAGE: "Edit organization settings",
@@ -103,6 +106,9 @@ CATALOG: dict[str, str] = {
     PROJECTS_READ: "View projects, their tasks and the hours logged on them",
     PROJECTS_MANAGE: "Create and change projects and their tasks, log anyone's hours, invoice billable hours",
     TIMESHEETS_WRITE: "Log your own hours on projects",
+    HR_READ: "View the employee directory and departments",
+    HR_MANAGE: "Add and edit employee records, departments, leave types, the weekend and public holidays; decide anyone's leave",
+    LEAVE_REQUEST: "Ask for your own leave and see your balance",
 }
 
 OWNER_ROLE = "owner"
@@ -116,20 +122,22 @@ _ACCOUNTING = [
 ]
 # Receiving goods against purchase orders is warehouse work.
 _WAREHOUSE = [PRODUCTS_READ, SALES_READ, INVENTORY_READ, INVENTORY_WRITE, PURCHASES_READ]
+# Every employee role sees the directory and asks for its own leave.
+_PEOPLE = [HR_READ, LEAVE_REQUEST]
 
 SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     OWNER_ROLE: ("Owner", sorted(CATALOG)),
     "admin": ("Administrator", sorted(set(CATALOG) - {ORG_MANAGE})),
     "accountant": ("Accountant", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, PROJECTS_READ,
-                                         *_ACCOUNTING})),
+                                         *_ACCOUNTING, *_PEOPLE})),
     "sales": ("Sales", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, PROJECTS_READ, TIMESHEETS_WRITE,
-                               *_SALES})),
-    "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, AI_USE, AGENTS_RUN, *_WAREHOUSE})),
+                               *_SALES, *_PEOPLE})),
+    "warehouse": ("Warehouse", sorted({MEMBERS_READ, FILES_READ, AI_USE, AGENTS_RUN, *_WAREHOUSE, *_PEOPLE})),
     # Builds apps and publishes previews; production needs someone with apps.deploy.
     "developer": ("Developer", sorted({MEMBERS_READ, FILES_READ, FILES_WRITE, AI_USE, AGENTS_RUN, BRAND_READ, APPS_READ, APPS_WRITE,
-                                       PROJECTS_READ, TIMESHEETS_WRITE})),
-    "member": ("Member", [AGENTS_RUN, AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ,
-                          PROJECTS_READ, TIMESHEETS_WRITE]),
+                                       PROJECTS_READ, TIMESHEETS_WRITE, *_PEOPLE})),
+    "member": ("Member", sorted([AGENTS_RUN, AI_USE, CUSTOMERS_READ, FILES_READ, FILES_WRITE, MEMBERS_READ, PRODUCTS_READ,
+                                 PROJECTS_READ, TIMESHEETS_WRITE, *_PEOPLE])),
     "viewer": ("Viewer", [FILES_READ]),
 }
 

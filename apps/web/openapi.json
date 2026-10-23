@@ -533,6 +533,106 @@
     "title": "AuditOut",
     "type": "object"
    },
+   "AwayOut": {
+    "description": "Who is off and when, without the kind of leave or the reason.",
+    "properties": {
+     "department_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department Name"
+     },
+     "employee_id": {
+      "title": "Employee Id",
+      "type": "string"
+     },
+     "employee_name": {
+      "title": "Employee Name",
+      "type": "string"
+     },
+     "end_date": {
+      "format": "date",
+      "title": "End Date",
+      "type": "string"
+     },
+     "start_date": {
+      "format": "date",
+      "title": "Start Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "employee_id",
+     "employee_name",
+     "department_name",
+     "start_date",
+     "end_date"
+    ],
+    "title": "AwayOut",
+    "type": "object"
+   },
+   "BalanceOut": {
+    "properties": {
+     "allowance": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Allowance"
+     },
+     "approved": {
+      "title": "Approved",
+      "type": "integer"
+     },
+     "leave_type": {
+      "title": "Leave Type",
+      "type": "string"
+     },
+     "leave_type_id": {
+      "title": "Leave Type Id",
+      "type": "string"
+     },
+     "paid": {
+      "title": "Paid",
+      "type": "boolean"
+     },
+     "pending": {
+      "title": "Pending",
+      "type": "integer"
+     },
+     "remaining": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Remaining"
+     }
+    },
+    "required": [
+     "leave_type_id",
+     "leave_type",
+     "paid",
+     "allowance",
+     "approved",
+     "pending",
+     "remaining"
+    ],
+    "title": "BalanceOut",
+    "type": "object"
+   },
    "BalanceSheetOut": {
     "properties": {
      "as_of": {
@@ -2104,6 +2204,31 @@
     "title": "DataKeyOut",
     "type": "object"
    },
+   "DaysOut": {
+    "properties": {
+     "days": {
+      "title": "Days",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "days"
+    ],
+    "title": "DaysOut",
+    "type": "object"
+   },
+   "DecisionIn": {
+    "properties": {
+     "note": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "title": "DecisionIn",
+    "type": "object"
+   },
    "DeliveryIn": {
     "properties": {
      "lines": {
@@ -2156,6 +2281,67 @@
      "quantity"
     ],
     "title": "DeliveryLineIn",
+    "type": "object"
+   },
+   "DepartmentIn": {
+    "properties": {
+     "manager_user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Manager User Id"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "DepartmentIn",
+    "type": "object"
+   },
+   "DepartmentOut": {
+    "properties": {
+     "employees": {
+      "title": "Employees",
+      "type": "integer"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "manager_user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Manager User Id"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "manager_user_id",
+     "employees"
+    ],
+    "title": "DepartmentOut",
     "type": "object"
    },
    "DeployIn": {
@@ -2292,6 +2478,279 @@
     "title": "DraftIn",
     "type": "object"
    },
+   "EmployeeIn": {
+    "properties": {
+     "department_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department Id"
+     },
+     "full_name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Full Name",
+      "type": "string"
+     },
+     "hire_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hire Date"
+     },
+     "job_title": {
+      "default": "",
+      "maxLength": 120,
+      "title": "Job Title",
+      "type": "string"
+     },
+     "phone": {
+      "default": "",
+      "maxLength": 40,
+      "title": "Phone",
+      "type": "string"
+     },
+     "user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Id"
+     },
+     "work_email": {
+      "default": "",
+      "maxLength": 320,
+      "title": "Work Email",
+      "type": "string"
+     }
+    },
+    "required": [
+     "full_name"
+    ],
+    "title": "EmployeeIn",
+    "type": "object"
+   },
+   "EmployeeOut": {
+    "properties": {
+     "away_today": {
+      "title": "Away Today",
+      "type": "boolean"
+     },
+     "department_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department Id"
+     },
+     "department_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department Name"
+     },
+     "end_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "End Date"
+     },
+     "full_name": {
+      "title": "Full Name",
+      "type": "string"
+     },
+     "hire_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hire Date"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "job_title": {
+      "title": "Job Title",
+      "type": "string"
+     },
+     "phone": {
+      "title": "Phone",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Id"
+     },
+     "work_email": {
+      "title": "Work Email",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "full_name",
+     "job_title",
+     "department_id",
+     "department_name",
+     "user_id",
+     "work_email",
+     "phone",
+     "hire_date",
+     "end_date",
+     "status",
+     "away_today"
+    ],
+    "title": "EmployeeOut",
+    "type": "object"
+   },
+   "EmployeeUpdate": {
+    "properties": {
+     "department_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department Id"
+     },
+     "end_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "End Date"
+     },
+     "full_name": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Full Name"
+     },
+     "hire_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hire Date"
+     },
+     "job_title": {
+      "anyOf": [
+       {
+        "maxLength": 120,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Job Title"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "maxLength": 40,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
+     "user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Id"
+     },
+     "work_email": {
+      "anyOf": [
+       {
+        "maxLength": 320,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Work Email"
+     }
+    },
+    "title": "EmployeeUpdate",
+    "type": "object"
+   },
    "FileInfo": {
     "properties": {
      "path": {
@@ -2372,6 +2831,51 @@
      }
     },
     "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "HolidayIn": {
+    "properties": {
+     "day": {
+      "format": "date",
+      "title": "Day",
+      "type": "string"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "day",
+     "name"
+    ],
+    "title": "HolidayIn",
+    "type": "object"
+   },
+   "HolidayOut": {
+    "properties": {
+     "day": {
+      "format": "date",
+      "title": "Day",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "day",
+     "name"
+    ],
+    "title": "HolidayOut",
     "type": "object"
    },
    "HookOut": {
@@ -3214,6 +3718,281 @@
     "title": "KitUpdate",
     "type": "object"
    },
+   "LeaveIn": {
+    "properties": {
+     "employee_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Employee Id"
+     },
+     "end_date": {
+      "format": "date",
+      "title": "End Date",
+      "type": "string"
+     },
+     "leave_type_id": {
+      "title": "Leave Type Id",
+      "type": "string"
+     },
+     "reason": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Reason",
+      "type": "string"
+     },
+     "start_date": {
+      "format": "date",
+      "title": "Start Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "leave_type_id",
+     "start_date",
+     "end_date"
+    ],
+    "title": "LeaveIn",
+    "type": "object"
+   },
+   "LeaveOut": {
+    "properties": {
+     "can_decide": {
+      "title": "Can Decide",
+      "type": "boolean"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "days": {
+      "title": "Days",
+      "type": "integer"
+     },
+     "decided_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decided At"
+     },
+     "decision_note": {
+      "title": "Decision Note",
+      "type": "string"
+     },
+     "department_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department Name"
+     },
+     "employee_id": {
+      "title": "Employee Id",
+      "type": "string"
+     },
+     "employee_name": {
+      "title": "Employee Name",
+      "type": "string"
+     },
+     "end_date": {
+      "format": "date",
+      "title": "End Date",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "leave_type": {
+      "title": "Leave Type",
+      "type": "string"
+     },
+     "leave_type_id": {
+      "title": "Leave Type Id",
+      "type": "string"
+     },
+     "mine": {
+      "title": "Mine",
+      "type": "boolean"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "start_date": {
+      "format": "date",
+      "title": "Start Date",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "employee_id",
+     "employee_name",
+     "department_name",
+     "leave_type_id",
+     "leave_type",
+     "start_date",
+     "end_date",
+     "days",
+     "reason",
+     "status",
+     "decided_at",
+     "decision_note",
+     "created_at",
+     "mine",
+     "can_decide"
+    ],
+    "title": "LeaveOut",
+    "type": "object"
+   },
+   "LeaveTypeIn": {
+    "properties": {
+     "annual_days": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "maximum": 366.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Annual Days"
+     },
+     "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "paid": {
+      "default": true,
+      "title": "Paid",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "LeaveTypeIn",
+    "type": "object"
+   },
+   "LeaveTypeOut": {
+    "properties": {
+     "active": {
+      "title": "Active",
+      "type": "boolean"
+     },
+     "annual_days": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Annual Days"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "paid": {
+      "title": "Paid",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "annual_days",
+     "paid",
+     "active"
+    ],
+    "title": "LeaveTypeOut",
+    "type": "object"
+   },
+   "LeaveTypeUpdate": {
+    "properties": {
+     "active": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Active"
+     },
+     "annual_days": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "maximum": 366.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Annual Days"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "maxLength": 80,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "paid": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Paid"
+     }
+    },
+    "title": "LeaveTypeUpdate",
+    "type": "object"
+   },
    "LevelOut": {
     "properties": {
      "available": {
@@ -3994,6 +4773,38 @@
      "journal_entry_id"
     ],
     "title": "MoveOut",
+    "type": "object"
+   },
+   "MyLeaveOut": {
+    "properties": {
+     "balances": {
+      "items": {
+       "$ref": "#/components/schemas/BalanceOut"
+      },
+      "title": "Balances",
+      "type": "array"
+     },
+     "employee": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/EmployeeOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "year": {
+      "title": "Year",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "employee",
+     "year",
+     "balances"
+    ],
+    "title": "MyLeaveOut",
     "type": "object"
    },
    "MyOrgOut": {
@@ -4846,6 +5657,39 @@
      "created_at"
     ],
     "title": "PaymentOut",
+    "type": "object"
+   },
+   "PolicyIn": {
+    "properties": {
+     "weekend": {
+      "items": {
+       "type": "integer"
+      },
+      "maxItems": 6,
+      "title": "Weekend",
+      "type": "array"
+     }
+    },
+    "required": [
+     "weekend"
+    ],
+    "title": "PolicyIn",
+    "type": "object"
+   },
+   "PolicyOut": {
+    "properties": {
+     "weekend": {
+      "items": {
+       "type": "integer"
+      },
+      "title": "Weekend",
+      "type": "array"
+     }
+    },
+    "required": [
+     "weekend"
+    ],
+    "title": "PolicyOut",
     "type": "object"
    },
    "ProductIn": {
@@ -15437,6 +16281,1476 @@
     "summary": "Cancel Request",
     "tags": [
      "hosting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/away": {
+   "get": {
+    "description": "Approved leave overlapping the range (today and the next 13 days by default).",
+    "operationId": "who_is_away_api_v1_orgs__org_id__hr_away_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "start",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Start"
+      }
+     },
+     {
+      "in": "query",
+      "name": "end",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "End"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AwayOut"
+         },
+         "title": "Response Who Is Away Api V1 Orgs  Org Id  Hr Away Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Who Is Away",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/departments": {
+   "get": {
+    "operationId": "list_departments_api_v1_orgs__org_id__hr_departments_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DepartmentOut"
+         },
+         "title": "Response List Departments Api V1 Orgs  Org Id  Hr Departments Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Departments",
+    "tags": [
+     "hr"
+    ]
+   },
+   "post": {
+    "operationId": "create_department_api_v1_orgs__org_id__hr_departments_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DepartmentIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DepartmentOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Department",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/departments/{dept_id}": {
+   "put": {
+    "operationId": "update_department_api_v1_orgs__org_id__hr_departments__dept_id__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "dept_id",
+      "required": true,
+      "schema": {
+       "title": "Dept Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DepartmentIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DepartmentOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Department",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/employees": {
+   "get": {
+    "operationId": "list_employees_api_v1_orgs__org_id__hr_employees_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status_filter",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": "active",
+       "title": "Status Filter"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/EmployeeOut"
+         },
+         "title": "Response List Employees Api V1 Orgs  Org Id  Hr Employees Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Employees",
+    "tags": [
+     "hr"
+    ]
+   },
+   "post": {
+    "operationId": "create_employee_api_v1_orgs__org_id__hr_employees_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EmployeeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EmployeeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Employee",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/employees/{employee_id}": {
+   "get": {
+    "operationId": "get_employee_api_v1_orgs__org_id__hr_employees__employee_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "employee_id",
+      "required": true,
+      "schema": {
+       "title": "Employee Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EmployeeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Employee",
+    "tags": [
+     "hr"
+    ]
+   },
+   "patch": {
+    "operationId": "update_employee_api_v1_orgs__org_id__hr_employees__employee_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "employee_id",
+      "required": true,
+      "schema": {
+       "title": "Employee Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EmployeeUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EmployeeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Employee",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/employees/{employee_id}/balances": {
+   "get": {
+    "operationId": "employee_balances_api_v1_orgs__org_id__hr_employees__employee_id__balances_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "employee_id",
+      "required": true,
+      "schema": {
+       "title": "Employee Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "year",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Year"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/BalanceOut"
+         },
+         "title": "Response Employee Balances Api V1 Orgs  Org Id  Hr Employees  Employee Id  Balances Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Employee Balances",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/holidays": {
+   "get": {
+    "operationId": "list_holidays_api_v1_orgs__org_id__hr_holidays_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "year",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Year"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/HolidayOut"
+         },
+         "title": "Response List Holidays Api V1 Orgs  Org Id  Hr Holidays Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Holidays",
+    "tags": [
+     "hr"
+    ]
+   },
+   "post": {
+    "description": "A public holiday isn't counted in leave asked for from now on.",
+    "operationId": "add_holiday_api_v1_orgs__org_id__hr_holidays_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/HolidayIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HolidayOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Add Holiday",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/holidays/{holiday_id}": {
+   "delete": {
+    "operationId": "remove_holiday_api_v1_orgs__org_id__hr_holidays__holiday_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "holiday_id",
+      "required": true,
+      "schema": {
+       "title": "Holiday Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Remove Holiday",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/leave-days": {
+   "get": {
+    "description": "How many working days a leave from start to end takes.",
+    "operationId": "leave_days_api_v1_orgs__org_id__hr_leave_days_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "start",
+      "required": true,
+      "schema": {
+       "format": "date",
+       "title": "Start",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "end",
+      "required": true,
+      "schema": {
+       "format": "date",
+       "title": "End",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DaysOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Leave Days",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/leave-requests": {
+   "get": {
+    "description": "HR sees every request; a department manager sees the department's; everyone sees their own.",
+    "operationId": "list_leave_api_v1_orgs__org_id__hr_leave_requests_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status_filter",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status Filter"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/LeaveOut"
+         },
+         "title": "Response List Leave Api V1 Orgs  Org Id  Hr Leave Requests Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Leave",
+    "tags": [
+     "hr"
+    ]
+   },
+   "post": {
+    "description": "Ask for leave (your own; HR can file for anyone). It waits for HR or the department's manager.",
+    "operationId": "request_leave_api_v1_orgs__org_id__hr_leave_requests_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LeaveIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LeaveOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Request Leave",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/leave-requests/{request_id}/approve": {
+   "post": {
+    "operationId": "approve_leave_api_v1_orgs__org_id__hr_leave_requests__request_id__approve_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "title": "Request Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DecisionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LeaveOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Approve Leave",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/leave-requests/{request_id}/cancel": {
+   "post": {
+    "description": "Withdraw a pending request, or give back approved leave that hasn't started. HR can cancel any.",
+    "operationId": "cancel_leave_api_v1_orgs__org_id__hr_leave_requests__request_id__cancel_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "title": "Request Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LeaveOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Cancel Leave",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/leave-requests/{request_id}/reject": {
+   "post": {
+    "operationId": "reject_leave_api_v1_orgs__org_id__hr_leave_requests__request_id__reject_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "title": "Request Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DecisionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LeaveOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reject Leave",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/leave-types": {
+   "get": {
+    "operationId": "list_leave_types_api_v1_orgs__org_id__hr_leave_types_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/LeaveTypeOut"
+         },
+         "title": "Response List Leave Types Api V1 Orgs  Org Id  Hr Leave Types Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Leave Types",
+    "tags": [
+     "hr"
+    ]
+   },
+   "post": {
+    "operationId": "create_leave_type_api_v1_orgs__org_id__hr_leave_types_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LeaveTypeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LeaveTypeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Leave Type",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/leave-types/{type_id}": {
+   "patch": {
+    "description": "A new allowance applies to new requests; ones already approved stand.",
+    "operationId": "update_leave_type_api_v1_orgs__org_id__hr_leave_types__type_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "type_id",
+      "required": true,
+      "schema": {
+       "title": "Type Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LeaveTypeUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LeaveTypeOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Leave Type",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/me": {
+   "get": {
+    "description": "Your employee record and leave balances (none until HR links your account to a record).",
+    "operationId": "my_leave_api_v1_orgs__org_id__hr_me_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "year",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Year"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MyLeaveOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "My Leave",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/policy": {
+   "get": {
+    "operationId": "get_policy_api_v1_orgs__org_id__hr_policy_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PolicyOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Policy",
+    "tags": [
+     "hr"
+    ]
+   },
+   "put": {
+    "description": "The weekend days. Requests already made keep the days they were counted with.",
+    "operationId": "set_policy_api_v1_orgs__org_id__hr_policy_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PolicyIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PolicyOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Set Policy",
+    "tags": [
+     "hr"
     ]
    }
   },
