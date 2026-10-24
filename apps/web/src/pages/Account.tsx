@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Copy, Download, KeyRound, LogOut, MailCheck, ShieldCheck } from "lucide-react";
+import { ArrowRight, Copy, Download, Fingerprint, KeyRound, LogOut, MailCheck, ShieldCheck, Trash2 } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -7,8 +7,9 @@ import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useAuth } from "../auth/Auth";
 import { refreshUser } from "../auth/refreshUser";
 import { BrandMark, SignOutButton, TopActions } from "../components/Layout";
-import { Badge, Button, Card, Dialog, ErrorNotice, Field, Input, Notice, QueryView, useToast } from "../components/ui";
+import { Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, Notice, QueryView, errorText, useToast } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
+import { creationOptions, credentialJson, passkeysSupported } from "../lib/webauthn";
 
 export function AccountPage() {
   const { t } = useI18n();
@@ -33,6 +34,7 @@ export function AccountPage() {
         <ProfileCard user={user} />
         <PasswordCard />
         <TwoFactorCard enabled={user.mfa_enabled} />
+        <PasskeysCard />
         <SessionsCard />
       </div>
     </div>
@@ -169,6 +171,92 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
       {dialog === "setup" && <SetupDialog onClose={() => setDialog(null)} />}
       {(dialog === "disable" || dialog === "codes") && <ConfirmDialog kind={dialog} onClose={() => setDialog(null)} />}
     </Card>
+  );
+}
+
+function PasskeysCard() {
+  const { t, date } = useI18n();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [adding, setAdding] = useState(false);
+  const passkeys = useQuery({ queryKey: ["passkeys"], queryFn: () => unwrap(api.GET("/api/v1/me/passkeys")) });
+  const remove = useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE("/api/v1/me/passkeys/{passkey_id}", { params: { path: { passkey_id: id } } })),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["passkeys"] }); toast(t("passkey.removed")); },
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const supported = passkeysSupported();
+  return (
+    <Card title={t("passkey.title")} actions={supported && <Button icon={<Fingerprint size={16} />} onClick={() => setAdding(true)}>{t("passkey.add")}</Button>}>
+      <div className="stack-sm">
+        <p className="muted">{t("passkey.about")}</p>
+        {!supported && <p className="notice notice-info small">{t("passkey.unsupported")}</p>}
+        <QueryView query={passkeys}>
+          {(list) => list.length === 0 ? <Empty>{t("passkey.none")}</Empty> : (
+            <ul className="plain-list">
+              {list.map((p) => (
+                <li key={p.id} className="row-between">
+                  <span className="stack-sm" style={{ gap: 2 }}>
+                    <strong dir="auto">{p.name}</strong>
+                    <span className="muted small">
+                      {t("passkey.added", { date: date(p.created_at) })}
+                      {p.last_used_at ? ` · ${t("passkey.lastUsed", { date: date(p.last_used_at) })}` : ""}
+                    </span>
+                  </span>
+                  <IconButton label={t("passkey.remove", { name: p.name })}
+                    onClick={() => window.confirm(t("passkey.removeConfirm", { name: p.name })) && remove.mutate(p.id)}>
+                    <Trash2 size={14} />
+                  </IconButton>
+                </li>
+              ))}
+            </ul>
+          )}
+        </QueryView>
+      </div>
+      {adding && <AddPasskeyDialog onClose={() => setAdding(false)} />}
+    </Card>
+  );
+}
+
+function AddPasskeyDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [form, setForm] = useState({ name: "", password: "" });
+  const add = useMutation({
+    mutationFn: async () => {
+      const start = await unwrap(api.POST("/api/v1/me/passkeys/options", { body: { password: form.password } }));
+      let credential: PublicKeyCredential | null;
+      try {
+        credential = (await navigator.credentials.create({ publicKey: creationOptions(start.options) })) as PublicKeyCredential | null;
+      } catch {
+        throw new Notice(t("passkey.notCreated"));
+      }
+      if (!credential) throw new Notice(t("passkey.notCreated"));
+      return unwrap(api.POST("/api/v1/me/passkeys", {
+        body: { challenge_id: start.challenge_id, name: form.name.trim(), credential: credentialJson(credential) },
+      }));
+    },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["passkeys"] }); toast(t("passkey.addedToast")); onClose(); },
+  });
+  return (
+    <Dialog open onClose={onClose} title={t("passkey.add")}>
+      <form className="stack" onSubmit={(e) => (e.preventDefault(), add.mutate())}>
+        <p className="muted">{t("passkey.addBody")}</p>
+        {add.isError && <ErrorNotice error={wrongPassword(add.error, t("passkey.wrongPassword"))} />}
+        <Field label={t("passkey.name")} hint={t("passkey.nameHint")} optional>
+          <Input value={form.name} maxLength={80} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label={t("auth.password")}>
+          <Input type="password" autoComplete="current-password" value={form.password} required ltr
+            onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        </Field>
+        <div className="form-actions">
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" variant="primary" icon={<Fingerprint size={16} />} loading={add.isPending}>{t("passkey.create")}</Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 

@@ -184,3 +184,31 @@ test("an organization requires two-step sign-in: members set it up before they g
   await expect(memberPage.getByRole("heading", { level: 1, name: /^(صباح|مساء) الخير/ })).toBeVisible();
   await memberPage.close();
 });
+
+test("passkeys: added on the account page, then used to sign in without the password", async ({ page }) => {
+  // Chromium's built-in software authenticator stands in for a phone or laptop with a fingerprint reader.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
+    protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true,
+    automaticPresenceSimulation: true } });
+  const app = "http://localhost:4173";  // passkeys belong to a host name, not an IP address
+  await signUpAndIn(page, uniqueEmail("passkey"), "Sara Ahmed", app);
+
+  await page.goto(`${app}/account`);
+  await page.getByRole("button", { name: "إضافة مفتاح مرور" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/^الاسم/).fill("حاسوب العمل");
+  await dialog.getByLabel("كلمة المرور").fill(PASSWORD);
+  await dialog.getByRole("button", { name: "إنشاء المفتاح" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("حاسوب العمل", { exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/passkeys-ar.png", fullPage: true });
+
+  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByRole("button", { name: "الدخول بمفتاح مرور" }).click();
+  await expect(page).toHaveURL(/\/orgs$/);
+  await page.goto(`${app}/account`);
+  await expect(page.getByText(/آخر استخدام/)).toBeVisible();
+});

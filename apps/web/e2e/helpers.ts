@@ -6,9 +6,9 @@ export function uniqueEmail(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
 }
 
-/** Register through the UI, sign in, and land on the organization picker. */
-export async function signUpAndIn(page: Page, email: string, name = "Sara Ahmed") {
-  await page.goto("/register");
+/** Register through the UI, sign in, and land on the organization picker (on `origin`, by default the base URL). */
+export async function signUpAndIn(page: Page, email: string, name = "Sara Ahmed", origin = "") {
+  await page.goto(`${origin}/register`);
   await page.getByLabel("الاسم الكامل").fill(name);
   await page.getByLabel("البريد الإلكتروني").fill(email);
   await page.getByLabel("كلمة المرور").fill(PASSWORD);

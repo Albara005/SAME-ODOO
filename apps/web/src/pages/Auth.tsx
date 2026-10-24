@@ -5,11 +5,12 @@ import { api, ApiError, unwrap } from "../api/client";
 import { useAuth } from "../auth/Auth";
 import { refreshUser } from "../auth/refreshUser";
 import { rememberOrg } from "../auth/Org";
-import { MailCheck, ShieldCheck, Sparkle } from "lucide-react";
+import { Fingerprint, MailCheck, ShieldCheck, Sparkle } from "lucide-react";
 import { StarLattice, StarMark } from "../components/Art";
 import { TopActions } from "../components/Layout";
 import { Button, Card, ErrorNotice, Field, Input, Loading, Notice } from "../components/ui";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
+import { passkeysSupported } from "../lib/webauthn";
 
 /** Where to go after signing in, and the email to prefill (both set by the invitation page). */
 type AuthState = { from?: string; email?: string; registered?: boolean; reset?: boolean } | null;
@@ -51,7 +52,7 @@ function AuthFrame({ children }: { children: React.ReactNode }) {
 
 export function LoginPage() {
   const { t } = useI18n();
-  const { login, completeMfa } = useAuth();
+  const { login, completeMfa, loginWithPasskey } = useAuth();
   const navigate = useNavigate();
   const state = useLocation().state as AuthState;
   const [email, setEmail] = useState(state?.email ?? "");
@@ -78,6 +79,20 @@ export function LoginPage() {
       navigate(state?.from ?? "/", { replace: true });
     } catch (err) {
       setError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function withPasskey() {
+    setBusy(true);
+    setError(null);
+    try {
+      await loginWithPasskey();
+      navigate(state?.from ?? "/", { replace: true });
+    } catch (err) {
+      // The browser says NotAllowedError when the person cancels or no passkey for this site is found.
+      setError(err instanceof DOMException ? new Notice(t("passkey.notUsed")) : err);
     } finally {
       setBusy(false);
     }
@@ -147,6 +162,14 @@ export function LoginPage() {
         <Button type="submit" variant="primary" loading={busy}>
           {t("auth.login")}
         </Button>
+        {passkeysSupported() && (
+          <>
+            <div className="or-line" aria-hidden><span>{t("auth.or")}</span></div>
+            <Button icon={<Fingerprint size={16} />} onClick={() => void withPasskey()} disabled={busy}>
+              {t("passkey.signIn")}
+            </Button>
+          </>
+        )}
         <p className="muted small">
           {t("auth.noAccount")} <Link to="/register" state={state}>{t("auth.register")}</Link>
         </p>

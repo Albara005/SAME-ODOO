@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, tokenStore, unwrap, UNAUTHORIZED_EVENT, type Schemas } from "../api/client";
+import { credentialJson, requestOptions } from "../lib/webauthn";
 
 type User = Schemas["UserOut"];
 
@@ -10,6 +11,8 @@ type AuthState = {
   /** Signs in, or returns the token for the second step when the account uses two-factor sign-in. */
   login: (email: string, password: string) => Promise<{ mfaToken: string } | null>;
   completeMfa: (mfaToken: string, code: string) => Promise<void>;
+  /** Signs in with a passkey the device holds for this site (counts as two-step sign-in). */
+  loginWithPasskey: () => Promise<void>;
   logout: () => Promise<void>;
   /** True after the user signed out themselves (not when the session expired). */
   signedOut: boolean;
@@ -70,6 +73,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [startSession],
   );
 
+  const loginWithPasskey = useCallback(async () => {
+    const start = await unwrap(api.POST("/api/v1/auth/passkey/options"));
+    const credential = (await navigator.credentials.get({ publicKey: requestOptions(start.options) })) as PublicKeyCredential | null;
+    if (!credential) throw new DOMException("no passkey chosen", "NotAllowedError");
+    const result = await unwrap(api.POST("/api/v1/auth/passkey", {
+      body: { challenge_id: start.challenge_id, credential: credentialJson(credential) },
+    }));
+    await startSession(result.access_token);
+  }, [startSession]);
+
   const logout = useCallback(async () => {
     try {
       await api.POST("/api/v1/auth/logout"); // revokes the session on the server
@@ -80,8 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [signOutLocally]);
 
   const value = useMemo<AuthState>(
-    () => ({ user: token ? (me.data ?? null) : null, loading: token !== null && me.isPending, login, completeMfa, logout, signedOut }),
-    [token, me.data, me.isPending, login, completeMfa, logout, signedOut],
+    () => ({
+      user: token ? (me.data ?? null) : null, loading: token !== null && me.isPending, login, completeMfa, loginWithPasskey, logout, signedOut,
+    }),
+    [token, me.data, me.isPending, login, completeMfa, loginWithPasskey, logout, signedOut],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

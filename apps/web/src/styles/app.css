@@ -754,3 +754,7 @@ td.short { color: var(--color-warning-text); font-weight: 600; }
 .hours-day { min-inline-size: 6rem; font-weight: 600; }
 
 .hook-signing { padding-block-start: var(--space-3); border-block-start: 1px solid var(--color-border); }
+
+/* "or" between the password form and the passkey button. */
+.or-line { display: flex; align-items: center; gap: var(--space-3); color: var(--color-muted); font-size: 0.875rem; }
+.or-line::before, .or-line::after { content: ""; flex: 1; border-block-start: 1px solid var(--color-border); }

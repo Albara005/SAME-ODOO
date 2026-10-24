@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -72,3 +72,28 @@ class RecoveryCode(IdMixin, TimestampMixin, Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
     code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Passkey(IdMixin, TimestampMixin, Base):
+    """A WebAuthn credential (passkey) for signing in without a password. Only the public key is kept."""
+
+    __tablename__ = "passkeys"
+
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    credential_id: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)  # base64url
+    public_key: Mapped[str] = mapped_column(Text, nullable=False)                          # base64url COSE key
+    sign_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    transports: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PasskeyChallenge(IdMixin, TimestampMixin, Base):
+    """A challenge handed to the browser for one passkey ceremony. Used once, then deleted."""
+
+    __tablename__ = "passkey_challenges"
+
+    user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    purpose: Mapped[str] = mapped_column(String(10), nullable=False)  # register | signin
+    challenge: Mapped[str] = mapped_column(String(128), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
