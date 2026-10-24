@@ -1462,4 +1462,10 @@ export const ar: Record<MessageKey, string> = {
   "bills.vendorUnitPrice": "سعر الوحدة في فاتورة المورد",
   "acct.5150": "فروقات أسعار الشراء",
   "audit.a.bill.price_changed": "إدخال سعر المورد في فاتورة",
+  "wf.sched.cron": "مخصص (cron)",
+  "wf.sched.cronExpr": "تعبير cron",
+  "wf.sched.cronHint": "الدقيقة الساعة اليوم الشهر يوم الأسبوع، مثل ⁦*/15 8-17 * * sun-thu⁩. مرة كل 5 دقائق على الأكثر.",
+  "wf.sched.cronAt": "حسب cron ⁦{cron}⁩ ({zone})",
+  "wf.sched.nextRuns": "التشغيلات القادمة:",
+  "wf.sched.invalid": "هذا الجدول غير صالح: {reason}",
 };

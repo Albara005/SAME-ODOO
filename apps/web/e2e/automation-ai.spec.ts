@@ -126,4 +126,20 @@ test("automation: another system starts a workflow through its webhook address; 
   await page.getByLabel("العنوان").fill("فحص المخزون");
   await page.getByRole("button", { name: "حفظ" }).click();
   await expect(page.getByText("كل ساعة عند الدقيقة 15 (Asia/Riyadh)")).toBeVisible();
+
+  // A cron expression: the server checks it as it's typed and shows the next runs.
+  await nav(page, "الأتمتة");
+  await page.getByRole("link", { name: "سير عمل جديد" }).click();
+  await page.getByLabel("الاسم", { exact: true }).fill("متابعة كل نصف ساعة");
+  await page.getByLabel("عندما يحدث").selectOption({ label: "حسب جدول زمني" });
+  await page.getByLabel("التكرار").selectOption({ label: "مخصص (cron)" });
+  await page.getByLabel("المنطقة الزمنية").selectOption("Asia/Riyadh");
+  await page.getByLabel("تعبير cron").fill("* * * * *");
+  await expect(page.getByRole("alert")).toContainText("هذا الجدول غير صالح: cron: a schedule runs at most every 5 minutes");
+  await page.getByLabel("تعبير cron").fill("*/30 9-17 * * sun-thu");
+  await expect(page.getByText("التشغيلات القادمة:")).toBeVisible();
+  await expect(page.locator(".next-runs li")).toHaveCount(3);
+  await page.getByLabel("العنوان").fill("متابعة الطلبات");
+  await page.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByText(/حسب cron .\*\/30 9-17 \* \* sun-thu. \(Asia\/Riyadh\)/)).toBeVisible();
 });

@@ -14,6 +14,8 @@ import {
 } from "../components/ui";
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
+import { locale } from "../lib/format";
+import { useDebounced } from "../lib/useDebounced";
 
 type Workflow = Schemas["WorkflowOut"];
 type Catalog = { triggers: Record<string, string>; operators: string[]; actions: Record<string, { required: string[]; optional: string[] }> };
@@ -24,7 +26,10 @@ const ACTION_ICON: Record<string, LucideIcon> = {
   create_task: ListChecks, notify: Bell, require_approval: ClipboardCheck, run_agent: Bot, webhook: Webhook,
 };
 
-type Schedule = { every: "hour" | "day" | "week" | "month"; time?: string; minute?: number; timezone: string; weekday?: number; day?: number };
+type Schedule = {
+  every: "hour" | "day" | "week" | "month" | "cron"; time?: string; minute?: number; timezone: string; weekday?: number;
+  day?: number; cron?: string;
+};
 const WEBHOOK_TRIGGER = "webhook.received";
 const ZONES = ["Asia/Riyadh", "Asia/Dubai", "Asia/Kuwait", "Asia/Qatar", "Asia/Bahrain", "Asia/Muscat", "Africa/Cairo",
   "Asia/Amman", "Europe/London", "UTC"];
@@ -41,6 +46,7 @@ function useScheduleLabel() {
   const { t } = useI18n();
   return (s: Schedule) => {
     if (s.every === "hour") return t("wf.sched.hourlyAt", { minute: String(s.minute ?? 0).padStart(2, "0"), zone: s.timezone });
+    if (s.every === "cron") return t("wf.sched.cronAt", { cron: s.cron ?? "", zone: s.timezone });
     const at = { time: s.time ?? "", zone: s.timezone };
     if (s.every === "week") return t("wf.sched.weeklyAt", { ...at, day: t(`wf.weekday.${s.weekday ?? 0}` as MessageKey) });
     if (s.every === "month") return t("wf.sched.monthlyAt", { ...at, day: s.day ?? 1 });
@@ -308,6 +314,7 @@ function WorkflowEditor({ catalog, workflow }: { catalog: Catalog; workflow?: Wo
 /** Only the fields the chosen frequency uses. */
 function scheduleBody(s: Schedule): Schedule {
   if (s.every === "hour") return { every: "hour", minute: s.minute ?? 0, timezone: s.timezone };
+  if (s.every === "cron") return { every: "cron", cron: (s.cron ?? "").trim(), timezone: s.timezone };
   const base = { every: s.every, time: s.time ?? "08:00", timezone: s.timezone };
   if (s.every === "week") return { ...base, weekday: s.weekday ?? 0 };
   if (s.every === "month") return { ...base, day: s.day ?? 1 };
@@ -317,15 +324,18 @@ function scheduleBody(s: Schedule): Schedule {
 function ScheduleFields({ value: s, onChange }: { value: Schedule; onChange: (s: Schedule) => void }) {
   const { t } = useI18n();
   const zones = ZONES.includes(s.timezone) ? ZONES : [s.timezone, ...ZONES];
+  const every = (e: Schedule["every"]) => onChange({ ...s, every: e, ...(e === "cron" && !s.cron ? { cron: "0 8 * * sun-thu" } : {}) });
   return (
+    <>
     <div className="schedule-fields">
       <CalendarClock size={16} aria-hidden className="muted" />
       <Field label={t("wf.sched.every")}>
-        <Select value={s.every} onChange={(e) => onChange({ ...s, every: e.target.value as Schedule["every"] })}>
+        <Select value={s.every} onChange={(e) => every(e.target.value as Schedule["every"])}>
           <option value="hour">{t("wf.sched.hour")}</option>
           <option value="day">{t("wf.sched.day")}</option>
           <option value="week">{t("wf.sched.week")}</option>
           <option value="month">{t("wf.sched.month")}</option>
+          <option value="cron">{t("wf.sched.cron")}</option>
         </Select>
       </Field>
       {s.every === "week" && (
@@ -340,7 +350,11 @@ function ScheduleFields({ value: s, onChange }: { value: Schedule; onChange: (s:
           <Input type="number" min={1} max={28} value={String(s.day ?? 1)} onChange={(e) => onChange({ ...s, day: Number(e.target.value) })} ltr />
         </Field>
       )}
-      {s.every === "hour" ? (
+      {s.every === "cron" ? (
+        <Field label={t("wf.sched.cronExpr")} hint={t("wf.sched.cronHint")}>
+          <Input value={s.cron ?? ""} onChange={(e) => onChange({ ...s, cron: e.target.value })} required ltr spellCheck={false} />
+        </Field>
+      ) : s.every === "hour" ? (
         <Field label={t("wf.sched.minute")} hint={t("wf.sched.minuteHint")}>
           <Input type="number" min={0} max={59} value={String(s.minute ?? 0)} onChange={(e) => onChange({ ...s, minute: Number(e.target.value) })} ltr />
         </Field>
@@ -354,6 +368,40 @@ function ScheduleFields({ value: s, onChange }: { value: Schedule; onChange: (s:
           {zones.map((z) => <option key={z} value={z}>{z}</option>)}
         </Select>
       </Field>
+    </div>
+    <NextRuns schedule={scheduleBody(s)} />
+    </>
+  );
+}
+
+/** When the schedule would run next, checked by the server as it's typed. */
+function NextRuns({ schedule }: { schedule: Schedule }) {
+  const { t, lang } = useI18n();
+  const { org } = useOrg();
+  const body = useDebounced(JSON.stringify(schedule), 400);
+  const preview = useQuery({
+    queryKey: ["wf-schedule-preview", org.id, body],
+    queryFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/workflows/schedule-preview", {
+      params: { path: { org_id: org.id } }, body: { schedule: JSON.parse(body) as Record<string, unknown> },
+    })),
+    retry: false,
+    staleTime: 60_000,
+    placeholderData: (prev) => prev,
+  });
+  if (preview.isError) {
+    return <p className="small danger-text" role="alert">{t("wf.sched.invalid", { reason: errorText(preview.error, t("common.error")) })}</p>;
+  }
+  if (!preview.data) return null;
+  // The zone the answer was computed for: the form may already show a newer one while the check is pending.
+  const fmt = new Intl.DateTimeFormat(locale(lang), {
+    timeZone: String(preview.data.schedule.timezone), weekday: "long", day: "numeric", month: "long", hour: "2-digit",
+    minute: "2-digit", hourCycle: "h23",
+  });
+  const stale = preview.isPlaceholderData || body !== JSON.stringify(schedule);
+  return (
+    <div className={`next-runs small${stale ? " stale" : ""}`} aria-live="polite" aria-busy={stale}>
+      <span className="muted">{t("wf.sched.nextRuns")}</span>
+      <ul>{preview.data.next_runs.map((r) => <li key={r}>{fmt.format(new Date(r))}</li>)}</ul>
     </div>
   );
 }

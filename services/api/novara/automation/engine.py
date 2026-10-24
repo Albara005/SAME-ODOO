@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from novara.automation import cron
 from novara.automation.events import EVENT_TYPES
 from novara.automation.models import Notification, OutboxEvent, Task, Workflow, WorkflowRun, WorkflowStep
 from novara.db import utcnow
@@ -97,14 +98,14 @@ ACTION_SPECS: dict[str, dict] = {
     # POST the event as signed JSON to an https endpoint on the public internet (see webhooks.py).
     "webhook": {"required": ["url"], "optional": []},
 }
-SCHEDULE_EVERY = ("hour", "day", "week", "month")
+SCHEDULE_EVERY = ("hour", "day", "week", "month", "cron")
 
 
 def validate_schedule(schedule: dict | None) -> dict:
     if not isinstance(schedule, dict):
         raise WorkflowError("a scheduled workflow needs a schedule")
-    if set(schedule) - {"every", "time", "minute", "timezone", "weekday", "day"}:
-        raise WorkflowError("schedule fields are every, time, minute, timezone, weekday and day")
+    if set(schedule) - {"every", "time", "minute", "timezone", "weekday", "day", "cron"}:
+        raise WorkflowError("schedule fields are every, time, minute, timezone, weekday, day and cron")
     every, at, tz = schedule.get("every"), schedule.get("time", ""), schedule.get("timezone", "")
     if every not in SCHEDULE_EVERY:
         raise WorkflowError(f"schedule.every must be one of {SCHEDULE_EVERY}")
@@ -112,6 +113,15 @@ def validate_schedule(schedule: dict | None) -> dict:
         ZoneInfo(tz)
     except (ZoneInfoNotFoundError, ValueError, TypeError):
         raise WorkflowError(f"unknown time zone: {tz!r}")
+    if every == "cron":  # a cron expression, read in the schedule's time zone
+        expression = schedule.get("cron")
+        if not isinstance(expression, str) or not expression.strip() or len(expression) > 120:
+            raise WorkflowError("a cron schedule needs an expression, e.g. \"*/15 8-17 * * sun-thu\"")
+        try:
+            cron.parse(expression)
+        except cron.CronError as e:
+            raise WorkflowError(f"cron: {e}")
+        return {"every": every, "cron": cron.normalise(expression), "timezone": tz}
     if every == "hour":  # minutes past every hour, in the schedule's time zone (some zones are offset by :30)
         minute = schedule.get("minute")
         if not (isinstance(minute, int) and not isinstance(minute, bool) and 0 <= minute <= 59):

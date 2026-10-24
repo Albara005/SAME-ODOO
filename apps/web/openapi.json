@@ -8033,6 +8033,41 @@
     "title": "SalesReportOut",
     "type": "object"
    },
+   "SchedulePreviewIn": {
+    "properties": {
+     "schedule": {
+      "title": "Schedule",
+      "type": "object"
+     }
+    },
+    "required": [
+     "schedule"
+    ],
+    "title": "SchedulePreviewIn",
+    "type": "object"
+   },
+   "SchedulePreviewOut": {
+    "properties": {
+     "next_runs": {
+      "items": {
+       "format": "date-time",
+       "type": "string"
+      },
+      "title": "Next Runs",
+      "type": "array"
+     },
+     "schedule": {
+      "title": "Schedule",
+      "type": "object"
+     }
+    },
+    "required": [
+     "schedule",
+     "next_runs"
+    ],
+    "title": "SchedulePreviewOut",
+    "type": "object"
+   },
    "SessionOut": {
     "properties": {
      "created_at": {
@@ -26604,6 +26639,64 @@
      }
     ],
     "summary": "Catalog",
+    "tags": [
+     "automation"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/workflows/schedule-preview": {
+   "post": {
+    "description": "Check a schedule and show when it would run next, before saving it.",
+    "operationId": "schedule_preview_api_v1_orgs__org_id__workflows_schedule_preview_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SchedulePreviewIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SchedulePreviewOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Schedule Preview",
     "tags": [
      "automation"
     ]

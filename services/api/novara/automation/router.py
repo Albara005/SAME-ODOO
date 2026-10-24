@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -24,7 +24,8 @@ class WorkflowIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     trigger: str
     # Only with trigger "schedule": {"every": "day"|"week"|"month", "time": "HH:MM", "timezone": "Asia/Riyadh",
-    # "weekday": 0-6 for weekly (Monday = 0), "day": 1-28 for monthly}
+    # "weekday": 0-6 for weekly (Monday = 0), "day": 1-28 for monthly}, {"every": "hour", "minute": 0-59, ...}
+    # or {"every": "cron", "cron": "*/15 8-17 * * sun-thu", "timezone": ...}
     schedule: dict | None = None
     conditions: list[dict] = Field(default_factory=list, max_length=20)
     actions: list[dict] = Field(min_length=1, max_length=E.MAX_ACTIONS)
@@ -126,6 +127,38 @@ def _workflow(db: Session, workflow_id: str) -> Workflow:
 @router.get("/orgs/{org_id}/workflows/catalog")
 def catalog(_: OrgContext = Depends(require(P.WORKFLOWS_MANAGE))):
     return {"triggers": EVENT_TYPES, "operators": E.OPS, "actions": E.ACTION_SPECS}
+
+
+class SchedulePreviewIn(BaseModel):
+    schedule: dict
+
+
+class SchedulePreviewOut(BaseModel):
+    schedule: dict           # as it would be saved
+    next_runs: list[datetime]  # in the schedule's time zone
+
+
+@router.post("/orgs/{org_id}/workflows/schedule-preview", response_model=SchedulePreviewOut)
+def schedule_preview(body: SchedulePreviewIn, _: OrgContext = Depends(require(P.WORKFLOWS_MANAGE))):
+    """Check a schedule and show when it would run next, before saving it."""
+    from zoneinfo import ZoneInfo
+
+    from novara.automation import cron
+    from novara.automation.events import last_slot
+
+    schedule = _validated(lambda: E.validate_schedule(body.schedule))
+    tz, now = ZoneInfo(schedule["timezone"]), utcnow()
+    if schedule["every"] == "cron":
+        runs = cron.next_fires(cron.parse(schedule["cron"]), tz, now)
+    else:  # step forward from the last slot until three future runs are found
+        runs, probe = [], now
+        while len(runs) < 3:
+            probe += timedelta(minutes=30)
+            slot = last_slot(schedule, probe)
+            if slot and slot > now and (not runs or slot > runs[-1]):
+                runs.append(slot)
+        runs = [r.astimezone(tz) for r in runs]
+    return SchedulePreviewOut(schedule=schedule, next_runs=runs)
 
 
 @router.post("/orgs/{org_id}/workflows", response_model=WorkflowOut, status_code=status.HTTP_201_CREATED)

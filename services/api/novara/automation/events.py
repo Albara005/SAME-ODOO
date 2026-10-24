@@ -70,9 +70,13 @@ def _from_audit(session: Session, entry: AuditLog) -> None:
                                      "actor_user_id": entry.actor_user_id, **(entry.details or {})})
 
 
-def last_slot(schedule: dict, now: datetime) -> datetime:
+def last_slot(schedule: dict, now: datetime) -> datetime | None:
     """The latest scheduled time at or before ``now`` (UTC), in the schedule's own time zone."""
     tz = ZoneInfo(schedule["timezone"])
+    if schedule["every"] == "cron":
+        from novara.automation import cron
+
+        return cron.last_fire(cron.parse(schedule["cron"]), tz, now)
     local = now.astimezone(tz)
     if schedule["every"] == "hour":
         slot = local.replace(minute=schedule["minute"], second=0, microsecond=0)
@@ -105,7 +109,7 @@ def scan_schedules(session: Session, now: datetime) -> int:
             continue
         slot = last_slot(wf.schedule, now)
         created = wf.created_at if wf.created_at.tzinfo else wf.created_at.replace(tzinfo=timezone.utc)
-        if slot < created:
+        if slot is None or slot < created:
             continue
         payload = {"target_type": "workflow", "target_id": wf.id, "workflow_id": wf.id,
                    "scheduled_for": slot.isoformat(),

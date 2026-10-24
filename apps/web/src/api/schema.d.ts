@@ -3687,6 +3687,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/workflows/schedule-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schedule Preview
+         * @description Check a schedule and show when it would run next, before saving it.
+         */
+        post: operations["schedule_preview_api_v1_orgs__org_id__workflows_schedule_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/workflows/{workflow_id}": {
         parameters: {
             query?: never;
@@ -6900,6 +6920,18 @@ export interface components {
             top_customers: components["schemas"]["SalesBucket"][];
             /** Top Products */
             top_products: components["schemas"]["SalesBucket"][];
+        };
+        /** SchedulePreviewIn */
+        SchedulePreviewIn: {
+            /** Schedule */
+            schedule: Record<string, unknown>;
+        };
+        /** SchedulePreviewOut */
+        SchedulePreviewOut: {
+            /** Next Runs */
+            next_runs: string[];
+            /** Schedule */
+            schedule: Record<string, unknown>;
         };
         /** SessionOut */
         SessionOut: {
@@ -16678,6 +16710,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_preview_api_v1_orgs__org_id__workflows_schedule_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchedulePreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchedulePreviewOut"];
                 };
             };
             /** @description Validation Error */

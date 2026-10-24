@@ -1460,6 +1460,12 @@ export const en = {
   "bills.vendorUnitPrice": "Unit price on the vendor's bill",
   "acct.5150": "Purchase Price Differences",
   "audit.a.bill.price_changed": "Vendor's price entered on a bill",
+  "wf.sched.cron": "Custom (cron)",
+  "wf.sched.cronExpr": "Cron expression",
+  "wf.sched.cronHint": "minute hour day month weekday, e.g. */15 8-17 * * sun-thu. At most every 5 minutes.",
+  "wf.sched.cronAt": "on cron {cron} ({zone})",
+  "wf.sched.nextRuns": "Next runs:",
+  "wf.sched.invalid": "This schedule isn't valid: {reason}",
 } as const;
 
 export type MessageKey = keyof typeof en;
