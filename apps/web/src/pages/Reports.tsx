@@ -16,7 +16,7 @@ import { addDays, fiscalYear, locale, today } from "../lib/format";
 type Tab = "receivables" | "payables" | "sales" | "pnl" | "balance" | "trial";
 
 /** The default chart's accounts in the reader's language; accounts an organization adds keep their own name. */
-const DEFAULT_ACCOUNTS = ["1100", "1200", "1300", "1400", "1500", "2100", "2150", "2200", "3000", "3100", "4000", "5000", "5100", "6000"];
+const DEFAULT_ACCOUNTS = ["1100", "1200", "1300", "1400", "1500", "2100", "2150", "2200", "3000", "3100", "4000", "5000", "5100", "5150", "6000"];
 
 export function useAccountName() {
   const { t } = useI18n();

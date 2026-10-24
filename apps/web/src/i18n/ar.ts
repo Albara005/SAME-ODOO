@@ -1455,4 +1455,11 @@ export const ar: Record<MessageKey, string> = {
   "yearEnd.periodEndHint": "آخر يوم في سنة مالية.",
   "reports.thisFiscalYear": "هذه السنة المالية",
   "reports.lastFiscalYear": "السنة المالية الماضية",
+  "bills.orderedAt": "سعر الأمر {price}",
+  "bills.vendorPrice": "سعر المورد",
+  "bills.vendorPriceTitle": "سعر المورد: {line}",
+  "bills.vendorPriceHint": "سعر أمر الشراء {price}. أدخل ما يطالب به المورد فعلاً، ويُسجَّل الفرق في فروقات أسعار الشراء عند ترحيل الفاتورة.",
+  "bills.vendorUnitPrice": "سعر الوحدة في فاتورة المورد",
+  "acct.5150": "فروقات أسعار الشراء",
+  "audit.a.bill.price_changed": "إدخال سعر المورد في فاتورة",
 };

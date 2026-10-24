@@ -1186,6 +1186,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/bills/{bill_id}/lines/{line_id}/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Vendor Price
+         * @description The vendor's actual unit price on a line billed from a purchase order. When the bill is posted,
+         *     the difference from the order's price goes to purchase price differences (5150).
+         */
+        put: operations["set_vendor_price_api_v1_orgs__org_id__bills__bill_id__lines__line_id__price_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/bills/{bill_id}/payments": {
         parameters: {
             query?: never;
@@ -4223,6 +4244,8 @@ export interface components {
             id: string;
             /** Net Amount */
             net_amount: string;
+            /** Ordered Unit Cost */
+            ordered_unit_cost?: string | null;
             /** Position */
             position: number;
             /** Product Id */
@@ -7495,6 +7518,11 @@ export interface components {
             /** Tax Number */
             tax_number: string;
         };
+        /** VendorPriceIn */
+        VendorPriceIn: {
+            /** Unit Cost */
+            unit_cost: number | string;
+        };
         /** VendorRefundIn */
         VendorRefundIn: {
             /** Amount */
@@ -10411,6 +10439,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VendorCreditOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_vendor_price_api_v1_orgs__org_id__bills__bill_id__lines__line_id__price_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bill_id: string;
+                line_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorPriceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillOut"];
                 };
             };
             /** @description Validation Error */

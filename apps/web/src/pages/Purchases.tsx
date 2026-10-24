@@ -730,6 +730,7 @@ function BillDetail({ bill: b }: { bill: Bill }) {
   const [paying, setPaying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [crediting, setCrediting] = useState(false);
+  const [pricing, setPricing] = useState<Bill["lines"][number] | null>(null);
   const ids = { org_id: org.id, bill_id: b.id };
   const refresh = (updated?: Bill) => {
     if (updated) qc.setQueryData(["bill", org.id, b.id], updated);
@@ -852,6 +853,7 @@ function BillDetail({ bill: b }: { bill: Bill }) {
               <th className="end">{t("purchases.unitCost")}</th>
               <th className="end">{t("invoices.taxCol")}</th>
               <th className="end">{t("invoices.net")}</th>
+              {isDraft && b.purchase_order_id && can("purchases.write") && <th className="no-print" />}
             </tr>
           </thead>
           <tbody>
@@ -859,9 +861,23 @@ function BillDetail({ bill: b }: { bill: Bill }) {
               <tr key={l.id}>
                 <td>{l.description}</td>
                 <td className="end num">{amount(l.quantity)}</td>
-                <td className="end num">{money(l.unit_cost, b.currency)}</td>
+                <td className="end num">
+                  {money(l.unit_cost, b.currency)}
+                  {l.ordered_unit_cost && l.ordered_unit_cost !== l.unit_cost && (
+                    <span className="muted small" style={{ display: "block" }}>
+                      {t("bills.orderedAt", { price: money(l.ordered_unit_cost, b.currency) })}
+                    </span>
+                  )}
+                </td>
                 <td className="end num">{l.tax_rate === "0" ? "—" : `${l.tax_rate}%`}</td>
                 <td className="end num">{money(l.net_amount, b.currency)}</td>
+                {isDraft && b.purchase_order_id && can("purchases.write") && (
+                  <td className="end no-print">
+                    {l.purchase_order_line_id && (
+                      <Button size="sm" variant="ghost" onClick={() => setPricing(l)}>{t("bills.vendorPrice")}</Button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -920,6 +936,7 @@ function BillDetail({ bill: b }: { bill: Bill }) {
           </table>
         </Card>
       )}
+      {pricing && <VendorPriceDialog bill={b} line={pricing} onClose={() => setPricing(null)} onDone={(updated) => { setPricing(null); refresh(updated); }} />}
       {crediting && (
         <VendorCreditDialog bill={b} onClose={() => setCrediting(false)} onDone={(creditId) => {
           setCrediting(false);
@@ -937,6 +954,36 @@ function BillDetail({ bill: b }: { bill: Bill }) {
       )}
       {cancelling && <BillCancelDialog bill={b} onClose={() => setCancelling(false)} onDone={(u) => { setCancelling(false); refresh(u); }} />}
     </div>
+  );
+}
+
+function VendorPriceDialog({ bill, line, onClose, onDone }: {
+  bill: Bill; line: Bill["lines"][number]; onClose: () => void; onDone: (updated: Bill) => void;
+}) {
+  const { t, money } = useI18n();
+  const { org } = useOrg();
+  const [price, setPrice] = useState(line.unit_cost);
+  const save = useMutation({
+    mutationFn: () => unwrap(api.PUT("/api/v1/orgs/{org_id}/bills/{bill_id}/lines/{line_id}/price", {
+      params: { path: { org_id: org.id, bill_id: bill.id, line_id: line.id } }, body: { unit_cost: price },
+    })),
+    onSuccess: onDone,
+  });
+  const err = save.error instanceof ApiError ? save.error.fields : {};
+  return (
+    <Dialog open onClose={onClose} title={t("bills.vendorPriceTitle", { line: line.description })}>
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <p className="muted">{t("bills.vendorPriceHint", { price: money(line.ordered_unit_cost ?? line.unit_cost, bill.currency) })}</p>
+        {save.isError && !Object.keys(err).length && <ErrorNotice error={save.error} />}
+        <Field label={t("bills.vendorUnitPrice")} error={err["unit_cost"]}>
+          <Input inputMode="decimal" value={price} required onChange={(e) => setPrice(e.target.value)} ltr />
+        </Field>
+        <div className="form-actions">
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" variant="primary" loading={save.isPending}>{t("common.save")}</Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 

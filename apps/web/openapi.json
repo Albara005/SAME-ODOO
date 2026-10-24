@@ -837,6 +837,17 @@
       "title": "Net Amount",
       "type": "string"
      },
+     "ordered_unit_cost": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ordered Unit Cost"
+     },
      "position": {
       "title": "Position",
       "type": "integer"
@@ -9622,6 +9633,27 @@
     "title": "VendorOut",
     "type": "object"
    },
+   "VendorPriceIn": {
+    "properties": {
+     "unit_cost": {
+      "anyOf": [
+       {
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Unit Cost"
+     }
+    },
+    "required": [
+     "unit_cost"
+    ],
+    "title": "VendorPriceIn",
+    "type": "object"
+   },
    "VendorRefundIn": {
     "properties": {
      "amount": {
@@ -14937,6 +14969,82 @@
     "summary": "Create Vendor Credit",
     "tags": [
      "vendor credits"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/bills/{bill_id}/lines/{line_id}/price": {
+   "put": {
+    "description": "The vendor's actual unit price on a line billed from a purchase order. When the bill is posted,\nthe difference from the order's price goes to purchase price differences (5150).",
+    "operationId": "set_vendor_price_api_v1_orgs__org_id__bills__bill_id__lines__line_id__price_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "bill_id",
+      "required": true,
+      "schema": {
+       "title": "Bill Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "line_id",
+      "required": true,
+      "schema": {
+       "title": "Line Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VendorPriceIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BillOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Set Vendor Price",
+    "tags": [
+     "purchases"
     ]
    }
   },

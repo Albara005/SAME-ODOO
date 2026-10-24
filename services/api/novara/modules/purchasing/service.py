@@ -195,6 +195,29 @@ def bill_from_order(db: Session, order: PurchaseOrder, *, bill_date: date, due_d
     return bill
 
 
+def ordered_costs(db: Session, lines: list[VendorBillLine]) -> dict[str, Decimal]:
+    """Bill line id -> the purchase order's unit cost, for lines billed from an order."""
+    po_ids = {l.purchase_order_line_id for l in lines if l.purchase_order_line_id}
+    if not po_ids:
+        return {}
+    costs = dict(db.execute(select(PurchaseOrderLine.id, PurchaseOrderLine.unit_cost)
+                            .where(PurchaseOrderLine.id.in_(po_ids))).all())
+    return {l.id: costs[l.purchase_order_line_id] for l in lines if l.purchase_order_line_id in costs}
+
+
+def set_vendor_price(db: Session, bill: VendorBill, line_id: str, unit_cost: Decimal) -> VendorBillLine:
+    """The vendor's actual unit price on a line billed from a purchase order (draft bills only)."""
+    if bill.status != "draft":
+        raise PurchaseStateError("only a draft bill's prices can change")
+    lines = bill_lines(db, bill)
+    line = next((l for l in lines if l.id == line_id), None)
+    if line is None or line.purchase_order_line_id is None:
+        raise PurchaseValidationError("that line isn't billed from a purchase order")
+    line.unit_cost = unit_cost
+    recompute(bill, lines)
+    return line
+
+
 def post_bill(db: Session, bill: VendorBill, *, user_id: str) -> JournalEntry:
     if bill.status != "draft":
         raise PurchaseStateError(f"only draft bills can be posted (status: {bill.status})")
@@ -208,11 +231,22 @@ def post_bill(db: Session, bill: VendorBill, *, user_id: str) -> JournalEntry:
     bill.number = next_number(db, f"bill:{year}", f"BILL-{year}-")
     debits: dict[str, int] = defaultdict(int)
     grni = system_account(db, "grni")
+    ordered = ordered_costs(db, lines)
     for line in lines:
-        debits[line.account_id or grni.id] += line.net_minor
+        if line.account_id is None and line.id in ordered:
+            # Received goods clear GRNI at the order's price (what the receipt credited); a vendor
+            # charging another price leaves a difference, which goes to purchase price differences.
+            at_order_price = line_net_minor(line.quantity, ordered[line.id], Decimal(0), bill.currency)
+            debits[grni.id] += at_order_price
+            if line.net_minor != at_order_price:
+                debits[system_account(db, "price_variance").id] += line.net_minor - at_order_price
+        else:
+            debits[line.account_id or grni.id] += line.net_minor
     accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_(set(debits))))}
-    specs = [LineSpec(accounts[aid], debit_minor=amount, label=f"Bill {bill.number}")
-             for aid, amount in sorted(debits.items(), key=lambda kv: accounts[kv[0]].code)]
+    # A lower vendor price makes the difference a credit.
+    specs = [LineSpec(accounts[aid], debit_minor=amount, label=f"Bill {bill.number}") if amount >= 0
+             else LineSpec(accounts[aid], credit_minor=-amount, label=f"Price difference on {bill.number}")
+             for aid, amount in sorted(debits.items(), key=lambda kv: accounts[kv[0]].code) if amount]
     specs.append(LineSpec(system_account(db, "vat_input"), debit_minor=bill.tax_minor, label=f"VAT on {bill.number}"))
     specs.append(LineSpec(system_account(db, "payable"), credit_minor=bill.total_minor, vendor_id=bill.vendor_id,
                           label=f"Bill {bill.number} {bill.vendor_reference}".strip()))

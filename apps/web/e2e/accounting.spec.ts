@@ -51,12 +51,18 @@ test("purchasing: vendor, order, receipt, bill, payment", async ({ page }) => {
   await dialog.getByLabel(/رقم فاتورة المورد/).fill("GS-881");
   await dialog.getByRole("button", { name: "تسجيل فاتورة المورد" }).click();
   await expect(page.getByText("هذه الفاتورة تتبع أمر الشراء")).toBeVisible();
+  // The vendor charged 210 a chair, not the ordered 200: the difference is booked when the bill posts.
+  await page.getByRole("button", { name: "سعر المورد" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("سعر الوحدة في فاتورة المورد").fill("210");
+  await dialog.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByText(/سعر الأمر/)).toBeVisible();
   await page.getByRole("button", { name: "ترحيل الفاتورة" }).click();
   await expect(page.getByRole("heading", { name: /^BILL-\d{4}-00001$/ })).toBeVisible();
 
   await page.getByRole("button", { name: "دفع للمورد" }).click();
   dialog = page.getByRole("dialog");
-  await expect(dialog.getByLabel(/المبلغ/)).toHaveValue("2300.00");
+  await expect(dialog.getByLabel(/المبلغ/)).toHaveValue("2415.00");
   await dialog.getByRole("button", { name: "دفع للمورد" }).click();
   await expect(page.getByRole("main").getByText("مدفوعة", { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/screens/vendor-bill-ar.png", fullPage: true });

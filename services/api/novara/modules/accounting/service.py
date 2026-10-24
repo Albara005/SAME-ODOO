@@ -36,6 +36,8 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     ("4000", "Sales Revenue", "income", "sales"),
     ("5000", "Cost of Goods Sold", "expense", "cogs"),
     ("5100", "Inventory Adjustments", "expense", "inventory_adjustment"),
+    # A vendor billing received goods at another price than the order's: the difference lands here.
+    ("5150", "Purchase Price Differences", "expense", "price_variance"),
     ("6000", "General Expenses", "expense", "expense"),
 ]
 

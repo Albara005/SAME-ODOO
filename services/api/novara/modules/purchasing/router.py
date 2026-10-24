@@ -451,6 +451,7 @@ class BillLineOut(BaseModel):
     net_amount: str
     account_id: str | None
     purchase_order_line_id: str | None
+    ordered_unit_cost: str | None = None  # the purchase order's price, when billed from one
     qty_credited: str = "0"  # by vendor credits
     qty_returned: str = "0"  # sent back to the vendor
 
@@ -523,6 +524,8 @@ def bill_out(db: Session, bill: VendorBill) -> BillOut:
         for lid, qty, returned in rows:
             q, r = credited.get(lid, (Decimal(0), Decimal(0)))
             credited[lid] = (q + qty, r + returned)
+    lines = svc.bill_lines(db, bill)
+    ordered = svc.ordered_costs(db, lines)
     return BillOut(
         id=bill.id, number=bill.number, vendor_reference=bill.vendor_reference, status=bill.status,
         vendor_id=bill.vendor_id, vendor_name=db.get(Vendor, bill.vendor_id).name, bill_date=bill.bill_date,
@@ -535,9 +538,10 @@ def bill_out(db: Session, bill: VendorBill) -> BillOut:
                            quantity=fmt_decimal(l.quantity), unit_cost=fmt_decimal(l.unit_cost), tax_id=l.tax_id,
                            tax_rate=fmt_decimal(l.tax_rate), net_amount=_money(l.net_minor, c),
                            account_id=l.account_id, purchase_order_line_id=l.purchase_order_line_id,
+                           ordered_unit_cost=fmt_decimal(ordered[l.id]) if l.id in ordered else None,
                            qty_credited=fmt_decimal(credited.get(l.id, (Decimal(0), Decimal(0)))[0]),
                            qty_returned=fmt_decimal(credited.get(l.id, (Decimal(0), Decimal(0)))[1]))
-               for l in svc.bill_lines(db, bill)],
+               for l in lines],
     )
 
 
@@ -631,6 +635,24 @@ def replace_bill(bill_id: str, body: BillIn, request: Request, ctx: OrgContext =
     db.add_all(lines)
     audit.record(db, actor_user_id=ctx.user.id, action="bill.updated", target_type="vendor_bill", target_id=bill.id,
                  details={"total": _money(bill.total_minor, bill.currency)}, ip_address=client_ip(request))
+    db.commit()
+    return bill_out(db, bill)
+
+
+class VendorPriceIn(BaseModel):
+    unit_cost: Decimal = Field(ge=0, max_digits=18, decimal_places=6)
+
+
+@router.put("/orgs/{org_id}/bills/{bill_id}/lines/{line_id}/price", response_model=BillOut)
+def set_vendor_price(bill_id: str, line_id: str, body: VendorPriceIn, request: Request,
+                     ctx: OrgContext = Depends(require(P.PURCHASES_WRITE)), db: Session = Depends(get_db)):
+    """The vendor's actual unit price on a line billed from a purchase order. When the bill is posted,
+    the difference from the order's price goes to purchase price differences (5150)."""
+    bill = _get_bill(db, bill_id, lock=True)
+    line = _domain(lambda: svc.set_vendor_price(db, bill, line_id, body.unit_cost))
+    audit.record(db, actor_user_id=ctx.user.id, action="bill.price_changed", target_type="vendor_bill",
+                 target_id=bill.id, details={"line": line.description, "unit_cost": fmt_decimal(body.unit_cost)},
+                 ip_address=client_ip(request))
     db.commit()
     return bill_out(db, bill)
 

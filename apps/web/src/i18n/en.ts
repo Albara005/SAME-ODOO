@@ -1453,6 +1453,13 @@ export const en = {
   "yearEnd.periodEndHint": "The last day of a fiscal year.",
   "reports.thisFiscalYear": "This fiscal year",
   "reports.lastFiscalYear": "Last fiscal year",
+  "bills.orderedAt": "ordered at {price}",
+  "bills.vendorPrice": "Vendor's price",
+  "bills.vendorPriceTitle": "Vendor's price: {line}",
+  "bills.vendorPriceHint": "The order's price was {price}. Enter what the vendor actually charges; the difference goes to purchase price differences when the bill is posted.",
+  "bills.vendorUnitPrice": "Unit price on the vendor's bill",
+  "acct.5150": "Purchase Price Differences",
+  "audit.a.bill.price_changed": "Vendor's price entered on a bill",
 } as const;
 
 export type MessageKey = keyof typeof en;
