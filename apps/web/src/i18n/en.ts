@@ -1412,6 +1412,19 @@ export const en = {
   "audit.a.booking.cancelled": "Booking cancelled",
   "wf.trigger.booking.requested": "A site asks for a booking",
   "wf.trigger.booking.confirmed": "A booking is confirmed",
+  "wf.hook.signingTitle": "Signed calls",
+  "wf.hook.unsigned": "Right now anyone holding the address can start the workflow. Requiring a signature means a call must also prove it knows a second secret.",
+  "wf.hook.signingStart": "Require signed calls",
+  "wf.hook.signingAbout": "Only signed calls are taken: X-Novara-Signature with X-Novara-Timestamp (within 5 minutes), or X-Hub-Signature-256. Unsigned calls get 401.",
+  "wf.hook.signingSecret": "Signing secret",
+  "wf.hook.copySecret": "Copy secret",
+  "wf.hook.newSecret": "New secret",
+  "wf.hook.newSecretConfirm": "A new signing secret replaces the current one at once; calls signed with the old one will be refused. Continue?",
+  "wf.hook.signingStop": "Stop requiring signatures",
+  "wf.hook.signingOn": "Only signed calls are taken now",
+  "wf.hook.signingOff": "Signatures are no longer required",
+  "audit.a.workflow.hook_signing_set": "Webhook signing required",
+  "audit.a.workflow.hook_signing_removed": "Webhook signing no longer required",
 } as const;
 
 export type MessageKey = keyof typeof en;

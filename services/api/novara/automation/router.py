@@ -317,6 +317,11 @@ def rotate_webhook_secret(request: Request, ctx: OrgContext = Depends(require(P.
 class HookOut(BaseModel):
     token: str
     path: str  # POST JSON here, on the API's own origin
+    signing_secret: str | None  # set: only signed calls are taken
+
+
+def _hook_out(db: Session, settings, w: Workflow, token: str) -> HookOut:
+    return HookOut(token=token, path=f"/api/v1/hooks/{token}", signing_secret=inbound.signing_secret(db, settings, w))
 
 
 def _hook_workflow(db: Session, workflow_id: str) -> Workflow:
@@ -329,10 +334,12 @@ def _hook_workflow(db: Session, workflow_id: str) -> Workflow:
 @router.get("/orgs/{org_id}/workflows/{workflow_id}/hook", response_model=HookOut)
 def workflow_hook(workflow_id: str, request: Request, _: OrgContext = Depends(require(P.WORKFLOWS_MANAGE)),
                   db: Session = Depends(get_db)):
-    """The secret address other systems POST to (anyone holding it can start the workflow)."""
-    token = inbound.hook_token(db, request.app.state.settings, _hook_workflow(db, workflow_id))
+    """The secret address other systems POST to (anyone holding it can start the workflow, unless calls
+    must also be signed)."""
+    w = _hook_workflow(db, workflow_id)
+    token = inbound.hook_token(db, request.app.state.settings, w)
     db.commit()
-    return HookOut(token=token, path=f"/api/v1/hooks/{token}")
+    return _hook_out(db, request.app.state.settings, w, token)
 
 
 @router.post("/orgs/{org_id}/workflows/{workflow_id}/hook/rotate", response_model=HookOut)
@@ -344,4 +351,32 @@ def rotate_workflow_hook(workflow_id: str, request: Request, ctx: OrgContext = D
     audit.record(db, actor_user_id=ctx.user.id, action="workflow.hook_rotated", target_type="workflow", target_id=w.id,
                  details={"name": w.name}, ip_address=client_ip(request))
     db.commit()
-    return HookOut(token=token, path=f"/api/v1/hooks/{token}")
+    return _hook_out(db, request.app.state.settings, w, token)
+
+
+@router.post("/orgs/{org_id}/workflows/{workflow_id}/hook/signing-secret", response_model=HookOut)
+def set_hook_signing(workflow_id: str, request: Request, ctx: OrgContext = Depends(require(P.WORKFLOWS_MANAGE)),
+                     db: Session = Depends(get_db)):
+    """Require signed calls, with a new signing secret (replacing any earlier one at once)."""
+    w = _hook_workflow(db, workflow_id)
+    settings = request.app.state.settings
+    token = inbound.hook_token(db, settings, w)
+    inbound.new_signing_secret(db, settings, w)
+    audit.record(db, actor_user_id=ctx.user.id, action="workflow.hook_signing_set", target_type="workflow",
+                 target_id=w.id, details={"name": w.name}, ip_address=client_ip(request))
+    db.commit()
+    return _hook_out(db, settings, w, token)
+
+
+@router.delete("/orgs/{org_id}/workflows/{workflow_id}/hook/signing-secret", response_model=HookOut)
+def remove_hook_signing(workflow_id: str, request: Request, ctx: OrgContext = Depends(require(P.WORKFLOWS_MANAGE)),
+                        db: Session = Depends(get_db)):
+    """Stop requiring signatures: the address alone is enough again."""
+    w = _hook_workflow(db, workflow_id)
+    settings = request.app.state.settings
+    token = inbound.hook_token(db, settings, w)
+    w.hook_signing_secret = None
+    audit.record(db, actor_user_id=ctx.user.id, action="workflow.hook_signing_removed", target_type="workflow",
+                 target_id=w.id, details={"name": w.name}, ip_address=client_ip(request))
+    db.commit()
+    return _hook_out(db, settings, w, token)

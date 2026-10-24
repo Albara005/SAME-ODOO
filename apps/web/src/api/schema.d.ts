@@ -3599,7 +3599,8 @@ export interface paths {
         };
         /**
          * Workflow Hook
-         * @description The secret address other systems POST to (anyone holding it can start the workflow).
+         * @description The secret address other systems POST to (anyone holding it can start the workflow, unless calls
+         *     must also be signed).
          */
         get: operations["workflow_hook_api_v1_orgs__org_id__workflows__workflow_id__hook_get"];
         put?: never;
@@ -3625,6 +3626,30 @@ export interface paths {
          */
         post: operations["rotate_workflow_hook_api_v1_orgs__org_id__workflows__workflow_id__hook_rotate_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/workflows/{workflow_id}/hook/signing-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Hook Signing
+         * @description Require signed calls, with a new signing secret (replacing any earlier one at once).
+         */
+        post: operations["set_hook_signing_api_v1_orgs__org_id__workflows__workflow_id__hook_signing_secret_post"];
+        /**
+         * Remove Hook Signing
+         * @description Stop requiring signatures: the address alone is enough again.
+         */
+        delete: operations["remove_hook_signing_api_v1_orgs__org_id__workflows__workflow_id__hook_signing_secret_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5026,6 +5051,8 @@ export interface components {
         HookOut: {
             /** Path */
             path: string;
+            /** Signing Secret */
+            signing_secret: string | null;
             /** Token */
             token: string;
         };
@@ -16293,6 +16320,70 @@ export interface operations {
         };
     };
     rotate_workflow_hook_api_v1_orgs__org_id__workflows__workflow_id__hook_rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HookOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_hook_signing_api_v1_orgs__org_id__workflows__workflow_id__hook_signing_secret_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HookOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_hook_signing_api_v1_orgs__org_id__workflows__workflow_id__hook_signing_secret_delete: {
         parameters: {
             query?: never;
             header?: never;

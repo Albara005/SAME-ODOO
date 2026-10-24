@@ -45,6 +45,8 @@ class Workflow(IdMixin, TimestampMixin, TenantScoped, Base):
     # Trigger "webhook.received": the secret in the workflow's address, encrypted, and its SHA-256 to find it by.
     hook_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     hook_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
+    # Optional, encrypted: when set, every call must be signed with it (see automation/inbound.py).
+    hook_signing_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class WorkflowRun(IdMixin, TimestampMixin, TenantScoped, Base):

@@ -101,6 +101,21 @@ test("automation: another system starts a workflow through its webhook address; 
   await expect(page.getByText(/العنوان الجديد جاهز/)).toBeVisible();
   expect((await page.request.post(url, { data: { name: "x" } })).status()).toBe(404);
 
+  // Requiring signed calls: unsigned ones are refused, a call signed with the secret gets in.
+  await page.getByRole("button", { name: "اشتراط التوقيع" }).click();
+  const secret = (await page.getByLabel("سر التوقيع").textContent())!.trim();
+  expect(secret).toMatch(/^whsec_/);
+  await expect(page.getByLabel("مثال")).toContainText("X-Novara-Signature: v1=$SIG");
+  const fresh = (await address.textContent())!.trim();
+  expect((await page.request.post(fresh, { data: { name: "x" } })).status()).toBe(401);
+  const { createHmac } = await import("node:crypto");
+  const body = JSON.stringify({ name: "موقّع" });
+  const ts = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex");
+  const signed = await page.request.post(fresh, {
+    data: body, headers: { "Content-Type": "application/json", "X-Novara-Timestamp": ts, "X-Novara-Signature": `v1=${signature}` } });
+  expect(signed.status()).toBe(202);
+
   await nav(page, "الأتمتة");
   await page.getByRole("link", { name: "سير عمل جديد" }).click();
   await page.getByLabel("الاسم", { exact: true }).fill("فحص كل ساعة");

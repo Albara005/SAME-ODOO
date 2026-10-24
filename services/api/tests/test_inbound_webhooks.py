@@ -103,6 +103,45 @@ def test_the_address_secret_is_stored_encrypted(api, hooked):
         assert token not in (wf.hook_secret or "") and wf.hook_hash != token
 
 
+
+def test_an_address_can_require_signed_calls(api, client, hooked, monkeypatch):
+    import hashlib
+    import hmac
+    import json
+    import time
+
+    s = hooked
+    url = o(s, f"/workflows/{s['workflow']['id']}/hook/signing-secret")
+    assert api.req("POST", SALES, url).status_code == 403
+    on = api.req("POST", OWNER, url)
+    assert on.status_code == 200 and on.json()["signing_secret"].startswith("whsec_")
+    secret = on.json()["signing_secret"].encode()
+    assert api.req("GET", OWNER, o(s, f"/workflows/{s['workflow']['id']}/hook")).json()["signing_secret"] == secret.decode()
+
+    body = json.dumps({"name": "Signed lead", "budget": 5000}).encode()
+    post = lambda **h: client.post(s["path"], content=body, headers={"Content-Type": "application/json", **h})  # noqa: E731
+    stamp = str(int(time.time()))
+    good = "v1=" + hmac.new(secret, f"{stamp}.".encode() + body, hashlib.sha256).hexdigest()
+    assert post().status_code == 401                                                     # unsigned
+    assert post(**{"X-Novara-Timestamp": stamp, "X-Novara-Signature": "v1=" + "0" * 64}).status_code == 401
+    old = str(int(time.time()) - inbound.SIGNATURE_WINDOW - 60)
+    stale = "v1=" + hmac.new(secret, f"{old}.".encode() + body, hashlib.sha256).hexdigest()
+    assert post(**{"X-Novara-Timestamp": old, "X-Novara-Signature": stale}).status_code == 401   # too old to replay
+    assert post(**{"X-Novara-Timestamp": stamp, "X-Novara-Signature": good}).status_code == 202
+    hub = "sha256=" + hmac.new(secret, body, hashlib.sha256).hexdigest()
+    assert post(**{"X-Hub-Signature-256": hub}).status_code == 202                      # the common body-only form
+    assert post(**{"X-Hub-Signature-256": "sha256=" + hmac.new(b"other", body, hashlib.sha256).hexdigest()}).status_code == 401
+
+    # Refused calls don't use up the rate limit; switching signing off takes the address alone again.
+    monkeypatch.setattr(inbound, "RATE_LIMIT", 3)
+    for _ in range(5):
+        assert post().status_code == 401
+    assert post(**{"X-Hub-Signature-256": hub}).status_code == 202
+    off = api.req("DELETE", OWNER, url)
+    assert off.status_code == 200 and off.json()["signing_secret"] is None
+    assert post().status_code == 429                                                     # 3 accepted this minute
+
+
 # ---------------------------------------------------------------- hourly schedules
 
 

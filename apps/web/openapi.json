@@ -3313,6 +3313,17 @@
       "title": "Path",
       "type": "string"
      },
+     "signing_secret": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Signing Secret"
+     },
      "token": {
       "title": "Token",
       "type": "string"
@@ -3320,7 +3331,8 @@
     },
     "required": [
      "token",
-     "path"
+     "path",
+     "signing_secret"
     ],
     "title": "HookOut",
     "type": "object"
@@ -26100,7 +26112,7 @@
   },
   "/api/v1/orgs/{org_id}/workflows/{workflow_id}/hook": {
    "get": {
-    "description": "The secret address other systems POST to (anyone holding it can start the workflow).",
+    "description": "The secret address other systems POST to (anyone holding it can start the workflow, unless calls\nmust also be signed).",
     "operationId": "workflow_hook_api_v1_orgs__org_id__workflows__workflow_id__hook_get",
     "parameters": [
      {
@@ -26207,6 +26219,118 @@
      }
     ],
     "summary": "Rotate Workflow Hook",
+    "tags": [
+     "automation"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/workflows/{workflow_id}/hook/signing-secret": {
+   "delete": {
+    "description": "Stop requiring signatures: the address alone is enough again.",
+    "operationId": "remove_hook_signing_api_v1_orgs__org_id__workflows__workflow_id__hook_signing_secret_delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "workflow_id",
+      "required": true,
+      "schema": {
+       "title": "Workflow Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HookOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Remove Hook Signing",
+    "tags": [
+     "automation"
+    ]
+   },
+   "post": {
+    "description": "Require signed calls, with a new signing secret (replacing any earlier one at once).",
+    "operationId": "set_hook_signing_api_v1_orgs__org_id__workflows__workflow_id__hook_signing_secret_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "workflow_id",
+      "required": true,
+      "schema": {
+       "title": "Workflow Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HookOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Set Hook Signing",
     "tags": [
      "automation"
     ]

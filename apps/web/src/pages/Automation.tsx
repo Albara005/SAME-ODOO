@@ -544,13 +544,32 @@ function HookCard({ workflowId }: { workflowId: string }) {
     },
     onError: (e) => toast(errorText(e, t("common.error")), "error"),
   });
+  const signing = useMutation({
+    mutationFn: (on: boolean) => on
+      ? unwrap(api.POST("/api/v1/orgs/{org_id}/workflows/{workflow_id}/hook/signing-secret", { params: { path: ids } }))
+      : unwrap(api.DELETE("/api/v1/orgs/{org_id}/workflows/{workflow_id}/hook/signing-secret", { params: { path: ids } })),
+    onSuccess: (h) => {
+      qc.setQueryData(["wf-hook", org.id, workflowId], h);
+      toast(h.signing_secret ? t("wf.hook.signingOn") : t("wf.hook.signingOff"));
+    },
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
   const copy = (text: string) => void navigator.clipboard?.writeText(text).then(() => toast(t("common.copied")), () => undefined);
   return (
     <Card title={t("wf.hook.title")}>
       <QueryView query={hook}>
         {(h) => {
           const url = `${window.location.origin}${h.path}`;
-          const example = [
+          const example = h.signing_secret ? [
+            `BODY='{"name": "Hala Stores", "budget": 2500}'`,
+            `TS=$(date +%s)`,
+            `SIG=$(printf '%s.%s' "$TS" "$BODY" | openssl dgst -sha256 -hmac "${h.signing_secret}" | sed 's/^.* //')`,
+            `curl -X POST "${url}" \\`,
+            `  -H "Content-Type: application/json" \\`,
+            `  -H "X-Novara-Timestamp: $TS" -H "X-Novara-Signature: v1=$SIG" \\`,
+            `  -H "Idempotency-Key: order-1001" \\`,
+            `  -d "$BODY"`,
+          ].join("\n") : [
             `curl -X POST "${url}" \\`,
             `  -H "Content-Type: application/json" \\`,
             `  -H "Idempotency-Key: order-1001" \\`,
@@ -568,6 +587,27 @@ function HookCard({ workflowId }: { workflowId: string }) {
                   onClick={() => window.confirm(t("wf.hook.rotateConfirm")) && rotate.mutate()}>
                   {t("wf.hook.rotate")}
                 </Button>
+              </div>
+              <div className="stack-sm hook-signing">
+                <strong className="small">{t("wf.hook.signingTitle")}</strong>
+                {h.signing_secret ? (
+                  <>
+                    <p className="muted small" style={{ margin: 0 }}>{t("wf.hook.signingAbout")}</p>
+                    <code className="mfa-secret" dir="ltr" style={{ textAlign: "start" }} aria-label={t("wf.hook.signingSecret")}>{h.signing_secret}</code>
+                    <div className="row">
+                      <Button size="sm" icon={<Copy size={14} />} onClick={() => copy(h.signing_secret!)}>{t("wf.hook.copySecret")}</Button>
+                      <Button size="sm" icon={<RotateCw size={14} />} loading={signing.isPending && signing.variables === true}
+                        onClick={() => window.confirm(t("wf.hook.newSecretConfirm")) && signing.mutate(true)}>{t("wf.hook.newSecret")}</Button>
+                      <Button size="sm" variant="ghost" loading={signing.isPending && signing.variables === false}
+                        onClick={() => signing.mutate(false)}>{t("wf.hook.signingStop")}</Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="muted small" style={{ margin: 0 }}>{t("wf.hook.unsigned")}</p>
+                    <div><Button size="sm" loading={signing.isPending} onClick={() => signing.mutate(true)}>{t("wf.hook.signingStart")}</Button></div>
+                  </>
+                )}
               </div>
             </div>
           );

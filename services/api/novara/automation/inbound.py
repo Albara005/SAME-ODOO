@@ -10,13 +10,28 @@ that only answers which organization holds that hash.
 Each call becomes one "webhook.received" event for that workflow, with the JSON under ``data``.
 An Idempotency-Key header makes a sender's retries harmless, and a workflow takes at most
 RATE_LIMIT calls a minute.
+
+A workflow can also require signed calls. With a signing secret set, a call must carry either
+
+    X-Novara-Timestamp: <unix seconds>
+    X-Novara-Signature: v1=<hex HMAC-SHA256 of "<timestamp>.<body>">     (as NOVARA signs its own)
+
+with the timestamp within SIGNATURE_WINDOW seconds of now, or the common body-only form
+
+    X-Hub-Signature-256: sha256=<hex HMAC-SHA256 of the body>
+
+which has no timestamp, so a captured call could be replayed: senders that can should use the
+first form (or send an Idempotency-Key). Anything else is refused with 401 before it counts
+against the rate limit.
 """
 
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import secrets
+import time
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -35,6 +50,7 @@ from novara.tenancy import bind_tenant, current_tenant, system_scope
 TRIGGER = "webhook.received"
 MAX_BYTES = 64 * 1024
 RATE_LIMIT = 60  # calls per workflow per minute
+SIGNATURE_WINDOW = 300  # seconds a timestamped signature stays valid, either side of now
 
 public_router = APIRouter(tags=["inbound webhooks"])
 
@@ -48,6 +64,34 @@ def hook_token(db: Session, settings, wf: Workflow, *, rotate: bool = False) -> 
     wf.hook_hash = crypto.token_hash(raw)
     db.flush()
     return raw
+
+
+def signing_secret(db: Session, settings, wf: Workflow) -> str | None:
+    if not wf.hook_signing_secret:
+        return None
+    return crypto.decrypt(settings, wf.hook_signing_secret, context=current_tenant(db))
+
+
+def new_signing_secret(db: Session, settings, wf: Workflow) -> str:
+    raw = "whsec_" + secrets.token_urlsafe(32)
+    wf.hook_signing_secret = crypto.encrypt(settings, raw, context=current_tenant(db))
+    db.flush()
+    return raw
+
+
+def signed(secret: str, body: bytes, headers, now: float | None = None) -> bool:
+    """Whether the call carries a valid signature in either accepted form (compared in constant time)."""
+    key = secret.encode()
+    stamp, sig = headers.get("x-novara-timestamp", ""), headers.get("x-novara-signature", "")
+    if stamp and sig:
+        if not stamp.isdigit() or abs((time.time() if now is None else now) - int(stamp)) > SIGNATURE_WINDOW:
+            return False
+        want = "v1=" + hmac.new(key, f"{stamp}.".encode() + body, hashlib.sha256).hexdigest()
+        return any(hmac.compare_digest(want, part.strip()) for part in sig.split(","))
+    hub = headers.get("x-hub-signature-256", "")
+    if hub:
+        return hmac.compare_digest("sha256=" + hmac.new(key, body, hashlib.sha256).hexdigest(), hub.strip())
+    return False
 
 
 def _workflow_for(db: Session, raw: str) -> Workflow | None:
@@ -64,10 +108,14 @@ def _workflow_for(db: Session, raw: str) -> Workflow | None:
                                             Workflow.enabled.is_(True)))
 
 
-def _accept(db: Session, token: str, data: dict, key: str | None) -> JSONResponse:
+def _accept(db: Session, settings, token: str, data: dict, key: str | None, body: bytes, headers) -> JSONResponse:
     wf = _workflow_for(db, token)
     if wf is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown webhook address")
+    secret = signing_secret(db, settings, wf)
+    if secret is not None and not signed(secret, body, headers):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "this address only takes signed calls; the signature is "
+                                                          "missing, wrong or too old")
     prefix = f"hook:{wf.id}:"
     dedup = prefix + (hashlib.sha256(key.encode()).hexdigest()[:32] if key else new_id())
 
@@ -118,4 +166,5 @@ async def receive(token: str, request: Request, idempotency_key: str | None = He
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "the body must be JSON")
     if not isinstance(data, dict):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "the body must be a JSON object")
-    return await run_in_threadpool(_accept, db, token, data, idempotency_key)
+    return await run_in_threadpool(_accept, db, request.app.state.settings, token, data, idempotency_key, raw,
+                                   request.headers)
