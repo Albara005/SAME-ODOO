@@ -440,10 +440,6 @@ function NewAccountDialog({ onClose }: { onClose: () => void }) {
 
 // ---------------------------------------------------------------- closing the year
 
-function lastYearEnd(): string {
-  return `${new Date().getFullYear() - 1}-12-31`;
-}
-
 function YearEnd() {
   const { t, date } = useI18n();
   const { org, can } = useOrg();
@@ -454,7 +450,12 @@ function YearEnd() {
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/accounting/year-end", { params: { path: { org_id: org.id } } })),
   });
   const [closing, setClosing] = useState(false);
-  const [form, setForm] = useState({ period_end: lastYearEnd(), lock: true });
+  const [form, setForm] = useState({ period_end: "", lock: true });
+  const open = () => {
+    // Start from the next fiscal year end to close; the accountant can still pick another day.
+    setForm({ period_end: status.data?.next_to_close ?? "", lock: true });
+    setClosing(true);
+  };
   const close = useMutation({
     mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/accounting/year-end", { params: { path: { org_id: org.id } }, body: form })),
     onSuccess: (r) => {
@@ -473,8 +474,12 @@ function YearEnd() {
         <QueryView query={status}>
           {(s) => (
             <dl className="kv">
+              <dt>{t("yearEnd.current")}</dt>
+              <dd className="num">{date(s.current_year_start)} – {date(s.current_year_end)}</dd>
               <dt>{t("yearEnd.last")}</dt>
               <dd className="num">{s.last_closed ? date(s.last_closed) : t("yearEnd.never")}</dd>
+              <dt>{t("yearEnd.next")}</dt>
+              <dd className="num">{s.next_to_close ? date(s.next_to_close) : t("yearEnd.nothingYet")}</dd>
               <dt>{t("lock.date")}</dt>
               <dd className="num">{s.locked_until ? date(s.locked_until) : t("lock.open")}</dd>
             </dl>
@@ -482,7 +487,7 @@ function YearEnd() {
         </QueryView>
         {can("accounting.close") && (
           <div>
-            <Button variant="primary" icon={<CalendarCheck size={16} />} onClick={() => setClosing(true)}>{t("yearEnd.close")}</Button>
+            <Button variant="primary" icon={<CalendarCheck size={16} />} onClick={open}>{t("yearEnd.close")}</Button>
           </div>
         )}
       </div>
@@ -491,7 +496,7 @@ function YearEnd() {
           <form className="stack" onSubmit={(e) => { e.preventDefault(); close.mutate(); }}>
             <p className="muted">{t("yearEnd.confirmHint")}</p>
             {close.isError && <ErrorNotice error={close.error} />}
-            <Field label={t("yearEnd.periodEnd")}>
+            <Field label={t("yearEnd.periodEnd")} hint={t("yearEnd.periodEndHint")}>
               <Input type="date" value={form.period_end} max={today()} onChange={(e) => setForm({ ...form, period_end: e.target.value })} required ltr />
             </Field>
             <Checkbox label={t("yearEnd.lock")} checked={form.lock} onChange={(e) => setForm({ ...form, lock: e.target.checked })} />

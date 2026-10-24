@@ -477,14 +477,22 @@ export function AuditPage() {
 
 // ---------------------------------------------------------------- organization
 
+/** Month names, January (1) to December (12), in the current language. */
+function monthNames(lang: string): string[] {
+  const fmt = new Intl.DateTimeFormat(lang === "ar" ? "ar-SA-u-ca-gregory" : "en-GB", { month: "long", timeZone: "UTC" });
+  return Array.from({ length: 12 }, (_, i) => fmt.format(new Date(Date.UTC(2024, i, 15))));
+}
+
 export function OrgSettingsPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { org } = useOrg();
   const qc = useQueryClient();
   const toast = useToast();
   const [form, setForm] = useState({
     name: org.name, default_currency: org.default_currency, default_locale: org.default_locale, vat_number: org.vat_number,
+    fiscal_year_start_month: org.fiscal_year_start_month ?? 1,
   });
+  const months = monthNames(lang);
   const save = useMutation({
     mutationFn: () => unwrap(api.PATCH("/api/v1/orgs/{org_id}", { params: { path: { org_id: org.id } }, body: form })),
     onSuccess: () => {
@@ -519,6 +527,12 @@ export function OrgSettingsPage() {
               </Select>
             </Field>
           </div>
+          <Field label={t("org.fiscalStart")} hint={t("org.fiscalStartHint")}>
+            <Select value={String(form.fiscal_year_start_month)}
+              onChange={(e) => setForm({ ...form, fiscal_year_start_month: Number(e.target.value) })}>
+              {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </Select>
+          </Field>
           <Field label={t("org.vatNumber")} hint={t("org.vatHint")} optional>
             <Input value={form.vat_number} onChange={(e) => setForm({ ...form, vat_number: e.target.value.toUpperCase().replace(/\s/g, "") })}
               maxLength={20} inputMode="numeric" ltr />

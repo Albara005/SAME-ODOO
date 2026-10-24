@@ -18,6 +18,7 @@ from novara.modules.access import permissions as P
 from novara.modules.access.models import Role
 from novara.modules.access.service import active_owner_count, create_system_roles, ensure_system_role
 from novara.modules.accounting.models import JournalEntry
+from novara.modules.accounting.service import last_year_end
 from novara.modules.accounting.service import ensure_chart
 from novara.modules.audit import service as audit
 from novara.modules.identity.models import User
@@ -43,6 +44,7 @@ class OrgUpdate(BaseModel):
     default_currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
     vat_number: str | None = Field(default=None, max_length=20, pattern="^[0-9A-Z]*$")
     require_mfa: bool | None = None
+    fiscal_year_start_month: int | None = Field(default=None, ge=1, le=12)
 
 
 class OrgOut(BaseModel):
@@ -57,6 +59,7 @@ class OrgOut(BaseModel):
     vat_number: str
     books_locked_until: date | None
     require_mfa: bool = False
+    fiscal_year_start_month: int = 1
     created_at: datetime
 
 
@@ -151,6 +154,11 @@ def update_org(body: OrgUpdate, request: Request, ctx: OrgContext = Depends(requ
         _check_currency(changes["default_currency"])
         if db.scalar(select(JournalEntry.id).limit(1)):
             raise HTTPException(status.HTTP_409_CONFLICT, "currency cannot change once the ledger has entries")
+    if changes.get("fiscal_year_start_month", ctx.organization.fiscal_year_start_month) != \
+            ctx.organization.fiscal_year_start_month and last_year_end(db) is not None:
+        # Closed years end on the old boundary; moving it would leave them misaligned.
+        raise HTTPException(status.HTTP_409_CONFLICT, "the fiscal year start can't change while a closed year "
+                                                      "stands; reopen the closed years first")
     for field, value in changes.items():
         setattr(ctx.organization, field, value)
     audit.record(db, actor_user_id=ctx.user.id, action="org.updated", target_type="organization",

@@ -5293,6 +5293,11 @@
       "title": "Default Locale",
       "type": "string"
      },
+     "fiscal_year_start_month": {
+      "default": 1,
+      "title": "Fiscal Year Start Month",
+      "type": "integer"
+     },
      "hosting_mode": {
       "title": "Hosting Mode",
       "type": "string"
@@ -5791,6 +5796,11 @@
       "title": "Default Locale",
       "type": "string"
      },
+     "fiscal_year_start_month": {
+      "default": 1,
+      "title": "Fiscal Year Start Month",
+      "type": "integer"
+     },
      "hosting_mode": {
       "title": "Hosting Mode",
       "type": "string"
@@ -5856,6 +5866,19 @@
        }
       ],
       "title": "Default Locale"
+     },
+     "fiscal_year_start_month": {
+      "anyOf": [
+       {
+        "maximum": 12.0,
+        "minimum": 1.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fiscal Year Start Month"
      },
      "name": {
       "anyOf": [
@@ -10325,6 +10348,16 @@
    },
    "YearEndOut": {
     "properties": {
+     "current_year_end": {
+      "format": "date",
+      "title": "Current Year End",
+      "type": "string"
+     },
+     "current_year_start": {
+      "format": "date",
+      "title": "Current Year Start",
+      "type": "string"
+     },
      "entry": {
       "anyOf": [
        {
@@ -10334,6 +10367,10 @@
         "type": "null"
        }
       ]
+     },
+     "fiscal_year_start_month": {
+      "title": "Fiscal Year Start Month",
+      "type": "integer"
      },
      "last_closed": {
       "anyOf": [
@@ -10358,11 +10395,27 @@
        }
       ],
       "title": "Locked Until"
+     },
+     "next_to_close": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next To Close"
      }
     },
     "required": [
      "last_closed",
-     "locked_until"
+     "locked_until",
+     "fiscal_year_start_month",
+     "current_year_start",
+     "current_year_end",
+     "next_to_close"
     ],
     "title": "YearEndOut",
     "type": "object"

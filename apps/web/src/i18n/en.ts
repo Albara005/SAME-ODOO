@@ -1445,6 +1445,14 @@ export const en = {
   "passkey.remove": "Remove {name}",
   "passkey.removeConfirm": "Remove the passkey \"{name}\"? It will no longer sign you in.",
   "passkey.removed": "Passkey removed",
+  "org.fiscalStart": "Fiscal year starts in",
+  "org.fiscalStartHint": "Year-end closes fall on the day before. Can't change while a closed year stands.",
+  "yearEnd.current": "This fiscal year",
+  "yearEnd.next": "Next to close",
+  "yearEnd.nothingYet": "None yet: the current year hasn't ended",
+  "yearEnd.periodEndHint": "The last day of a fiscal year.",
+  "reports.thisFiscalYear": "This fiscal year",
+  "reports.lastFiscalYear": "Last fiscal year",
 } as const;
 
 export type MessageKey = keyof typeof en;

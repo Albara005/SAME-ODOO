@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -15,6 +15,7 @@ HOSTING_MODES = ("shared", "dedicated_database", "dedicated_environment")
 
 class Organization(IdMixin, TimestampMixin, Base):
     __tablename__ = "organizations"
+    __table_args__ = (CheckConstraint("fiscal_year_start_month BETWEEN 1 AND 12", name="ck_org_fiscal_start"),)
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(80), unique=True, index=True, nullable=False)
@@ -29,6 +30,8 @@ class Organization(IdMixin, TimestampMixin, Base):
     books_locked_until: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Every member must have two-step sign-in on to reach this organization's data.
     require_mfa: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # The month the fiscal year starts in (1 = January): year-end closes fall on the day before it.
+    fiscal_year_start_month: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
 
 
 class Membership(IdMixin, TimestampMixin, TenantScoped, Base):

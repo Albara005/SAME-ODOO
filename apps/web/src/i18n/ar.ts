@@ -1447,4 +1447,12 @@ export const ar: Record<MessageKey, string> = {
   "passkey.remove": "حذف {name}",
   "passkey.removeConfirm": "حذف مفتاح المرور «{name}»؟ لن يُدخلك بعد ذلك.",
   "passkey.removed": "حُذف مفتاح المرور",
+  "org.fiscalStart": "تبدأ السنة المالية في",
+  "org.fiscalStartHint": "يُقفل العام في اليوم السابق لبدايتها. لا تتغير ما دامت هناك سنة مقفلة.",
+  "yearEnd.current": "السنة المالية الحالية",
+  "yearEnd.next": "التالية للإقفال",
+  "yearEnd.nothingYet": "لا شيء بعد: السنة الحالية لم تنتهِ",
+  "yearEnd.periodEndHint": "آخر يوم في سنة مالية.",
+  "reports.thisFiscalYear": "هذه السنة المالية",
+  "reports.lastFiscalYear": "السنة المالية الماضية",
 };

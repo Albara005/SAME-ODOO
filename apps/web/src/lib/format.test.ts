@@ -1,4 +1,4 @@
-import { formatAmount, formatDate, formatMoney, sumAmounts } from "./format";
+import { addDays, fiscalYear, formatAmount, formatDate, formatMoney, sumAmounts } from "./format";
 
 describe("formatAmount", () => {
   it("groups large amounts exactly, without float rounding", () => {
@@ -34,5 +34,15 @@ describe("sumAmounts", () => {
     expect(sumAmounts(["1000.005", "-0.010"])).toBe("999.995");
     expect(sumAmounts([])).toBe("0");
     expect(sumAmounts(["-5.00", "2.50"])).toBe("-2.50");
+  });
+});
+
+describe("fiscal years", () => {
+  it("finds the year a day falls in, for any start month", () => {
+    expect(fiscalYear(1, "2026-05-04")).toEqual({ start: "2026-01-01", end: "2026-12-31" });
+    expect(fiscalYear(7, "2026-05-04")).toEqual({ start: "2025-07-01", end: "2026-06-30" });
+    expect(fiscalYear(7, "2026-07-01")).toEqual({ start: "2026-07-01", end: "2027-06-30" });
+    expect(fiscalYear(3, "2024-02-10")).toEqual({ start: "2023-03-01", end: "2024-02-29" });   // ends on a leap day
+    expect(addDays("2026-01-01", -1)).toBe("2025-12-31");
   });
 });

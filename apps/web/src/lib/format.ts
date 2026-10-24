@@ -62,3 +62,18 @@ export function sumAmounts(values: string[]): string {
   const out = scale ? `${digits.slice(0, -scale)}.${digits.slice(-scale)}` : digits;
   return negative ? `-${out}` : out;
 }
+
+export function addDays(day: string, n: number): string {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The fiscal year (first and last day, YYYY-MM-DD) containing `day`, for a year starting in `startMonth`. */
+export function fiscalYear(startMonth: number, day: string): { start: string; end: string } {
+  const [y, m] = day.split("-").map(Number) as [number, number];
+  const year = m >= startMonth ? y : y - 1;
+  const start = `${year}-${String(startMonth).padStart(2, "0")}-01`;
+  const next = new Date(Date.UTC(year + 1, startMonth - 1, 1) - 86_400_000);
+  return { start, end: next.toISOString().slice(0, 10) };
+}

@@ -11,12 +11,13 @@ import {
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
 import { isZero } from "../lib/decimal";
-import { locale, today } from "../lib/format";
+import { addDays, fiscalYear, locale, today } from "../lib/format";
 
 type Tab = "receivables" | "payables" | "sales" | "pnl" | "balance" | "trial";
 
 /** The default chart's accounts in the reader's language; accounts an organization adds keep their own name. */
 const DEFAULT_ACCOUNTS = ["1100", "1200", "1300", "1400", "1500", "2100", "2150", "2200", "3000", "3100", "4000", "5000", "5100", "6000"];
+
 export function useAccountName() {
   const { t } = useI18n();
   return (code: string, name: string) => (DEFAULT_ACCOUNTS.includes(code) ? t(`acct.${code}` as MessageKey) : name);
@@ -218,7 +219,8 @@ function monthLabel(key: string, lang: "ar" | "en") {
 function Sales() {
   const { t, money, lang } = useI18n();
   const { org } = useOrg();
-  const [range, setRange] = useState({ date_from: `${today().slice(0, 4)}-01-01`, date_to: today() });
+  const fiscal = fiscalYear(org.fiscal_year_start_month ?? 1, today());
+  const [range, setRange] = useState({ date_from: fiscal.start, date_to: today() });
   const report = useQuery({
     queryKey: ["report", org.id, "sales", range],
     queryFn: () =>
@@ -435,7 +437,10 @@ function StatementSection({ title, lines, total, currency, extra }: {
 function ProfitAndLoss() {
   const { t, money } = useI18n();
   const { org } = useOrg();
-  const [range, setRange] = useState({ from: `${today().slice(0, 4)}-01-01`, to: today() });
+  const startMonth = org.fiscal_year_start_month ?? 1;
+  const thisYear = fiscalYear(startMonth, today());
+  const lastYear = fiscalYear(startMonth, addDays(thisYear.start, -1));
+  const [range, setRange] = useState({ from: thisYear.start, to: today() });
   const report = useQuery({
     queryKey: ["report", org.id, "pnl", range],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/accounting/profit-and-loss", {
@@ -452,6 +457,12 @@ function ProfitAndLoss() {
         <Field label={t("reports.to")} optional>
           <Input type="date" value={range.to} min={range.from} onChange={(e) => setRange({ ...range, to: e.target.value })} ltr />
         </Field>
+        <div className="row" style={{ gap: 4, alignSelf: "flex-end" }}>
+          <Button size="sm" variant="ghost" aria-pressed={range.from === thisYear.start && range.to === today()}
+            onClick={() => setRange({ from: thisYear.start, to: today() })}>{t("reports.thisFiscalYear")}</Button>
+          <Button size="sm" variant="ghost" aria-pressed={range.from === lastYear.start && range.to === lastYear.end}
+            onClick={() => setRange({ from: lastYear.start, to: lastYear.end })}>{t("reports.lastFiscalYear")}</Button>
+        </div>
       </div>
       <QueryView query={report}>
         {(r) => (

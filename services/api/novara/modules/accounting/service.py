@@ -11,7 +11,7 @@ Rules enforced here (and again by the database on PostgreSQL):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
@@ -338,9 +338,29 @@ def last_year_end(db: Session) -> date | None:
         JournalEntry.id.not_in(reversed_ids)))
 
 
-def close_year(db: Session, *, period_end: date, currency: str, created_by: str) -> JournalEntry:
+def fiscal_year_of(start_month: int, day: date) -> tuple[date, date]:
+    """First and last day of the fiscal year that contains ``day`` (it starts on the 1st of ``start_month``)."""
+    year = day.year if day.month >= start_month else day.year - 1
+    return date(year, start_month, 1), date(year + 1, start_month, 1) - timedelta(days=1)
+
+
+def next_year_end(start_month: int, last_closed: date | None, today: date) -> date | None:
+    """The next fiscal year end to close: the one after the last close, or the year before this one.
+    None while that year hasn't ended yet."""
+    if last_closed is not None:
+        candidate = fiscal_year_of(start_month, last_closed + timedelta(days=1))[1]
+    else:
+        candidate = fiscal_year_of(start_month, today)[0] - timedelta(days=1)
+    return candidate if candidate < today else None
+
+
+def close_year(db: Session, *, period_end: date, currency: str, created_by: str, fiscal_start: int = 1) -> JournalEntry:
     """Move the result of the period into retained earnings: every income and expense account
     goes to zero as of ``period_end``, and the difference (profit or loss) lands in retained earnings."""
+    if fiscal_year_of(fiscal_start, period_end)[1] != period_end:
+        end = fiscal_year_of(fiscal_start, period_end)[0] - timedelta(days=1)
+        raise LedgerError(f"a year is closed on the last day of a fiscal year (e.g. {end.isoformat()}); "
+                          "the fiscal year start is set in the organization's settings")
     previous = last_year_end(db)
     if previous is not None and period_end <= previous:
         raise LedgerError(f"the year is already closed up to {previous.isoformat()}")

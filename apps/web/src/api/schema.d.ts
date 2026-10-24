@@ -5899,6 +5899,11 @@ export interface components {
             default_currency: string;
             /** Default Locale */
             default_locale: string;
+            /**
+             * Fiscal Year Start Month
+             * @default 1
+             */
+            fiscal_year_start_month: number;
             /** Hosting Mode */
             hosting_mode: string;
             /** Id */
@@ -6096,6 +6101,11 @@ export interface components {
             default_currency: string;
             /** Default Locale */
             default_locale: string;
+            /**
+             * Fiscal Year Start Month
+             * @default 1
+             */
+            fiscal_year_start_month: number;
             /** Hosting Mode */
             hosting_mode: string;
             /** Id */
@@ -6118,6 +6128,8 @@ export interface components {
             default_currency?: string | null;
             /** Default Locale */
             default_locale?: string | null;
+            /** Fiscal Year Start Month */
+            fiscal_year_start_month?: number | null;
             /** Name */
             name?: string | null;
             /** Require Mfa */
@@ -7740,11 +7752,25 @@ export interface components {
         };
         /** YearEndOut */
         YearEndOut: {
+            /**
+             * Current Year End
+             * Format: date
+             */
+            current_year_end: string;
+            /**
+             * Current Year Start
+             * Format: date
+             */
+            current_year_start: string;
             entry?: components["schemas"]["JournalEntryOut"] | null;
+            /** Fiscal Year Start Month */
+            fiscal_year_start_month: number;
             /** Last Closed */
             last_closed: string | null;
             /** Locked Until */
             locked_until: string | null;
+            /** Next To Close */
+            next_to_close: string | null;
         };
         /** RunOut */
         novara__agents__router__RunOut: {

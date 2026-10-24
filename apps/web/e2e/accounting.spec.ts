@@ -177,6 +177,13 @@ test("accounting: a manual entry, a new account, closing the year and reversing"
   });
   await call("POST", `/invoices/${inv.id}/post`);
 
+  // This business's fiscal year runs April to March.
+  const orgPath = page.url().match(/\/o\/[0-9a-f-]+/)![0];
+  await page.goto(`${orgPath}/settings/organization`);
+  await page.getByLabel("تبدأ السنة المالية في").selectOption({ label: "أبريل" });
+  await page.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByText("تم الحفظ")).toBeVisible();
+
   await nav(page, "المحاسبة");
   await page.getByRole("button", { name: "قيد يدوي" }).click();
   let dialog = page.getByRole("dialog");
@@ -208,7 +215,8 @@ test("accounting: a manual entry, a new account, closing the year and reversing"
   await expect(page.getByText("لم تُقفل سنة بعد")).toBeVisible();
   await page.getByRole("button", { name: "إقفال السنة" }).click();
   dialog = page.getByRole("dialog");
-  await dialog.getByLabel("آخر يوم في السنة").fill("2026-03-31");
+  await expect(dialog.getByLabel(/آخر يوم في السنة/)).toHaveValue(/-03-31$/);     // the next fiscal year end
+  await dialog.getByLabel(/آخر يوم في السنة/).fill("2026-03-31");
   await dialog.getByRole("button", { name: "إقفال السنة" }).click();
   await expect(page.getByText(/أُقفلت السنة حتى/)).toBeVisible();
   await expect(page.getByText(/الدفاتر مقفلة حتى/).first()).toBeVisible();

@@ -200,6 +200,8 @@ def test_manual_entries_balance_avoid_control_accounts_and_are_reversed(api, sho
 
 
 def test_year_end_close_moves_the_result_into_retained_earnings(api, shop):
+    # This organization's fiscal year runs April to March.
+    assert api.req("PATCH", OWNER, f"/orgs/{shop['org']}", json={"fiscal_year_start_month": 4}).status_code == 200
     assert api.req("POST", ACCT, o(shop, "/accounting/year-end"),
                    json={"period_end": "2026-03-31"}).status_code == 422  # nothing to close yet
     posted_invoice(api, shop, [{"product_id": shop["setup"], "quantity": "10"}], date="2026-02-01")  # 1,000 income
@@ -242,3 +244,34 @@ def test_year_end_close_moves_the_result_into_retained_earnings(api, shop):
     again = api.req("POST", ACCT, o(shop, "/accounting/year-end"), json={"period_end": "2026-03-31", "lock": False})
     assert again.status_code == 201, again.text
     assert again.json()["locked_until"] is None
+
+
+def test_a_year_closes_on_the_last_day_of_its_fiscal_year(api, shop):
+    from datetime import date
+
+    from novara.modules.accounting.service import fiscal_year_of, next_year_end
+
+    assert fiscal_year_of(1, date(2026, 5, 4)) == (date(2026, 1, 1), date(2026, 12, 31))
+    assert fiscal_year_of(7, date(2026, 5, 4)) == (date(2025, 7, 1), date(2026, 6, 30))
+    assert fiscal_year_of(7, date(2026, 7, 1)) == (date(2026, 7, 1), date(2027, 6, 30))
+    assert fiscal_year_of(3, date(2024, 2, 29)) == (date(2023, 3, 1), date(2024, 2, 29))      # a leap-year end
+    assert next_year_end(7, None, date(2026, 10, 24)) == date(2026, 6, 30)
+    assert next_year_end(7, date(2026, 6, 30), date(2026, 10, 24)) is None                    # this year isn't over
+    assert next_year_end(1, date(2024, 12, 31), date(2026, 10, 24)) == date(2025, 12, 31)
+
+    org = f"/orgs/{shop['org']}"
+    assert api.req("PATCH", OWNER, org, json={"fiscal_year_start_month": 13}).status_code == 422
+    assert api.req("PATCH", OWNER, org, json={"fiscal_year_start_month": 7}).json()["fiscal_year_start_month"] == 7
+    info = api.req("GET", ACCT, o(shop, "/accounting/year-end")).json()
+    assert info["fiscal_year_start_month"] == 7 and info["current_year_start"][5:] == "07-01"
+    assert info["current_year_end"][5:] == "06-30" and info["next_to_close"][5:] == "06-30"
+
+    posted_invoice(api, shop, [{"product_id": shop["setup"], "quantity": "2"}], date="2025-03-01")
+    wrong = api.req("POST", ACCT, o(shop, "/accounting/year-end"), json={"period_end": "2025-12-31"})
+    assert wrong.status_code == 422 and "2025-06-30" in wrong.json()["detail"]
+    closed = api.req("POST", ACCT, o(shop, "/accounting/year-end"), json={"period_end": "2025-06-30"})
+    assert closed.status_code == 201, closed.text
+    assert closed.json()["next_to_close"] in (None, "2026-06-30")
+    # The boundary can't move while a closed year stands on it.
+    assert api.req("PATCH", OWNER, org, json={"fiscal_year_start_month": 1}).status_code == 409
+    assert api.req("PATCH", OWNER, org, json={"fiscal_year_start_month": 7}).status_code == 200   # unchanged is fine

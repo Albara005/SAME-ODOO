@@ -14,9 +14,9 @@ from novara.deps import OrgContext, client_ip, get_db, require, require_any
 from novara.modules.access import permissions as P
 from novara.modules.accounting.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Tax
 from novara.modules.accounting.service import (CONTROL_ACCOUNTS, LedgerError, PeriodLocked, TrialBalanceRow, balance_sheet,
-                                              close_year, ensure_chart, last_year_end, natural_balance,
-                                              post_manual_entry, profit_and_loss, reverse_manual, system_account,
-                                              trial_balance)
+                                              close_year, ensure_chart, fiscal_year_of, last_year_end, natural_balance,
+                                              next_year_end, post_manual_entry, profit_and_loss, reverse_manual,
+                                              system_account, trial_balance)
 from novara.modules.audit import service as audit
 from novara.money import fmt_decimal, from_minor, to_minor
 
@@ -121,7 +121,20 @@ class YearEndIn(BaseModel):
 class YearEndOut(BaseModel):
     last_closed: date | None
     locked_until: date | None
+    fiscal_year_start_month: int
+    current_year_start: date      # the fiscal year today falls in
+    current_year_end: date
+    next_to_close: date | None    # the next fiscal year end to close, once that year is over
     entry: JournalEntryOut | None = None
+
+
+def _year_end_out(db: Session, org, entry: JournalEntryOut | None = None) -> YearEndOut:
+    start_month, today = org.fiscal_year_start_month, date.today()
+    last = last_year_end(db)
+    start, end = fiscal_year_of(start_month, today)
+    return YearEndOut(last_closed=last, locked_until=org.books_locked_until, fiscal_year_start_month=start_month,
+                      current_year_start=start, current_year_end=end,
+                      next_to_close=next_year_end(start_month, last, today), entry=entry)
 
 
 class TrialBalanceLine(BaseModel):
@@ -484,7 +497,7 @@ def set_lock(body: LockIn, request: Request, ctx: OrgContext = Depends(require(P
 
 @router.get("/orgs/{org_id}/accounting/year-end", response_model=YearEndOut)
 def get_year_end(ctx: OrgContext = Depends(require(P.ACCOUNTING_READ)), db: Session = Depends(get_db)):
-    return YearEndOut(last_closed=last_year_end(db), locked_until=ctx.organization.books_locked_until)
+    return _year_end_out(db, ctx.organization)
 
 
 @router.post("/orgs/{org_id}/accounting/year-end", response_model=YearEndOut, status_code=status.HTTP_201_CREATED)
@@ -494,12 +507,11 @@ def post_year_end(body: YearEndIn, request: Request, ctx: OrgContext = Depends(r
     By default the books are closed up to the same day, so the closed year can't change afterwards."""
     org = ctx.organization
     entry = _ledger(lambda: close_year(db, period_end=body.period_end, currency=org.default_currency,
-                                       created_by=ctx.user.id))
+                                       created_by=ctx.user.id, fiscal_start=org.fiscal_year_start_month))
     if body.lock and (org.books_locked_until is None or org.books_locked_until < body.period_end):
         org.books_locked_until = body.period_end
     audit.record(db, actor_user_id=ctx.user.id, action="books.year_closed", target_type="organization",
                  target_id=org.id, details={"period_end": body.period_end.isoformat(), "entry": entry.number,
                                             "locked": body.lock}, ip_address=client_ip(request))
     db.commit()
-    return YearEndOut(last_closed=last_year_end(db), locked_until=org.books_locked_until,
-                      entry=entries_out(db, [entry])[0])
+    return _year_end_out(db, org, entries_out(db, [entry])[0])
