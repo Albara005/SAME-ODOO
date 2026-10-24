@@ -70,12 +70,19 @@ def current_user(auth: AuthContext = Depends(current_auth)) -> User:
     return auth.user
 
 
+def two_step(auth: AuthContext) -> bool:
+    """Whether this sign-in meets a two-step requirement: the account has the app on (so every password
+    sign-in asks for a code), or this session was opened with a passkey or a code."""
+    return auth.user.mfa_enabled or auth.session.two_step
+
+
 @dataclass
 class OrgContext:
     organization: Organization
     membership: Membership
     role: Role
     user: User
+    two_step: bool = False  # see two_step(); set for requests, False for the workflow worker
 
     @property
     def permissions(self) -> set[str]:
@@ -85,19 +92,21 @@ class OrgContext:
         return permission in self.permissions
 
 
-MFA_REQUIRED = "this organization requires two-step sign-in: turn it on in your account to continue"
+MFA_REQUIRED = ("this organization requires two-step sign-in: sign in with a passkey, or turn on an authenticator "
+                "app in your account, to continue")
 
 
 def membership_context(
     org_id: str = Path(...),
-    user: User = Depends(current_user),
+    auth: AuthContext = Depends(current_auth),
     db: Session = Depends(get_db),
 ) -> OrgContext:
     """Membership only, without the organization's two-step sign-in requirement. Used just to
     describe the organization to its member (so the app can explain what is needed)."""
-    ctx = member_context(db, org_id, user)
+    ctx = member_context(db, org_id, auth.user)
     if ctx is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+    ctx.two_step = two_step(auth)
     return ctx
 
 
@@ -105,9 +114,9 @@ def org_context(ctx: OrgContext = Depends(membership_context)) -> OrgContext:
     """Bind the request's DB session to the organization in the URL after checking membership.
 
     Non-members get 404 rather than 403 so organization ids can't be probed. When the
-    organization requires two-step sign-in, members without it get 403 until they turn it on.
+    organization requires two-step sign-in, a sign-in without a second step gets 403.
     """
-    if ctx.organization.require_mfa and not ctx.user.mfa_enabled:
+    if ctx.organization.require_mfa and not ctx.two_step:
         raise HTTPException(status.HTTP_403_FORBIDDEN, MFA_REQUIRED)
     return ctx
 

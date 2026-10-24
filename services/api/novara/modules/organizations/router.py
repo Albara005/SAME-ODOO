@@ -21,7 +21,7 @@ from novara.modules.accounting.models import JournalEntry
 from novara.modules.accounting.service import last_year_end
 from novara.modules.accounting.service import ensure_chart
 from novara.modules.audit import service as audit
-from novara.modules.identity.models import User
+from novara.modules.identity.models import Passkey, User
 from novara.modules.organizations.models import Invitation, Membership, Organization
 from novara.money import CURRENCY_DIGITS
 from novara.tenancy import bind_tenant, system_scope
@@ -86,13 +86,18 @@ class MemberOut(BaseModel):
     role: str
     status: str
     mfa_enabled: bool = False
+    has_passkey: bool = False  # a passkey sign-in also meets the two-step requirement
     created_at: datetime
 
 
-def _member_out(m: Membership, user: User, role: Role) -> MemberOut:
+def _with_passkeys(db: Session, user_ids: list[str]) -> set[str]:
+    return set(db.scalars(select(Passkey.user_id).where(Passkey.user_id.in_(user_ids)).distinct())) if user_ids else set()
+
+
+def _member_out(m: Membership, user: User, role: Role, has_passkey: bool) -> MemberOut:
     return MemberOut(
-        id=m.id, user_id=user.id, email=user.email, full_name=user.full_name,
-        role=role.key, status=m.status, mfa_enabled=user.mfa_enabled, created_at=m.created_at,
+        id=m.id, user_id=user.id, email=user.email, full_name=user.full_name, role=role.key, status=m.status,
+        mfa_enabled=user.mfa_enabled, has_passkey=has_passkey, created_at=m.created_at,
     )
 
 
@@ -147,9 +152,10 @@ def get_org(ctx: OrgContext = Depends(membership_context)):
 def update_org(body: OrgUpdate, request: Request, ctx: OrgContext = Depends(require(P.ORG_MANAGE)),
                db: Session = Depends(get_db)):
     changes = body.model_dump(exclude_none=True)
-    if changes.get("require_mfa") and not ctx.organization.require_mfa and not ctx.user.mfa_enabled:
+    if changes.get("require_mfa") and not ctx.organization.require_mfa and not ctx.two_step:
         # Otherwise the person turning it on would be locked out first.
-        raise HTTPException(status.HTTP_409_CONFLICT, "turn on two-step sign-in for your own account first")
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "sign in with a passkey, or turn on two-step sign-in for your own account, first")
     if "default_currency" in changes and changes["default_currency"] != ctx.organization.default_currency:
         _check_currency(changes["default_currency"])
         if db.scalar(select(JournalEntry.id).limit(1)):
@@ -200,7 +206,8 @@ def list_members(ctx: OrgContext = Depends(require(P.MEMBERS_READ)), db: Session
         .join(Role, Role.id == Membership.role_id)
         .order_by(User.email)
     ).all()
-    return [_member_out(m, u, r) for m, u, r in rows]
+    keys = _with_passkeys(db, [u.id for _, u, _ in rows])
+    return [_member_out(m, u, r, u.id in keys) for m, u, r in rows]
 
 
 @router.post("/orgs/{org_id}/members", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
@@ -220,7 +227,7 @@ def add_member(body: MemberIn, request: Request, ctx: OrgContext = Depends(requi
     audit.record(db, actor_user_id=ctx.user.id, action="member.added", target_type="membership",
                  target_id=m.id, details={"user_id": user.id, "role": role.key}, ip_address=client_ip(request))
     db.commit()
-    return _member_out(m, user, role)
+    return _member_out(m, user, role, bool(_with_passkeys(db, [user.id])))
 
 
 def _load_member(db: Session, member_id: str) -> tuple[Membership, User, Role]:
@@ -257,7 +264,7 @@ def update_member(member_id: str, body: MemberUpdate, request: Request,
         audit.record(db, actor_user_id=ctx.user.id, action="member.updated", target_type="membership",
                      target_id=m.id, details=details, ip_address=client_ip(request))
     db.commit()
-    return _member_out(m, user, new_role)
+    return _member_out(m, user, new_role, bool(_with_passkeys(db, [user.id])))
 
 
 @router.delete("/orgs/{org_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)

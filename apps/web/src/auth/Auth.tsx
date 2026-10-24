@@ -80,7 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await unwrap(api.POST("/api/v1/auth/passkey", {
       body: { challenge_id: start.challenge_id, credential: credentialJson(credential) },
     }));
+    const replaced = tokenStore.get();
     await startSession(result.access_token);
+    if (replaced) {
+      // Signing in again from a one-step session (to meet a two-step requirement): end the old one.
+      void fetch("/api/v1/auth/logout", { method: "POST", headers: { Authorization: `Bearer ${replaced}` } }).catch(() => undefined);
+    }
   }, [startSession]);
 
   const logout = useCallback(async () => {

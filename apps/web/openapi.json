@@ -5012,6 +5012,11 @@
       "title": "Full Name",
       "type": "string"
      },
+     "has_passkey": {
+      "default": false,
+      "title": "Has Passkey",
+      "type": "boolean"
+     },
      "id": {
       "title": "Id",
       "type": "string"
@@ -8093,6 +8098,10 @@
       "title": "Ip Address",
       "type": "string"
      },
+     "two_step": {
+      "title": "Two Step",
+      "type": "boolean"
+     },
      "user_agent": {
       "title": "User Agent",
       "type": "string"
@@ -8103,7 +8112,8 @@
      "created_at",
      "expires_at",
      "user_agent",
-     "ip_address"
+     "ip_address",
+     "two_step"
     ],
     "title": "SessionOut",
     "type": "object"
@@ -9091,6 +9101,11 @@
       "title": "Full Name",
       "type": "string"
      },
+     "has_passkey": {
+      "default": false,
+      "title": "Has Passkey",
+      "type": "boolean"
+     },
      "id": {
       "title": "Id",
       "type": "string"
@@ -9106,6 +9121,11 @@
      "timezone": {
       "title": "Timezone",
       "type": "string"
+     },
+     "two_step": {
+      "default": false,
+      "title": "Two Step",
+      "type": "boolean"
      }
     },
     "required": [
@@ -11528,7 +11548,7 @@
   },
   "/api/v1/me/passkeys/options": {
    "post": {
-    "description": "Start adding a passkey (the password is checked again, as for two-step sign-in).",
+    "description": "Start adding a passkey: the password is checked again, and an account that already has a second\nstep must have used it for this sign-in.",
     "operationId": "passkey_registration_options_api_v1_me_passkeys_options_post",
     "requestBody": {
      "content": {

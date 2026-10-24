@@ -12,10 +12,10 @@ from sqlalchemy.orm import Session
 
 from novara import crypto
 from novara.db import utcnow
-from novara.deps import AuthContext, client_ip, current_auth, current_user, get_db
+from novara.deps import AuthContext, client_ip, current_auth, current_user, get_db, two_step
 from novara.mail import Message, deliver
 from novara.modules.identity import totp
-from novara.modules.identity.models import LoginAttempt, RecoveryCode, User, UserSession, UserToken
+from novara.modules.identity.models import LoginAttempt, Passkey, RecoveryCode, User, UserSession, UserToken
 from novara.modules.organizations.models import Membership, Organization
 from novara.security import (
     DUMMY_HASH, MIN_PASSWORD_LENGTH, decode_mfa_token, hash_password, issue_mfa_token, issue_token, verify_password,
@@ -61,6 +61,9 @@ class UserOut(BaseModel):
     timezone: str
     email_verified: bool
     mfa_enabled: bool
+    has_passkey: bool = False
+    # This sign-in meets a two-step requirement (the app is on, or it was opened with a passkey or a code).
+    two_step: bool = False
 
 
 class TokenOut(BaseModel):
@@ -87,6 +90,7 @@ class SessionOut(BaseModel):
     expires_at: datetime
     user_agent: str
     ip_address: str
+    two_step: bool
     current: bool = False
 
 
@@ -215,10 +219,10 @@ def _record(db: Session, email: str, ip: str, succeeded: bool) -> None:
     db.commit()
 
 
-def _new_session(db: Session, request: Request, user: User) -> TokenOut:
+def _new_session(db: Session, request: Request, user: User, *, two_step: bool) -> TokenOut:
     settings = request.app.state.settings
     expires_at = utcnow() + timedelta(minutes=settings.session_ttl_minutes)
-    login_session = UserSession(user_id=user.id, expires_at=expires_at,
+    login_session = UserSession(user_id=user.id, expires_at=expires_at, two_step=two_step,
                                 user_agent=request.headers.get("user-agent", "")[:500], ip_address=client_ip(request))
     db.add(login_session)
     db.commit()
@@ -262,7 +266,7 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)) -> Log
                                 expires_at=utcnow() + MFA_TOKEN_TTL, nonce=secrets.token_hex(8))
         return LoginOut(mfa_required=True, mfa_token=token)
     _record(db, email, ip, succeeded=True)
-    return LoginOut(**_new_session(db, request, user).model_dump())
+    return LoginOut(**_new_session(db, request, user, two_step=False).model_dump())
 
 
 def _second_factor_ok(db: Session, request: Request, user: User, code: str) -> bool:
@@ -298,7 +302,7 @@ def login_mfa(body: MfaLoginIn, request: Request, db: Session = Depends(get_db))
         _record(db, user.email, ip, succeeded=False)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid code")
     _record(db, user.email, ip, succeeded=True)
-    return _new_session(db, request, user)
+    return _new_session(db, request, user, two_step=True)
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
@@ -372,8 +376,21 @@ def change_password(body: PasswordChangeIn, auth: AuthContext = Depends(current_
 
 
 @router.get("/me", response_model=UserOut)
-def me(user: User = Depends(current_user)) -> User:
-    return user
+def me(auth: AuthContext = Depends(current_auth), db: Session = Depends(get_db)) -> UserOut:
+    return UserOut.model_validate(auth.user).model_copy(
+        update={"has_passkey": has_passkey(db, auth.user), "two_step": two_step(auth)})
+
+
+def has_passkey(db: Session, user: User) -> bool:
+    return db.scalar(select(Passkey.id).where(Passkey.user_id == user.id).limit(1)) is not None
+
+
+def require_second_step(db: Session, auth: AuthContext) -> None:
+    """Changing how you sign in needs the second step you already have, not just the password:
+    otherwise a stolen password could add its own passkey or app, or remove yours."""
+    if (auth.user.mfa_enabled or has_passkey(db, auth.user)) and not auth.session.two_step:
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "sign in again with your passkey or authenticator code to change how you sign in")
 
 
 @router.get("/me/sessions", response_model=list[SessionOut])
@@ -411,11 +428,13 @@ def _new_recovery_codes(db: Session, user: User) -> list[str]:
 
 
 @router.post("/me/mfa/setup", response_model=MfaSetupOut)
-def mfa_setup(body: PasswordIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def mfa_setup(body: PasswordIn, request: Request, auth: AuthContext = Depends(current_auth), db: Session = Depends(get_db)):
     """Start two-factor setup: scan the secret into an authenticator app, then confirm with a code."""
+    user = auth.user
     _require_password(user, body.password)
     if user.mfa_enabled:
         raise HTTPException(status.HTTP_409_CONFLICT, "two-factor sign-in is already on")
+    require_second_step(db, auth)
     secret = totp.new_secret()
     user.mfa_pending_secret = crypto.encrypt(request.app.state.settings, secret, context=user.id)
     db.commit()
@@ -423,17 +442,22 @@ def mfa_setup(body: PasswordIn, request: Request, user: User = Depends(current_u
 
 
 @router.post("/me/mfa/enable", response_model=RecoveryCodesOut)
-def mfa_enable(body: MfaCodeIn, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def mfa_enable(body: MfaCodeIn, request: Request, auth: AuthContext = Depends(current_auth), db: Session = Depends(get_db)):
+    user = auth.user
     if user.mfa_enabled:
         raise HTTPException(status.HTTP_409_CONFLICT, "two-factor sign-in is already on")
     if not user.mfa_pending_secret:
         raise HTTPException(status.HTTP_409_CONFLICT, "start the setup first")
+    require_second_step(db, auth)  # again: a passkey may have been added since the setup started
     secret = crypto.decrypt(request.app.state.settings, user.mfa_pending_secret, context=user.id)
     step = totp.matching_step(secret, body.code)
     if step is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "the code doesn't match; check the time on your phone")
     user.mfa_secret, user.mfa_pending_secret, user.mfa_last_step, user.mfa_enabled = (
         user.mfa_pending_secret, None, step, True)
+    # Setup needed a two-step session if the account had a passkey; otherwise this is the first second
+    # factor, just proven here, so this session now counts as two-step.
+    auth.session.two_step = True
     codes = _new_recovery_codes(db, user)
     db.commit()
     return RecoveryCodesOut(recovery_codes=codes)
@@ -457,7 +481,7 @@ def mfa_disable(body: PasswordAndCodeIn, request: Request, user: User = Depends(
     if not _second_factor_ok(db, request, user, body.code):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "invalid code")
     requiring = _orgs_requiring_mfa(db, user)
-    if requiring:
+    if requiring and not has_passkey(db, user):  # with a passkey, signing in with it still meets the requirement
         raise HTTPException(status.HTTP_409_CONFLICT,
                             f"{', '.join(requiring)} requires two-step sign-in; it can't be turned off while you're a member")
     user.mfa_enabled, user.mfa_secret, user.mfa_pending_secret, user.mfa_last_step = False, None, None, None

@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useAuth } from "../auth/Auth";
+import { PasskeySignInButton } from "../auth/PasskeySignIn";
 import { refreshUser } from "../auth/refreshUser";
 import { BrandMark, SignOutButton, TopActions } from "../components/Layout";
 import { Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, Notice, QueryView, errorText, useToast } from "../components/ui";
@@ -15,6 +16,8 @@ export function AccountPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   if (!user) return null;
+  // A sign-in without a second step can't change how an account that has one signs in.
+  const locked = !user.two_step && (user.mfa_enabled || user.has_passkey);
   return (
     <div className="content" style={{ maxWidth: 820 }}>
       <div className="row-between" style={{ marginBlockEnd: "var(--space-5)" }}>
@@ -33,8 +36,8 @@ export function AccountPage() {
         </div>
         <ProfileCard user={user} />
         <PasswordCard />
-        <TwoFactorCard enabled={user.mfa_enabled} />
-        <PasskeysCard />
+        <TwoFactorCard enabled={user.mfa_enabled} locked={locked} hasPasskey={user.has_passkey} />
+        <PasskeysCard locked={locked} />
         <SessionsCard />
       </div>
     </div>
@@ -132,7 +135,18 @@ function PasswordCard() {
 
 // ---------------------------------------------------------------- two-factor sign-in
 
-function TwoFactorCard({ enabled }: { enabled: boolean }) {
+/** Why adding or removing a way to sign in is blocked, and the quickest way past it. */
+function StepUpNotice({ hasPasskey }: { hasPasskey: boolean }) {
+  const { t } = useI18n();
+  return (
+    <div className="notice notice-info small stack-sm">
+      <span>{t("account.stepUp")}</span>
+      {hasPasskey && <div className="row"><PasskeySignInButton size="sm" /></div>}
+    </div>
+  );
+}
+
+function TwoFactorCard({ enabled, locked, hasPasskey }: { enabled: boolean; locked: boolean; hasPasskey: boolean }) {
   const { t } = useI18n();
   const [dialog, setDialog] = useState<"setup" | "disable" | "codes" | null>(null);
   const remaining = useQuery({
@@ -151,6 +165,7 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
         {enabled && left !== undefined && (
           <p className={left <= 2 ? "notice notice-info small" : "small"}>{t("mfa.remaining", { n: left })}</p>
         )}
+        {!enabled && locked && <StepUpNotice hasPasskey={hasPasskey} />}
         <div className="row">
           {enabled ? (
             <>
@@ -162,7 +177,7 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
               </Button>
             </>
           ) : (
-            <Button variant="primary" icon={<ShieldCheck size={16} />} onClick={() => setDialog("setup")}>
+            <Button variant="primary" icon={<ShieldCheck size={16} />} onClick={() => setDialog("setup")} disabled={locked}>
               {t("mfa.enable")}
             </Button>
           )}
@@ -174,7 +189,7 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
   );
 }
 
-function PasskeysCard() {
+function PasskeysCard({ locked }: { locked: boolean }) {
   const { t, date } = useI18n();
   const qc = useQueryClient();
   const toast = useToast();
@@ -182,15 +197,23 @@ function PasskeysCard() {
   const passkeys = useQuery({ queryKey: ["passkeys"], queryFn: () => unwrap(api.GET("/api/v1/me/passkeys")) });
   const remove = useMutation({
     mutationFn: (id: string) => unwrap(api.DELETE("/api/v1/me/passkeys/{passkey_id}", { params: { path: { passkey_id: id } } })),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["passkeys"] }); toast(t("passkey.removed")); },
-    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["passkeys"] });
+      void refreshUser(qc);
+      toast(t("passkey.removed"));
+    },
+    onError: (e) => toast(e instanceof ApiError && e.status === 409
+      ? t("passkey.requiredByOrg", { orgs: e.message.split(" requires ")[0] ?? "" })
+      : errorText(e, t("common.error")), "error"),
   });
   const supported = passkeysSupported();
   return (
-    <Card title={t("passkey.title")} actions={supported && <Button icon={<Fingerprint size={16} />} onClick={() => setAdding(true)}>{t("passkey.add")}</Button>}>
+    <Card title={t("passkey.title")}
+      actions={supported && <Button icon={<Fingerprint size={16} />} onClick={() => setAdding(true)} disabled={locked}>{t("passkey.add")}</Button>}>
       <div className="stack-sm">
         <p className="muted">{t("passkey.about")}</p>
         {!supported && <p className="notice notice-info small">{t("passkey.unsupported")}</p>}
+        {locked && <StepUpNotice hasPasskey={(passkeys.data?.length ?? 0) > 0} />}
         <QueryView query={passkeys}>
           {(list) => list.length === 0 ? <Empty>{t("passkey.none")}</Empty> : (
             <ul className="plain-list">
@@ -203,7 +226,7 @@ function PasskeysCard() {
                       {p.last_used_at ? ` · ${t("passkey.lastUsed", { date: date(p.last_used_at) })}` : ""}
                     </span>
                   </span>
-                  <IconButton label={t("passkey.remove", { name: p.name })}
+                  <IconButton label={t("passkey.remove", { name: p.name })} disabled={locked}
                     onClick={() => window.confirm(t("passkey.removeConfirm", { name: p.name })) && remove.mutate(p.id)}>
                     <Trash2 size={14} />
                   </IconButton>
@@ -237,7 +260,12 @@ function AddPasskeyDialog({ onClose }: { onClose: () => void }) {
         body: { challenge_id: start.challenge_id, name: form.name.trim(), credential: credentialJson(credential) },
       }));
     },
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["passkeys"] }); toast(t("passkey.addedToast")); onClose(); },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["passkeys"] });
+      void refreshUser(qc); // the first passkey makes this sign-in two-step
+      toast(t("passkey.addedToast"));
+      onClose();
+    },
   });
   return (
     <Dialog open onClose={onClose} title={t("passkey.add")}>

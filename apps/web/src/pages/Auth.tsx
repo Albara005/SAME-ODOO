@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError, unwrap } from "../api/client";
 import { useAuth } from "../auth/Auth";
+import { PasskeySignInButton } from "../auth/PasskeySignIn";
 import { refreshUser } from "../auth/refreshUser";
 import { rememberOrg } from "../auth/Org";
 import { Fingerprint, MailCheck, ShieldCheck, Sparkle } from "lucide-react";
@@ -358,17 +359,19 @@ export function VerifyEmailPage() {
   );
 }
 
-/** The organization requires two-step sign-in and this account doesn't have it yet. */
-export function MfaRequiredPage({ orgName }: { orgName: string }) {
+/** The organization requires two-step sign-in and this sign-in had no second step. */
+export function MfaRequiredPage({ orgName, hasPasskey }: { orgName: string; hasPasskey: boolean }) {
   const { t } = useI18n();
+  const withPasskey = hasPasskey && passkeysSupported();
   return (
     <AuthFrame>
       <div className="stack">
         <h1>{t("mfaGate.title")}</h1>
         <div className="notice notice-info">
-          <ShieldCheck size={18} aria-hidden /> {t("mfaGate.body", { org: orgName })}
+          <ShieldCheck size={18} aria-hidden /> {t(withPasskey ? "mfaGate.bodyPasskey" : "mfaGate.body", { org: orgName })}
         </div>
-        <Link to="/account" className="btn btn-primary">{t("mfaGate.setUp")}</Link>
+        {withPasskey && <PasskeySignInButton primary />}
+        <Link to="/account" className={withPasskey ? "btn" : "btn btn-primary"}>{t("mfaGate.setUp")}</Link>
         <Link to="/orgs" className="btn">{t("mfaGate.otherOrgs")}</Link>
       </div>
     </AuthFrame>

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Index, String, Text, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -38,6 +38,8 @@ class UserSession(IdMixin, TimestampMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     user_agent: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     ip_address: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    # Opened with a second step (an app code or a passkey), or the account's first second factor was set up in it.
+    two_step: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
 
 
 class LoginAttempt(IdMixin, TimestampMixin, Base):

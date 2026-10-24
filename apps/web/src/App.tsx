@@ -109,7 +109,7 @@ function OrgRoute() {
   const org = useOrgQuery(orgId);
   if (org.isPending) return <Loading />;
   if (org.isError) return <Navigate to="/orgs" replace />;
-  if (org.data.require_mfa && !user?.mfa_enabled) return <MfaRequiredPage orgName={org.data.name} />;
+  if (org.data.require_mfa && !user?.two_step) return <MfaRequiredPage orgName={org.data.name} hasPasskey={user?.has_passkey ?? false} />;
   rememberOrg(org.data.id);
   return (
     <OrgProvider org={org.data}>

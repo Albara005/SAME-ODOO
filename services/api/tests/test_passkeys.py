@@ -8,12 +8,14 @@ import hashlib
 import json
 import os
 import struct
+import time
 
 import cbor2
 import pytest
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from novara.modules.identity import totp
 from tests.test_security import OWNER, PASSWORD, enable_mfa
 
 UP, UV, AT = 0x01, 0x04, 0x40  # authenticator data flags: user present, user verified, credential data included
@@ -136,3 +138,69 @@ def test_failed_passkey_sign_ins_count_against_the_limit(api, client, origin):
     for _ in range(5):
         assert sign_in(client, origin, device, flags=UP).status_code == 401
     assert sign_in(client, origin, device).status_code == 429
+
+
+def test_a_passkey_meets_the_organizations_two_step_requirement(api, client, origin):
+    member = "member@keys.example.com"
+    for e in (OWNER, member):
+        api.signup(e)
+    org = api.create_org(OWNER, "keys-co")
+    assert api.add_member(OWNER, org, member, "sales").status_code == 201
+    me = lambda email: api.req("GET", email, "/me").json()  # noqa: E731
+
+    # Turning the requirement on needs a second step on your own sign-in; a first passkey set up here counts.
+    assert api.req("PATCH", OWNER, f"/orgs/{org}", json={"require_mfa": True}).status_code == 409
+    assert register(api, origin, SoftAuthenticator())[1].status_code == 201
+    assert (me(OWNER)["has_passkey"], me(OWNER)["two_step"], me(OWNER)["mfa_enabled"]) == (True, True, False)
+    assert api.req("PATCH", OWNER, f"/orgs/{org}", json={"require_mfa": True}).status_code == 200
+
+    phone = SoftAuthenticator()
+    assert register(api, origin, phone, email=member, name="Phone")[1].status_code == 201
+    members = api.req("GET", OWNER, f"/orgs/{org}/members").json()
+    assert {m["email"]: (m["mfa_enabled"], m["has_passkey"]) for m in members} == {OWNER: (False, True), member: (False, True)}
+
+    # Someone with only the member's password gets in, but not into the organization, and can't change
+    # how the member signs in: no passkey of their own, no authenticator app, no removing the member's.
+    password_only = client.post("/api/v1/auth/login", json={"email": member, "password": PASSWORD}).json()
+    api.tokens[member] = password_only["access_token"]
+    assert (me(member)["two_step"], me(member)["has_passkey"]) == (False, True)
+    blocked = api.req("GET", member, f"/orgs/{org}/customers")
+    assert blocked.status_code == 403 and "sign in with a passkey" in blocked.text
+    assert api.req("GET", member, f"/orgs/{org}").status_code == 200                    # can still see why
+    assert api.req("POST", member, "/me/passkeys/options", json={"password": PASSWORD}).status_code == 403
+    assert api.req("POST", member, "/me/mfa/setup", json={"password": PASSWORD}).status_code == 403
+    pid = api.req("GET", member, "/me/passkeys").json()[0]["id"]
+    assert api.req("DELETE", member, f"/me/passkeys/{pid}").status_code == 403
+
+    # Signing in with the passkey opens the organization.
+    signed = sign_in(client, origin, phone)
+    assert signed.status_code == 200
+    api.tokens[member] = signed.json()["access_token"]
+    assert me(member)["two_step"] is True
+    assert api.req("GET", member, f"/orgs/{org}/customers").status_code == 200
+    sessions = api.req("GET", member, "/me/sessions").json()
+    assert {(s["current"], s["two_step"]) for s in sessions} >= {(True, True), (False, False)}
+
+    # The last second step can't go while the organization requires it; with another one it can.
+    last = api.req("DELETE", member, f"/me/passkeys/{pid}")
+    assert last.status_code == 409 and "Keys-Co" in last.text
+    laptop = SoftAuthenticator()
+    assert register(api, origin, laptop, email=member, name="Laptop")[1].status_code == 201
+    assert api.req("DELETE", member, f"/me/passkeys/{pid}").status_code == 204
+    assert sign_in(client, origin, phone).status_code == 401
+
+    # An authenticator app can be added from this two-step sign-in, and turned off again while a passkey remains.
+    secret, codes = enable_mfa(api, member)
+    assert api.req("POST", member, "/me/mfa/disable", json={"password": PASSWORD, "code": codes[0]}).status_code == 204
+    assert api.req("GET", member, f"/orgs/{org}/customers").status_code == 200
+
+
+def test_an_app_setup_started_before_a_passkey_was_added_needs_the_passkey_to_finish(api, client, origin):
+    api.signup(OWNER)
+    stolen = client.post("/api/v1/auth/login", json={"email": OWNER, "password": PASSWORD}).json()["access_token"]
+    as_stolen = {"Authorization": f"Bearer {stolen}"}
+    setup = client.post("/api/v1/me/mfa/setup", json={"password": PASSWORD}, headers=as_stolen).json()
+    assert register(api, origin, SoftAuthenticator())[1].status_code == 201           # meanwhile, the owner adds a passkey
+    code = totp.code_at(setup["secret"], time.time())
+    assert client.post("/api/v1/me/mfa/enable", json={"code": code}, headers=as_stolen).status_code == 403
+    assert api.req("GET", OWNER, "/me").json()["mfa_enabled"] is False

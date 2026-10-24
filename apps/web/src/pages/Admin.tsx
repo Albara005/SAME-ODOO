@@ -113,6 +113,8 @@ export function MembersPage() {
                         )}
                         {m.mfa_enabled ? (
                           <Badge tone="info">{t("members.mfaOn")}</Badge>
+                        ) : m.has_passkey ? (
+                          <Badge tone="info">{t("members.passkeyOn")}</Badge>
                         ) : org.require_mfa ? (
                           <Badge tone="warning">{t("members.mfaMissing")}</Badge>
                         ) : null}
@@ -557,7 +559,7 @@ export function OrgSettingsPage() {
   );
 }
 
-/** Two-step sign-in for every member. Turning it on needs it on your own account, or you'd be locked out first. */
+/** Two-step sign-in for every member. Turning it on needs it on your own sign-in, or you'd be locked out first. */
 function RequireMfaCard() {
   const { t } = useI18n();
   const { org } = useOrg();
@@ -575,7 +577,7 @@ function RequireMfaCard() {
     },
   });
   const required = save.isPending ? save.variables : (org.require_mfa ?? false);
-  const blocked = !org.require_mfa && !user?.mfa_enabled;
+  const blocked = !org.require_mfa && !user?.two_step;
   return (
     <Card title={t("org.security")}>
       <div className="stack-sm">

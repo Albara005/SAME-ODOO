@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 
 from novara.automation.live import snapshot
+from novara.modules.organizations.models import Organization
+from novara.tenancy import bind_tenant
 from tests.test_automation import ACCT, OWNER, SALES, create_wf, post_invoice, process, wf  # noqa: F401
 
 
@@ -49,6 +51,16 @@ def test_stream_requires_membership_and_a_live_session(api, wf, app):
     sessions = api.req("GET", OWNER, "/me/sessions").json()
     sid = sessions[0]["id"]
     maker = app.state.sessionmaker
+    assert snapshot(maker, wf["org"], me["id"], sid) is not None
+    with maker() as db:
+        bind_tenant(db, wf["org"])
+        db.get(Organization, wf["org"]).require_mfa = True
+        db.commit()
+    assert snapshot(maker, wf["org"], me["id"], sid) is None   # this password-only sign-in no longer qualifies
+    with maker() as db:
+        bind_tenant(db, wf["org"])
+        db.get(Organization, wf["org"]).require_mfa = False
+        db.commit()
     assert snapshot(maker, wf["org"], me["id"], sid) is not None
     assert api.req("POST", OWNER, "/auth/logout").status_code in (200, 204)
     assert snapshot(maker, wf["org"], me["id"], sid) is None   # a revoked login ends an open stream

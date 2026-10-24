@@ -143,7 +143,7 @@ test("an organization requires two-step sign-in: members set it up before they g
   await page.getByRole("complementary").getByRole("link", { name: "المؤسسة", exact: true }).click();
   const requireBox = page.getByLabel("إلزام كل الأعضاء بالتحقق بخطوتين");
   await expect(requireBox).toBeDisabled();
-  await expect(page.getByText("فعّل التحقق بخطوتين لحسابك أولاً:")).toBeVisible();
+  await expect(page.getByText("يلزم أن يكون دخولك أنت بخطوتين أولاً (تطبيق مصادقة أو مفتاح مرور):")).toBeVisible();
   const setup = await (await page.request.post("/api/v1/me/mfa/setup", { headers, data: { password: PASSWORD } })).json();
   expect((await page.request.post("/api/v1/me/mfa/enable", { headers, data: { code: await totp(setup.secret) } })).ok()).toBeTruthy();
   await page.reload();
@@ -211,4 +211,52 @@ test("passkeys: added on the account page, then used to sign in without the pass
   await expect(page).toHaveURL(/\/orgs$/);
   await page.goto(`${app}/account`);
   await expect(page.getByText(/آخر استخدام/)).toBeVisible();
+});
+
+test("a passkey meets the organization's two-step requirement; a password-only sign-in can't change sign-in methods", async ({ page, browser }) => {
+  const owner = await browser.newPage();
+  await signUpAndIn(owner, uniqueEmail("keys-owner"));
+  await createOrg(owner, "شركة المفاتيح");
+  const orgId = owner.url().match(/\/o\/([0-9a-f-]+)/)![1]!;
+  const headers = { Authorization: `Bearer ${await owner.evaluate(() => localStorage.getItem("novara.token"))}` };
+  const setup = await (await owner.request.post("/api/v1/me/mfa/setup", { headers, data: { password: PASSWORD } })).json();
+  expect((await owner.request.post("/api/v1/me/mfa/enable", { headers, data: { code: await totp(setup.secret) } })).ok()).toBeTruthy();
+  expect((await owner.request.patch(`/api/v1/orgs/${orgId}`, { headers, data: { require_mfa: true } })).ok()).toBeTruthy();
+
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
+    protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true,
+    automaticPresenceSimulation: true } });
+  const app = "http://localhost:4173";
+  const member = uniqueEmail("keys-member");
+  await signUpAndIn(page, member, "Omar Ali", app);
+  expect((await owner.request.post(`/api/v1/orgs/${orgId}/members`, { headers, data: { email: member, role: "sales" } })).ok()).toBeTruthy();
+  await page.goto(`${app}/account`);
+  await page.getByRole("button", { name: "إضافة مفتاح مرور" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("كلمة المرور").fill(PASSWORD);
+  await dialog.getByRole("button", { name: "إنشاء المفتاح" }).click();
+  await expect(dialog).toHaveCount(0);
+
+  // Signed in again with the password only: the account page won't change sign-in methods...
+  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await signIn(page, member);
+  await expect(page.getByRole("heading", { name: "يلزم التحقق بخطوتين" })).toBeVisible();   // its only organization
+  await page.goto(`${app}/account`);
+  await expect(page.getByText(/دخلت بكلمة المرور وحدها/).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "إضافة مفتاح مرور" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^حذف / })).toBeDisabled();
+
+  // ...and the organization asks for the passkey, which opens it.
+  await page.goto(`${app}/o/${orgId}`);
+  await expect(page.getByRole("heading", { name: "يلزم التحقق بخطوتين" })).toBeVisible();
+  await expect(page.getByText(/ادخل مجدداً بمفتاح المرور للمتابعة/)).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/mfa-required-passkey-ar.png" });
+  await page.getByRole("button", { name: "الدخول بمفتاح مرور" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: /^(صباح|مساء) الخير/ })).toBeVisible();
+
+  await owner.goto(`/o/${orgId}/settings/members`);
+  await expect(owner.getByRole("row", { name: new RegExp(member) }).getByText("مفتاح مرور", { exact: true })).toBeVisible();
+  await owner.close();
 });

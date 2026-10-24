@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from novara.automation.models import Notification, Task
 from novara.automation.router import approvable_runs
 from novara.db import utcnow
-from novara.deps import AuthContext, OrgContext, current_auth, member_context, org_context
+from novara.deps import AuthContext, OrgContext, current_auth, member_context, org_context, two_step
 from novara.modules.identity.models import User, UserSession
 from novara.tenancy import bind_user
 
@@ -42,7 +42,7 @@ def snapshot(maker, org_id: str, user_id: str, session_id: str) -> dict | None:
         if expires <= utcnow() or user is None:
             return None
         ctx = member_context(db, org_id, user)
-        if ctx is None:
+        if ctx is None or (ctx.organization.require_mfa and not two_step(AuthContext(user=user, session=login))):
             return None
         return counts(db, ctx)
 

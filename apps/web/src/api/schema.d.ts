@@ -360,7 +360,8 @@ export interface paths {
         put?: never;
         /**
          * Passkey Registration Options
-         * @description Start adding a passkey (the password is checked again, as for two-step sign-in).
+         * @description Start adding a passkey: the password is checked again, and an account that already has a second
+         *     step must have used it for this sign-in.
          */
         post: operations["passkey_registration_options_api_v1_me_passkeys_options_post"];
         delete?: never;
@@ -5827,6 +5828,11 @@ export interface components {
             email: string;
             /** Full Name */
             full_name: string;
+            /**
+             * Has Passkey
+             * @default false
+             */
+            has_passkey: boolean;
             /** Id */
             id: string;
             /**
@@ -6954,6 +6960,8 @@ export interface components {
             id: string;
             /** Ip Address */
             ip_address: string;
+            /** Two Step */
+            two_step: boolean;
             /** User Agent */
             user_agent: string;
         };
@@ -7301,6 +7309,11 @@ export interface components {
             email_verified: boolean;
             /** Full Name */
             full_name: string;
+            /**
+             * Has Passkey
+             * @default false
+             */
+            has_passkey: boolean;
             /** Id */
             id: string;
             /** Locale */
@@ -7309,6 +7322,11 @@ export interface components {
             mfa_enabled: boolean;
             /** Timezone */
             timezone: string;
+            /**
+             * Two Step
+             * @default false
+             */
+            two_step: boolean;
         };
         /** ValidationError */
         ValidationError: {
