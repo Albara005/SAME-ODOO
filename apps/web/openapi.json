@@ -5083,6 +5083,24 @@
     "title": "KnowledgeFileOut",
     "type": "object"
    },
+   "LeaveBalanceOut": {
+    "properties": {
+     "leave_type": {
+      "title": "Leave Type",
+      "type": "string"
+     },
+     "remaining": {
+      "title": "Remaining",
+      "type": "string"
+     }
+    },
+    "required": [
+     "leave_type",
+     "remaining"
+    ],
+    "title": "LeaveBalanceOut",
+    "type": "object"
+   },
    "LeaveIn": {
     "properties": {
      "employee_id": {
@@ -7213,6 +7231,11 @@
       "title": "Contributory",
       "type": "boolean"
      },
+     "end_of_service": {
+      "default": false,
+      "title": "End Of Service",
+      "type": "boolean"
+     },
      "kind": {
       "enum": [
        "earning",
@@ -7246,6 +7269,10 @@
       "title": "Contributory",
       "type": "boolean"
      },
+     "end_of_service": {
+      "title": "End Of Service",
+      "type": "boolean"
+     },
      "kind": {
       "enum": [
        "earning",
@@ -7263,7 +7290,8 @@
      "name",
      "kind",
      "amount",
-     "contributory"
+     "contributory",
+     "end_of_service"
     ],
     "title": "PayItemOut",
     "type": "object"
@@ -7317,6 +7345,10 @@
      },
      "employer_contributions": {
       "title": "Employer Contributions",
+      "type": "string"
+     },
+     "end_of_service_change": {
+      "title": "End Of Service Change",
       "type": "string"
      },
      "gross": {
@@ -7445,6 +7477,7 @@
      "employee_contributions",
      "employer_contributions",
      "net",
+     "end_of_service_change",
      "payslip_count",
      "journal_entry_id",
      "payment_entry_id",
@@ -7945,6 +7978,50 @@
     "title": "PaymentSettingsOut",
     "type": "object"
    },
+   "PayrollSettingsIn": {
+    "properties": {
+     "eosb_rule": {
+      "enum": [
+       "saudi",
+       "uae",
+       "none"
+      ],
+      "title": "Eosb Rule",
+      "type": "string"
+     }
+    },
+    "required": [
+     "eosb_rule"
+    ],
+    "title": "PayrollSettingsIn",
+    "type": "object"
+   },
+   "PayrollSettingsOut": {
+    "properties": {
+     "eosb_rule": {
+      "enum": [
+       "saudi",
+       "uae",
+       "none"
+      ],
+      "title": "Eosb Rule",
+      "type": "string"
+     },
+     "reasons": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Reasons",
+      "type": "array"
+     }
+    },
+    "required": [
+     "eosb_rule",
+     "reasons"
+    ],
+    "title": "PayrollSettingsOut",
+    "type": "object"
+   },
    "PayslipLineOut": {
     "properties": {
      "amount": {
@@ -8012,6 +8089,10 @@
       "title": "Employer Contributions",
       "type": "string"
      },
+     "end_of_service_accrued": {
+      "title": "End Of Service Accrued",
+      "type": "string"
+     },
      "gross": {
       "title": "Gross",
       "type": "string"
@@ -8047,6 +8128,10 @@
       "title": "Run Status",
       "type": "string"
      },
+     "service_days": {
+      "title": "Service Days",
+      "type": "integer"
+     },
      "unpaid_leave_days": {
       "title": "Unpaid Leave Days",
       "type": "string"
@@ -8069,7 +8154,9 @@
      "deductions",
      "employee_contributions",
      "employer_contributions",
-     "net"
+     "net",
+     "service_days",
+     "end_of_service_accrued"
     ],
     "title": "PayslipOut",
     "type": "object"
@@ -10235,6 +10322,362 @@
      }
     },
     "title": "SettingsUpdate",
+    "type": "object"
+   },
+   "SettlementIn": {
+    "properties": {
+     "employee_id": {
+      "title": "Employee Id",
+      "type": "string"
+     },
+     "last_day": {
+      "format": "date",
+      "title": "Last Day",
+      "type": "string"
+     },
+     "leave_days": {
+      "anyOf": [
+       {
+        "maximum": 999.0,
+        "minimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "default": "0",
+      "title": "Leave Days"
+     },
+     "notes": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Notes",
+      "type": "string"
+     },
+     "reason": {
+      "enum": [
+       "termination",
+       "contract_end",
+       "resignation",
+       "resignation_full",
+       "dismissal"
+      ],
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "employee_id",
+     "last_day",
+     "reason"
+    ],
+    "title": "SettlementIn",
+    "type": "object"
+   },
+   "SettlementOut": {
+    "properties": {
+     "award": {
+      "title": "Award",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "employee_id": {
+      "title": "Employee Id",
+      "type": "string"
+     },
+     "employee_name": {
+      "title": "Employee Name",
+      "type": "string"
+     },
+     "full_award": {
+      "title": "Full Award",
+      "type": "string"
+     },
+     "hire_date": {
+      "format": "date",
+      "title": "Hire Date",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "journal_entry_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Journal Entry Id"
+     },
+     "last_day": {
+      "format": "date",
+      "title": "Last Day",
+      "type": "string"
+     },
+     "leave_balances": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/LeaveBalanceOut"
+      },
+      "title": "Leave Balances",
+      "type": "array"
+     },
+     "leave_days": {
+      "title": "Leave Days",
+      "type": "string"
+     },
+     "leave_pay": {
+      "title": "Leave Pay",
+      "type": "string"
+     },
+     "months": {
+      "title": "Months",
+      "type": "string"
+     },
+     "notes": {
+      "title": "Notes",
+      "type": "string"
+     },
+     "payment_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Payment Date"
+     },
+     "payment_entry_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Payment Entry Id"
+     },
+     "posted_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Posted At"
+     },
+     "provision": {
+      "title": "Provision",
+      "type": "string"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "reversal_entry_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reversal Entry Id"
+     },
+     "rule": {
+      "title": "Rule",
+      "type": "string"
+     },
+     "service_days": {
+      "title": "Service Days",
+      "type": "integer"
+     },
+     "service_years": {
+      "title": "Service Years",
+      "type": "string"
+     },
+     "share": {
+      "title": "Share",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "draft",
+       "posted",
+       "paid",
+       "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     },
+     "wage": {
+      "title": "Wage",
+      "type": "string"
+     }
+    },
+    "required": [
+     "employee_id",
+     "employee_name",
+     "currency",
+     "rule",
+     "reason",
+     "hire_date",
+     "last_day",
+     "service_days",
+     "service_years",
+     "wage",
+     "months",
+     "share",
+     "full_award",
+     "award",
+     "leave_days",
+     "leave_pay",
+     "provision",
+     "total",
+     "id",
+     "status",
+     "notes",
+     "journal_entry_id",
+     "payment_entry_id",
+     "reversal_entry_id",
+     "payment_date",
+     "posted_at",
+     "created_at"
+    ],
+    "title": "SettlementOut",
+    "type": "object"
+   },
+   "SettlementPreviewOut": {
+    "properties": {
+     "award": {
+      "title": "Award",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "employee_id": {
+      "title": "Employee Id",
+      "type": "string"
+     },
+     "employee_name": {
+      "title": "Employee Name",
+      "type": "string"
+     },
+     "full_award": {
+      "title": "Full Award",
+      "type": "string"
+     },
+     "hire_date": {
+      "format": "date",
+      "title": "Hire Date",
+      "type": "string"
+     },
+     "last_day": {
+      "format": "date",
+      "title": "Last Day",
+      "type": "string"
+     },
+     "leave_balances": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/LeaveBalanceOut"
+      },
+      "title": "Leave Balances",
+      "type": "array"
+     },
+     "leave_days": {
+      "title": "Leave Days",
+      "type": "string"
+     },
+     "leave_pay": {
+      "title": "Leave Pay",
+      "type": "string"
+     },
+     "months": {
+      "title": "Months",
+      "type": "string"
+     },
+     "provision": {
+      "title": "Provision",
+      "type": "string"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "rule": {
+      "title": "Rule",
+      "type": "string"
+     },
+     "service_days": {
+      "title": "Service Days",
+      "type": "integer"
+     },
+     "service_years": {
+      "title": "Service Years",
+      "type": "string"
+     },
+     "share": {
+      "title": "Share",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     },
+     "wage": {
+      "title": "Wage",
+      "type": "string"
+     }
+    },
+    "required": [
+     "employee_id",
+     "employee_name",
+     "currency",
+     "rule",
+     "reason",
+     "hire_date",
+     "last_day",
+     "service_days",
+     "service_years",
+     "wage",
+     "months",
+     "share",
+     "full_award",
+     "award",
+     "leave_days",
+     "leave_pay",
+     "provision",
+     "total"
+    ],
+    "title": "SettlementPreviewOut",
     "type": "object"
    },
    "StatementLine": {
@@ -24836,6 +25279,460 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/payroll/end-of-service": {
+   "get": {
+    "operationId": "list_settlements_api_v1_orgs__org_id__payroll_end_of_service_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/SettlementOut"
+         },
+         "title": "Response List Settlements Api V1 Orgs  Org Id  Payroll End Of Service Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Settlements",
+    "tags": [
+     "payroll"
+    ]
+   },
+   "post": {
+    "operationId": "create_settlement_api_v1_orgs__org_id__payroll_end_of_service_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SettlementIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SettlementOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Settlement",
+    "tags": [
+     "payroll"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/payroll/end-of-service/preview": {
+   "post": {
+    "operationId": "preview_settlement_api_v1_orgs__org_id__payroll_end_of_service_preview_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SettlementIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SettlementPreviewOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Preview Settlement",
+    "tags": [
+     "payroll"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/payroll/end-of-service/{doc_id}": {
+   "delete": {
+    "operationId": "delete_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete Settlement",
+    "tags": [
+     "payroll"
+    ]
+   },
+   "get": {
+    "operationId": "get_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SettlementOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Settlement",
+    "tags": [
+     "payroll"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/payroll/end-of-service/{doc_id}/cancel": {
+   "post": {
+    "operationId": "cancel_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__cancel_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PayRunCancelIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SettlementOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Cancel Settlement",
+    "tags": [
+     "payroll"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/payroll/end-of-service/{doc_id}/pay": {
+   "post": {
+    "operationId": "pay_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__pay_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PayRunPaymentIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SettlementOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Pay Settlement",
+    "tags": [
+     "payroll"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/payroll/end-of-service/{doc_id}/post": {
+   "post": {
+    "operationId": "post_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__post_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SettlementOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Post Settlement",
+    "tags": [
+     "payroll"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/payroll/my-payslips": {
    "get": {
     "description": "The signed-in member's own payslips (when their account is linked to an employee record), once posted.",
@@ -25386,6 +26283,109 @@
      }
     ],
     "summary": "Recalculate",
+    "tags": [
+     "payroll"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/payroll/settings": {
+   "get": {
+    "operationId": "get_settings_api_v1_orgs__org_id__payroll_settings_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PayrollSettingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Settings",
+    "tags": [
+     "payroll"
+    ]
+   },
+   "put": {
+    "description": "Changing the rules applies to runs and settlements from now on; what is posted stays as it was.",
+    "operationId": "put_settings_api_v1_orgs__org_id__payroll_settings_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PayrollSettingsIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PayrollSettingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Settings",
     "tags": [
      "payroll"
     ]

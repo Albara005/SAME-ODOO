@@ -9,7 +9,7 @@ async function apiFor(page: Page) {
   const orgId = page.url().match(/\/o\/([0-9a-f-]+)/)![1]!;
   const token = await page.evaluate(() => localStorage.getItem("novara.token"));
   const headers = { Authorization: `Bearer ${token}` };
-  return async (method: "GET" | "POST", path: string, data?: object) => {
+  return async (method: "GET" | "POST" | "PUT", path: string, data?: object) => {
     const res = await page.request.fetch(`/api/v1/orgs/${orgId}${path}`, { method, headers, data });
     expect(res.ok(), await res.text()).toBeTruthy();
     return res.json();
@@ -271,4 +271,57 @@ test("payroll: a contribution, an employee's pay, the month's run posted and pai
   await page.getByRole("button", { name: /قسيمة راتب/ }).click();
   await expect(page.getByText("التأمينات الاجتماعية")).toBeVisible();
   await expect(page.getByText("11,281.25").first()).toBeVisible();
+});
+
+test("end of service: Saudi rules, the provision on each run, a resignation settled and paid", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await signUpAndIn(page, uniqueEmail("eos"));
+  await createOrg(page, "شركة نهاية الخدمة");
+  const call = await apiFor(page);
+  const huda = await call("POST", "/hr/employees", { full_name: "هدى صالح", hire_date: "2024-10-01" });
+  await call("PUT", `/payroll/employees/${huda.id}`, { iban: "", contribution_ids: [], items: [
+    { name: "الراتب الأساسي", kind: "earning", amount: "10000", contributory: true, end_of_service: true },
+    { name: "بدل سكن", kind: "earning", amount: "2500", contributory: true, end_of_service: true },
+    { name: "بدل نقل", kind: "earning", amount: "500" },
+  ] });
+
+  await nav(page, "الرواتب");
+  await page.getByRole("tab", { name: "نهاية الخدمة" }).click();
+  await expect(page.getByText(/اختر القواعد أولاً/)).toBeVisible();
+  await page.getByLabel("قواعد مكافأة نهاية الخدمة").selectOption({ label: "السعودية: نظام العمل، المادتان 84 و85" });
+  await expect(page.getByText("حُفظت قواعد نهاية الخدمة")).toBeVisible();
+  await expect(page.getByText(/نصف شهر عن كل سنة/)).toBeVisible();
+
+  // Two years of service by the end of September: the provision is one month's wage (basic + housing).
+  await page.getByRole("tab", { name: "مسيرات الرواتب" }).click();
+  await page.getByLabel("الشهر").fill("2026-09");
+  await page.getByRole("button", { name: "إعداد مسير الشهر" }).click();
+  await page.getByRole("button", { name: "ترحيل إلى الدفاتر" }).click();
+  await expect(page.getByText("رُحِّل المسير")).toBeVisible();
+  await expect(page.getByText("التغيّر في مخصص نهاية الخدمة")).toBeVisible();
+  await expect(page.locator("dd", { hasText: "12,500.00" }).first()).toBeVisible();
+  const october = await call("POST", "/payroll/runs", { month: "2026-10" });
+  await call("POST", `/payroll/runs/${october.id}/post`);
+
+  await page.getByRole("tab", { name: "نهاية الخدمة" }).click();
+  await page.getByRole("button", { name: "تسوية جديدة" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("الموظف").selectOption({ label: "هدى صالح" });
+  await dialog.getByLabel("آخر يوم عمل").fill("2026-11-15");
+  await dialog.getByLabel("سبب انتهاء الخدمة").selectOption({ label: "استقالة" });
+  await dialog.getByLabel("أيام الإجازة غير المستخدمة").fill("5");
+  await expect(dialog.getByText("6,512.55")).toBeVisible();          // a third of the award (resigned after 2 years) + 5 days
+  await expect(dialog.getByText("4,429.22")).toBeVisible();
+  await expect(dialog.getByText("1/3")).toBeVisible();
+  await dialog.getByRole("button", { name: "حفظ كمسودة" }).click();
+
+  const card = page.locator(".card", { has: page.getByRole("heading", { name: "تسوية هدى صالح" }) });
+  await card.getByRole("button", { name: "ترحيل التسوية" }).click();
+  await expect(page.getByText("رُحّلت التسوية")).toBeVisible();
+  await card.getByRole("button", { name: "صرف المستحقات" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "صرف المستحقات" }).click();
+  await expect(page.getByText("سُجّل صرف المستحقات")).toBeVisible();
+  await expect(page.getByRole("table", { name: "تسويات نهاية الخدمة" }).getByText("مدفوعة")).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/end-of-service-ar.png", fullPage: true });
+  expect((await call("GET", `/hr/employees/${huda.id}`)).end_date).toBe("2026-11-15");
 });

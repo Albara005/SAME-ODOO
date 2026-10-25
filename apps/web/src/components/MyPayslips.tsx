@@ -36,6 +36,9 @@ export function MyPayslips() {
                 ))}
                 <dt><strong>{t("payroll.net")}</strong></dt>
                 <dd className="num"><strong>{money(s.net, s.currency)}</strong></dd>
+                {s.end_of_service_accrued !== "0.00" && (
+                  <><dt className="muted">{t("payroll.eosAccrued")}</dt><dd className="num muted">{money(s.end_of_service_accrued, s.currency)}</dd></>
+                )}
               </dl>
             )}
           </li>

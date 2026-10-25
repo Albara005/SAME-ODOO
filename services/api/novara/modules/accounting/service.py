@@ -37,6 +37,8 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     # Payroll (modules/payroll): net pay until it is paid, and contributions until they are paid over.
     ("2250", "Salaries Payable", "liability", "salaries_payable"),
     ("2260", "Contributions Payable", "liability", "contributions_payable"),
+    # End-of-service benefits earned so far (payroll/eosb.py): grown with each pay run, released at settlement.
+    ("2270", "End-of-Service Provision", "liability", "eosb_provision"),
     ("3000", "Owner's Equity", "equity", "equity"),
     ("3100", "Retained Earnings", "equity", "retained_earnings"),
     ("4000", "Sales Revenue", "income", "sales"),
@@ -49,6 +51,7 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     ("6000", "General Expenses", "expense", "expense"),
     ("6100", "Salaries and Wages", "expense", "salaries"),
     ("6110", "Employer Contributions", "expense", "employer_contributions"),
+    ("6120", "End-of-Service Benefits", "expense", "eosb_expense"),
 ]
 
 
@@ -66,7 +69,7 @@ class PeriodLocked(LedgerError):
 
 # Accounts with a subledger behind them (customer and vendor balances, stock value, goods awaiting a
 # bill). Only documents post to them, so the subledgers always agree with the ledger.
-CONTROL_ACCOUNTS = ("receivable", "payable", "inventory", "grni", "salaries_payable")
+CONTROL_ACCOUNTS = ("receivable", "payable", "inventory", "grni", "salaries_payable", "eosb_provision")
 YEAR_END = "year_end_close"
 
 

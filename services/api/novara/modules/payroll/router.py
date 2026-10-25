@@ -8,6 +8,11 @@
     POST     .../runs/{id}/recalculate | post | pay | cancel
     GET      .../runs/{id}/bank-file.csv                    who to pay, to which IBAN, how much
     GET      /orgs/{org}/payroll/my-payslips                the signed-in member's own payslips
+    GET/PUT  /orgs/{org}/payroll/settings                   which market's end-of-service rules apply
+    POST     /orgs/{org}/payroll/end-of-service/preview     a leaver's settlement worked out, nothing saved
+    GET/POST /orgs/{org}/payroll/end-of-service             settlements (created as drafts)
+    GET/DELETE /orgs/{org}/payroll/end-of-service/{id}
+    POST     .../end-of-service/{id}/post | pay | cancel
 """
 
 from __future__ import annotations
@@ -30,10 +35,11 @@ from novara.deps import OrgContext, client_ip, get_db, org_context, require
 from novara.modules.access import permissions as P
 from novara.modules.audit import service as audit
 from novara.modules.hr.models import Employee
-from novara.modules.hr.service import status_of
+from novara.modules.hr.service import balances, status_of
 from novara.modules.organizations.models import Organization
+from novara.modules.payroll import eosb
 from novara.modules.payroll import service as svc
-from novara.modules.payroll.models import Contribution, EmployeePay, PayItem, PayRun, Payslip
+from novara.modules.payroll.models import Contribution, EmployeePay, EndOfService, PayItem, PayrollSettings, PayRun, Payslip
 from novara.money import fmt_decimal, from_minor, to_minor
 
 router = APIRouter(tags=["payroll"])
@@ -69,6 +75,7 @@ class PayItemIn(BaseModel):
     kind: Literal["earning", "deduction"]
     amount: Decimal = Field(gt=0, max_digits=18, decimal_places=3)
     contributory: bool = False
+    end_of_service: bool = False
 
 
 class PayItemOut(BaseModel):
@@ -76,6 +83,7 @@ class PayItemOut(BaseModel):
     kind: Literal["earning", "deduction"]
     amount: str
     contributory: bool
+    end_of_service: bool
 
 
 class EmployeePayIn(BaseModel):
@@ -151,6 +159,8 @@ class PayslipOut(BaseModel):
     employee_contributions: str
     employer_contributions: str
     net: str
+    service_days: int
+    end_of_service_accrued: str     # the full end-of-service award as of the month's last day
 
 
 class PayRunOut(BaseModel):
@@ -165,6 +175,7 @@ class PayRunOut(BaseModel):
     employee_contributions: str
     employer_contributions: str
     net: str
+    end_of_service_change: str      # how much the end-of-service provision grows (negative: shrinks) with this run
     payslip_count: int
     journal_entry_id: str | None
     payment_entry_id: str | None
@@ -201,7 +212,8 @@ def _slip_out(s: Payslip, run: PayRun) -> PayslipOut:
                            employer_amount=_money(l["employer_minor"], c)) for l in s.lines],
         gross=_money(s.gross_minor, c), deductions=_money(s.deductions_minor, c),
         employee_contributions=_money(s.employee_contributions_minor, c),
-        employer_contributions=_money(s.employer_contributions_minor, c), net=_money(s.net_minor, c))
+        employer_contributions=_money(s.employer_contributions_minor, c), net=_money(s.net_minor, c),
+        service_days=s.service_days, end_of_service_accrued=_money(s.eosb_liability_minor, c))
 
 
 def _run_out(db: Session, run: PayRun, *, detail: bool = False) -> PayRunOut:
@@ -212,7 +224,7 @@ def _run_out(db: Session, run: PayRun, *, detail: bool = False) -> PayRunOut:
         status=run.status, currency=c, gross=_money(run.gross_minor, c), deductions=_money(run.deductions_minor, c),
         employee_contributions=_money(run.employee_contributions_minor, c),
         employer_contributions=_money(run.employer_contributions_minor, c), net=_money(run.net_minor, c),
-        payslip_count=len(slips), journal_entry_id=run.journal_entry_id, payment_entry_id=run.payment_entry_id,
+        end_of_service_change=_money(run.eosb_minor, c), payslip_count=len(slips), journal_entry_id=run.journal_entry_id, payment_entry_id=run.payment_entry_id,
         reversal_entry_id=run.reversal_entry_id, payment_date=run.payment_date, posted_at=run.posted_at,
         created_at=run.created_at,
         without_pay=svc.without_pay(db, run.period_start, run.period_end) if detail and run.status == "draft" else [],
@@ -292,8 +304,8 @@ def _pay_out(db: Session, e: Employee, currency: str) -> EmployeePayOut:
     return EmployeePayOut(
         employee_id=e.id, employee_name=e.full_name, currency=currency, iban=pay.iban if pay else "",
         contribution_ids=list(pay.contribution_ids) if pay else [],
-        items=[PayItemOut(name=i.name, kind=i.kind, amount=_money(i.amount_minor, currency), contributory=i.contributory)
-               for i in items],
+        items=[PayItemOut(name=i.name, kind=i.kind, amount=_money(i.amount_minor, currency), contributory=i.contributory,
+                          end_of_service=i.end_of_service) for i in items],
         monthly_earnings=_money(earn, currency), monthly_deductions=_money(ded, currency))
 
 
@@ -342,7 +354,8 @@ def set_pay(employee_id: str, body: EmployeePayIn, request: Request, ctx: OrgCon
     db.execute(delete(PayItem).where(PayItem.employee_id == e.id))
     for n, (item, minor) in enumerate(zip(body.items, amounts)):
         db.add(PayItem(employee_id=e.id, position=n, name=item.name.strip(), kind=item.kind, amount_minor=minor,
-                       contributory=item.contributory and item.kind == "earning"))
+                       contributory=item.contributory and item.kind == "earning",
+                       end_of_service=item.end_of_service and item.kind == "earning"))
     # Who changed whose pay, not the amounts: the audit log is readable more widely than payroll.
     audit.record(db, actor_user_id=ctx.user.id, action="payroll.pay_changed", target_type="employee", target_id=e.id,
                  details={"employee": e.full_name, "items": len(body.items)}, ip_address=client_ip(request))
@@ -479,3 +492,232 @@ def my_payslips(ctx: OrgContext = Depends(org_context), db: Session = Depends(ge
                       .where(Payslip.employee_id == me.id, PayRun.status.in_(("posted", "paid")))
                       .order_by(PayRun.period_start.desc()))
     return [_slip_out(s, run) for s, run in rows]
+
+
+# ---------------------------------------------------------------- end of service
+
+
+class PayrollSettingsIn(BaseModel):
+    eosb_rule: Literal["saudi", "uae", "none"]
+
+
+class PayrollSettingsOut(BaseModel):
+    eosb_rule: Literal["saudi", "uae", "none"]
+    reasons: list[str]              # the reasons for leaving these rules know
+
+
+EosbReason = Literal["termination", "contract_end", "resignation", "resignation_full", "dismissal"]
+
+
+class SettlementIn(BaseModel):
+    employee_id: str
+    last_day: date
+    reason: EosbReason
+    leave_days: Decimal = Field(default=Decimal(0), ge=0, le=999, max_digits=5, decimal_places=1)
+    notes: str = Field(default="", max_length=2000)
+
+
+class LeaveBalanceOut(BaseModel):
+    leave_type: str
+    remaining: str
+
+
+class SettlementPreviewOut(BaseModel):
+    employee_id: str
+    employee_name: str
+    currency: str
+    rule: str
+    reason: str
+    hire_date: date
+    last_day: date
+    service_days: int
+    service_years: str              # to two decimals, for reading; the award uses the exact days
+    wage: str
+    months: str                     # months of wage the full award is worth, to four decimals
+    share: str                      # "1", "2/3", "1/3", "0"
+    full_award: str
+    award: str
+    leave_days: str
+    leave_pay: str
+    provision: str
+    total: str
+    leave_balances: list[LeaveBalanceOut] = []
+
+
+class SettlementOut(SettlementPreviewOut):
+    id: str
+    status: Literal["draft", "posted", "paid", "cancelled"]
+    notes: str
+    journal_entry_id: str | None
+    payment_entry_id: str | None
+    reversal_entry_id: str | None
+    payment_date: date | None
+    posted_at: datetime | None
+    created_at: datetime
+
+
+def _settings_out(rule: str) -> PayrollSettingsOut:
+    return PayrollSettingsOut(eosb_rule=rule, reasons=list(eosb.REASONS[rule]))
+
+
+@router.get("/orgs/{org_id}/payroll/settings", response_model=PayrollSettingsOut)
+def get_settings(_: OrgContext = Depends(require(P.PAYROLL_MANAGE)), db: Session = Depends(get_db)):
+    return _settings_out(svc.settings_of(db).eosb_rule)
+
+
+@router.put("/orgs/{org_id}/payroll/settings", response_model=PayrollSettingsOut)
+def put_settings(body: PayrollSettingsIn, request: Request, ctx: OrgContext = Depends(require(P.PAYROLL_MANAGE)),
+                 db: Session = Depends(get_db)):
+    """Changing the rules applies to runs and settlements from now on; what is posted stays as it was."""
+    current = db.scalar(select(PayrollSettings))
+    if current is None:
+        current = PayrollSettings()
+        db.add(current)
+    before = current.eosb_rule
+    current.eosb_rule = body.eosb_rule
+    audit.record(db, actor_user_id=ctx.user.id, action="payroll.settings_changed", target_type="payroll_settings",
+                 target_id=ctx.organization.id, details={"eosb_rule": [before, body.eosb_rule]}, ip_address=client_ip(request))
+    try:
+        db.commit()
+    except IntegrityError:                          # two first saves at once: the other one won
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "the settings were just changed; try again")
+    return _settings_out(current.eosb_rule)
+
+
+def _years(days: int) -> str:
+    return str((Decimal(days) / eosb.YEAR).quantize(Decimal("0.01")))
+
+
+def _months(fraction: str) -> str:
+    num, _, den = fraction.partition("/")
+    return str((Decimal(num) / Decimal(den or 1)).quantize(Decimal("0.0001")))
+
+
+def _preview_out(db: Session, e: Employee, s: svc.Settlement, currency: str) -> SettlementPreviewOut:
+    a = s.award
+    return SettlementPreviewOut(
+        employee_id=e.id, employee_name=e.full_name, currency=currency, rule=s.rule, reason=s.reason,
+        hire_date=s.hire_date, last_day=s.last_day, service_days=a.days, service_years=_years(a.days),
+        wage=_money(s.wage_minor, currency), months=_months(svc._fraction(a.months)), share=svc._fraction(a.share),
+        full_award=_money(a.full_minor, currency), award=_money(a.award_minor, currency),
+        leave_days=fmt_decimal(s.leave_days), leave_pay=_money(s.leave_pay_minor, currency),
+        provision=_money(s.provision_minor, currency), total=_money(s.total_minor, currency),
+        leave_balances=[LeaveBalanceOut(leave_type=b.leave_type.name, remaining=fmt_decimal(b.remaining))
+                        for b in balances(db, e, s.last_day.year, s.last_day) if b.leave_type.paid and b.remaining is not None])
+
+
+def _settlement_out(d: EndOfService) -> SettlementOut:
+    c = d.currency
+    return SettlementOut(
+        id=d.id, status=d.status, employee_id=d.employee_id, employee_name=d.employee_name, currency=c, rule=d.rule,
+        reason=d.reason, hire_date=d.hire_date, last_day=d.last_day, service_days=d.service_days,
+        service_years=_years(d.service_days), wage=_money(d.wage_minor, c), months=_months(d.months), share=d.share,
+        full_award=_money(d.full_award_minor, c), award=_money(d.award_minor, c), leave_days=fmt_decimal(d.leave_days),
+        leave_pay=_money(d.leave_pay_minor, c), provision=_money(d.provision_minor, c), total=_money(d.total_minor, c),
+        notes=d.notes, journal_entry_id=d.journal_entry_id, payment_entry_id=d.payment_entry_id,
+        reversal_entry_id=d.reversal_entry_id, payment_date=d.payment_date, posted_at=d.posted_at, created_at=d.created_at)
+
+
+def _work_out(db: Session, body: SettlementIn) -> tuple[Employee, svc.Settlement]:
+    e = _employee(db, body.employee_id)
+    return e, _errors(lambda: svc.work_out_settlement(db, e, last_day=body.last_day, reason=body.reason,
+                                                      leave_days=body.leave_days))
+
+
+@router.post("/orgs/{org_id}/payroll/end-of-service/preview", response_model=SettlementPreviewOut)
+def preview_settlement(body: SettlementIn, ctx: OrgContext = Depends(require(P.PAYROLL_MANAGE)),
+                       db: Session = Depends(get_db)):
+    e, s = _work_out(db, body)
+    return _preview_out(db, e, s, _currency(db, ctx))
+
+
+@router.get("/orgs/{org_id}/payroll/end-of-service", response_model=list[SettlementOut])
+def list_settlements(_: OrgContext = Depends(require(P.PAYROLL_MANAGE)), db: Session = Depends(get_db)):
+    return [_settlement_out(d) for d in db.scalars(select(EndOfService).order_by(EndOfService.last_day.desc(),
+                                                                                  EndOfService.created_at.desc()))]
+
+
+@router.post("/orgs/{org_id}/payroll/end-of-service", response_model=SettlementOut, status_code=status.HTTP_201_CREATED)
+def create_settlement(body: SettlementIn, request: Request, ctx: OrgContext = Depends(require(P.PAYROLL_MANAGE)),
+                      db: Session = Depends(get_db)):
+    e, s = _work_out(db, body)
+    if db.scalar(select(EndOfService.id).where(EndOfService.employee_id == e.id, EndOfService.status != "cancelled")):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{e.full_name} already has an end-of-service settlement")
+    doc = EndOfService(employee_id=e.id, employee_name=e.full_name, status="draft", currency=_currency(db, ctx),
+                       notes=body.notes.strip(), created_by=ctx.user.id)
+    svc.fill_settlement(doc, s)
+    db.add(doc)
+    audit.record(db, actor_user_id=ctx.user.id, action="payroll.end_of_service_created", target_type="employee",
+                 target_id=e.id, details={"employee": e.full_name, "reason": body.reason,
+                                          "last_day": body.last_day.isoformat()}, ip_address=client_ip(request))
+    try:
+        db.commit()
+    except IntegrityError:                          # two at once
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{e.full_name} already has an end-of-service settlement")
+    return _settlement_out(doc)
+
+
+def _settlement(db: Session, doc_id: str, *, lock: bool = False) -> EndOfService:
+    doc = svc.lock_settlement(db, doc_id) if lock else db.get(EndOfService, doc_id)
+    if doc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "settlement not found")
+    return doc
+
+
+@router.get("/orgs/{org_id}/payroll/end-of-service/{doc_id}", response_model=SettlementOut)
+def get_settlement(doc_id: str, _: OrgContext = Depends(require(P.PAYROLL_MANAGE)), db: Session = Depends(get_db)):
+    return _settlement_out(_settlement(db, doc_id))
+
+
+@router.delete("/orgs/{org_id}/payroll/end-of-service/{doc_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+def delete_settlement(doc_id: str, request: Request, ctx: OrgContext = Depends(require(P.PAYROLL_MANAGE)),
+                      db: Session = Depends(get_db)):
+    doc = _settlement(db, doc_id, lock=True)
+    if doc.status != "draft":
+        raise HTTPException(status.HTTP_409_CONFLICT, "only a draft settlement can be deleted; cancel a posted one")
+    db.delete(doc)
+    audit.record(db, actor_user_id=ctx.user.id, action="payroll.end_of_service_deleted", target_type="employee",
+                 target_id=doc.employee_id, details={"employee": doc.employee_name}, ip_address=client_ip(request))
+    db.commit()
+
+
+@router.post("/orgs/{org_id}/payroll/end-of-service/{doc_id}/post", response_model=SettlementOut)
+def post_settlement(doc_id: str, request: Request, ctx: OrgContext = Depends(require(P.PAYROLL_MANAGE)),
+                    db: Session = Depends(get_db)):
+    doc = _settlement(db, doc_id, lock=True)
+    entry = _errors(lambda: svc.post_settlement(db, doc, user_id=ctx.user.id))
+    audit.record(db, actor_user_id=ctx.user.id, action="payroll.end_of_service_posted", target_type="employee",
+                 target_id=doc.employee_id, details={"employee": doc.employee_name, "journal_entry": entry.number},
+                 ip_address=client_ip(request))
+    db.commit()
+    return _settlement_out(doc)
+
+
+@router.post("/orgs/{org_id}/payroll/end-of-service/{doc_id}/pay", response_model=SettlementOut)
+def pay_settlement(doc_id: str, body: PayRunPaymentIn, request: Request, ctx: OrgContext = Depends(require(P.PAYROLL_MANAGE)),
+                   db: Session = Depends(get_db)):
+    if not ctx.has(P.PAYMENTS_WRITE):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"missing permission: {P.PAYMENTS_WRITE}")
+    doc = _settlement(db, doc_id, lock=True)
+    entry = _errors(lambda: svc.pay_settlement(db, doc, payment_date=body.payment_date, method=body.method,
+                                               user_id=ctx.user.id))
+    audit.record(db, actor_user_id=ctx.user.id, action="payroll.end_of_service_paid", target_type="employee",
+                 target_id=doc.employee_id, details={"employee": doc.employee_name,
+                                                     "journal_entry": entry.number if entry else None},
+                 ip_address=client_ip(request))
+    db.commit()
+    return _settlement_out(doc)
+
+
+@router.post("/orgs/{org_id}/payroll/end-of-service/{doc_id}/cancel", response_model=SettlementOut)
+def cancel_settlement(doc_id: str, body: PayRunCancelIn, request: Request, ctx: OrgContext = Depends(require(P.PAYROLL_MANAGE)),
+                      db: Session = Depends(get_db)):
+    doc = _settlement(db, doc_id, lock=True)
+    reversal = _errors(lambda: svc.cancel_settlement(db, doc, cancel_date=body.cancel_date, user_id=ctx.user.id))
+    audit.record(db, actor_user_id=ctx.user.id, action="payroll.end_of_service_cancelled", target_type="employee",
+                 target_id=doc.employee_id, details={"employee": doc.employee_name, "reversal_entry": reversal.number},
+                 ip_address=client_ip(request))
+    db.commit()
+    return _settlement_out(doc)

@@ -2946,6 +2946,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/payroll/end-of-service": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Settlements */
+        get: operations["list_settlements_api_v1_orgs__org_id__payroll_end_of_service_get"];
+        put?: never;
+        /** Create Settlement */
+        post: operations["create_settlement_api_v1_orgs__org_id__payroll_end_of_service_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/payroll/end-of-service/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Settlement */
+        post: operations["preview_settlement_api_v1_orgs__org_id__payroll_end_of_service_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/payroll/end-of-service/{doc_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settlement */
+        get: operations["get_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Settlement */
+        delete: operations["delete_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/payroll/end-of-service/{doc_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Settlement */
+        post: operations["cancel_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/payroll/end-of-service/{doc_id}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pay Settlement */
+        post: operations["pay_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__pay_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/payroll/end-of-service/{doc_id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Settlement */
+        post: operations["post_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__post_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/payroll/my-payslips": {
         parameters: {
             query?: never;
@@ -3084,6 +3188,27 @@ export interface paths {
         put?: never;
         /** Recalculate */
         post: operations["recalculate_api_v1_orgs__org_id__payroll_runs__run_id__recalculate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/payroll/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings_api_v1_orgs__org_id__payroll_settings_get"];
+        /**
+         * Put Settings
+         * @description Changing the rules applies to runs and settlements from now on; what is posted stays as it was.
+         */
+        put: operations["put_settings_api_v1_orgs__org_id__payroll_settings_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6673,6 +6798,13 @@ export interface components {
             /** Text Status */
             text_status: string;
         };
+        /** LeaveBalanceOut */
+        LeaveBalanceOut: {
+            /** Leave Type */
+            leave_type: string;
+            /** Remaining */
+            remaining: string;
+        };
         /** LeaveIn */
         LeaveIn: {
             /** Employee Id */
@@ -7497,6 +7629,11 @@ export interface components {
              */
             contributory: boolean;
             /**
+             * End Of Service
+             * @default false
+             */
+            end_of_service: boolean;
+            /**
              * Kind
              * @enum {string}
              */
@@ -7510,6 +7647,8 @@ export interface components {
             amount: string;
             /** Contributory */
             contributory: boolean;
+            /** End Of Service */
+            end_of_service: boolean;
             /**
              * Kind
              * @enum {string}
@@ -7546,6 +7685,8 @@ export interface components {
             employee_contributions: string;
             /** Employer Contributions */
             employer_contributions: string;
+            /** End Of Service Change */
+            end_of_service_change: string;
             /** Gross */
             gross: string;
             /** Id */
@@ -7787,6 +7928,24 @@ export interface components {
             /** Webhook Url */
             webhook_url: string;
         };
+        /** PayrollSettingsIn */
+        PayrollSettingsIn: {
+            /**
+             * Eosb Rule
+             * @enum {string}
+             */
+            eosb_rule: "saudi" | "uae" | "none";
+        };
+        /** PayrollSettingsOut */
+        PayrollSettingsOut: {
+            /**
+             * Eosb Rule
+             * @enum {string}
+             */
+            eosb_rule: "saudi" | "uae" | "none";
+            /** Reasons */
+            reasons: string[];
+        };
         /** PayslipLineOut */
         PayslipLineOut: {
             /** Amount */
@@ -7819,6 +7978,8 @@ export interface components {
             employee_name: string;
             /** Employer Contributions */
             employer_contributions: string;
+            /** End Of Service Accrued */
+            end_of_service_accrued: string;
             /** Gross */
             gross: string;
             /** Iban */
@@ -7835,6 +7996,8 @@ export interface components {
             run_id: string;
             /** Run Status */
             run_status: string;
+            /** Service Days */
+            service_days: number;
             /** Unpaid Leave Days */
             unpaid_leave_days: string;
         };
@@ -8591,6 +8754,155 @@ export interface components {
             } | null;
             /** User Monthly Budget Usd */
             user_monthly_budget_usd?: number | string | null;
+        };
+        /** SettlementIn */
+        SettlementIn: {
+            /** Employee Id */
+            employee_id: string;
+            /**
+             * Last Day
+             * Format: date
+             */
+            last_day: string;
+            /**
+             * Leave Days
+             * @default 0
+             */
+            leave_days: number | string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "termination" | "contract_end" | "resignation" | "resignation_full" | "dismissal";
+        };
+        /** SettlementOut */
+        SettlementOut: {
+            /** Award */
+            award: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Employee Id */
+            employee_id: string;
+            /** Employee Name */
+            employee_name: string;
+            /** Full Award */
+            full_award: string;
+            /**
+             * Hire Date
+             * Format: date
+             */
+            hire_date: string;
+            /** Id */
+            id: string;
+            /** Journal Entry Id */
+            journal_entry_id: string | null;
+            /**
+             * Last Day
+             * Format: date
+             */
+            last_day: string;
+            /**
+             * Leave Balances
+             * @default []
+             */
+            leave_balances: components["schemas"]["LeaveBalanceOut"][];
+            /** Leave Days */
+            leave_days: string;
+            /** Leave Pay */
+            leave_pay: string;
+            /** Months */
+            months: string;
+            /** Notes */
+            notes: string;
+            /** Payment Date */
+            payment_date: string | null;
+            /** Payment Entry Id */
+            payment_entry_id: string | null;
+            /** Posted At */
+            posted_at: string | null;
+            /** Provision */
+            provision: string;
+            /** Reason */
+            reason: string;
+            /** Reversal Entry Id */
+            reversal_entry_id: string | null;
+            /** Rule */
+            rule: string;
+            /** Service Days */
+            service_days: number;
+            /** Service Years */
+            service_years: string;
+            /** Share */
+            share: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "posted" | "paid" | "cancelled";
+            /** Total */
+            total: string;
+            /** Wage */
+            wage: string;
+        };
+        /** SettlementPreviewOut */
+        SettlementPreviewOut: {
+            /** Award */
+            award: string;
+            /** Currency */
+            currency: string;
+            /** Employee Id */
+            employee_id: string;
+            /** Employee Name */
+            employee_name: string;
+            /** Full Award */
+            full_award: string;
+            /**
+             * Hire Date
+             * Format: date
+             */
+            hire_date: string;
+            /**
+             * Last Day
+             * Format: date
+             */
+            last_day: string;
+            /**
+             * Leave Balances
+             * @default []
+             */
+            leave_balances: components["schemas"]["LeaveBalanceOut"][];
+            /** Leave Days */
+            leave_days: string;
+            /** Leave Pay */
+            leave_pay: string;
+            /** Months */
+            months: string;
+            /** Provision */
+            provision: string;
+            /** Reason */
+            reason: string;
+            /** Rule */
+            rule: string;
+            /** Service Days */
+            service_days: number;
+            /** Service Years */
+            service_years: string;
+            /** Share */
+            share: string;
+            /** Total */
+            total: string;
+            /** Wage */
+            wage: string;
         };
         /** StatementLine */
         StatementLine: {
@@ -16354,6 +16666,273 @@ export interface operations {
             };
         };
     };
+    list_settlements_api_v1_orgs__org_id__payroll_end_of_service_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_settlement_api_v1_orgs__org_id__payroll_end_of_service_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettlementIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_settlement_api_v1_orgs__org_id__payroll_end_of_service_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettlementIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayRunCancelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pay_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__pay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayRunPaymentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_settlement_api_v1_orgs__org_id__payroll_end_of_service__doc_id__post_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_payslips_api_v1_orgs__org_id__payroll_my_payslips_get: {
         parameters: {
             query?: never;
@@ -16666,6 +17245,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PayRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_api_v1_orgs__org_id__payroll_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_orgs__org_id__payroll_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayrollSettingsOut"];
                 };
             };
             /** @description Validation Error */
