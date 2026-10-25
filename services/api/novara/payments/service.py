@@ -34,7 +34,7 @@ from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
 from novara.money import from_minor
 from novara.payments.models import PaymentLink, PaymentSettings
-from novara.payments.providers import CheckoutRequest, ProviderError, Stripe, TestProvider
+from novara.payments.providers import CheckoutRequest, Moyasar, ProviderError, Stripe, TestProvider
 from novara.tenancy import current_tenant
 
 LINK_HOURS = 23  # Stripe allows at most 24
@@ -64,9 +64,9 @@ def settings_row(db: Session, settings) -> PaymentSettings:
     return row
 
 
-def webhook_url(db: Session, settings, row: PaymentSettings) -> str:
+def webhook_url(db: Session, settings, row: PaymentSettings, provider: str = "stripe") -> str:
     raw = crypto.decrypt(settings, row.webhook_token, context=current_tenant(db))
-    return f"{settings.app_base_url}/api/v1/public/payments/stripe/{raw}"
+    return f"{settings.app_base_url}/api/v1/public/payments/{provider}/{raw}"
 
 
 def secret(db: Session, settings, value: str | None) -> str | None:
@@ -80,6 +80,11 @@ def provider(db: Session, settings, row: PaymentSettings, http=None, name: str |
         if key is None:
             raise PaymentsUnavailable("Stripe isn't set up: add the secret key in the organization's settings")
         return Stripe(key, http)
+    if name == "moyasar":
+        key = secret(db, settings, row.moyasar_secret_key)
+        if key is None:
+            raise PaymentsUnavailable("Moyasar isn't set up: add the secret key in the organization's settings")
+        return Moyasar(key, http)
     if name == "test" and test_provider_allowed(settings):
         return TestProvider(settings.app_base_url)
     raise PaymentsUnavailable("online payments aren't set up for this organization")

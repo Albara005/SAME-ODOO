@@ -9,6 +9,11 @@ organization's secret key; Stripe then calls the organization's webhook address 
 A link is only ever marked paid from that signed call, never from the customer's browser coming
 back to the success page (anyone can open that).
 
+Moyasar (https://docs.moyasar.com/api/invoices), the common gateway in Saudi Arabia: an invoice
+gives a hosted page that takes mada, Apple Pay, STC Pay and cards. Its webhook calls carry the secret
+token the organization set in Moyasar's dashboard; even then the call is only a hint: the invoice is
+read back from Moyasar's API with the organization's secret key, and that answer decides.
+
 The test provider is the same flow without a real provider, for development and tests: its
 checkout page is served by NOVARA itself and refused in production.
 """
@@ -26,6 +31,8 @@ from datetime import datetime, timezone
 import httpx
 
 STRIPE_API = "https://api.stripe.com/v1"
+MOYASAR_API = "https://api.moyasar.com/v1"
+MOYASAR_CURRENCIES = {"SAR"}  # mada, Apple Pay and STC Pay settle in riyals
 TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 SIGNATURE_TOLERANCE = 300  # seconds either side of now, as Stripe's own libraries allow
 # Stripe takes these in the same minor unit as ISO 4217. Its three-decimal currencies must end in 0.
@@ -190,6 +197,89 @@ def stripe_event(event: dict) -> Paid | Expired | None:
                     reference=str(obj.get("payment_intent") or obj["id"]), paid_at=paid_at)
     if kind == "checkout.session.expired":
         return Expired(session_id=str(obj["id"]))
+    return None
+
+
+class Moyasar:
+    name = "moyasar"
+
+    def __init__(self, secret_key: str, http: httpx.Client | None = None):
+        self._key = secret_key
+        self._http = http
+
+    def _call(self, method: str, path: str, body: dict | None = None) -> dict:
+        client = self._http or httpx.Client(timeout=TIMEOUT)
+        try:
+            r = client.request(method, f"{MOYASAR_API}{path}", json=body, auth=(self._key, ""))
+        except httpx.HTTPError as e:
+            raise ProviderError(f"Moyasar didn't answer ({type(e).__name__}); try again") from None
+        finally:
+            if self._http is None:
+                client.close()
+        try:
+            data = r.json()
+        except ValueError:
+            data = {}
+        if r.status_code >= 400:
+            message = data.get("message") or f"HTTP {r.status_code}"
+            if isinstance(data.get("errors"), dict):
+                message += ": " + "; ".join(f"{k} {', '.join(map(str, v)) if isinstance(v, list) else v}"
+                                            for k, v in data["errors"].items())
+            raise ProviderError(f"Moyasar refused: {message}"[:300], invalid=400 <= r.status_code < 500 and r.status_code != 401)
+        return data if isinstance(data, dict) else {}
+
+    def create_checkout(self, req: CheckoutRequest) -> Checkout:
+        if req.currency not in MOYASAR_CURRENCIES:
+            raise ProviderError(f"Moyasar can't charge in {req.currency}", invalid=True)
+        if req.amount_minor < 100:
+            raise ProviderError("Moyasar's smallest payment is 1.00 SAR", invalid=True)
+        body = self._call("POST", "/invoices", {
+            "amount": req.amount_minor, "currency": req.currency, "description": req.title,
+            "success_url": req.success_url, "back_url": req.cancel_url,
+            "expired_at": req.expires_at.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "metadata": req.metadata | {"link_id": req.link_id},
+        })
+        if not body.get("id") or not body.get("url"):
+            raise ProviderError("Moyasar's answer had no invoice address")
+        return Checkout(session_id=str(body["id"]), url=str(body["url"]), expires_at=req.expires_at)
+
+    def expire(self, session_id: str) -> None:
+        self._call("PUT", f"/invoices/{session_id}/cancel")
+
+    def fetch(self, session_id: str) -> Paid | Expired | None:
+        """What Moyasar itself says about the invoice (None: not paid, nor over, yet)."""
+        inv = self._call("GET", f"/invoices/{session_id}")
+        state = inv.get("status")
+        if state == "paid":
+            try:
+                amount, currency = int(inv["amount"]), str(inv["currency"]).upper()
+            except (KeyError, TypeError, ValueError):
+                raise ProviderError("Moyasar's answer had no amount") from None
+            paid = [p for p in inv.get("payments") or [] if isinstance(p, dict) and p.get("status") == "paid"]
+            reference = str(paid[-1].get("id")) if paid else str(inv.get("id") or session_id)
+            return Paid(session_id=session_id, amount_minor=amount, currency=currency, reference=reference,
+                        paid_at=_moyasar_time(inv.get("updated_at")))
+        if state in ("expired", "canceled", "cancelled"):
+            return Expired(session_id=session_id)
+        return None
+
+
+def _moyasar_time(value) -> datetime:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return datetime.now(timezone.utc)
+
+
+def moyasar_invoice(event: dict) -> str | None:
+    """The Moyasar invoice a webhook call is about (a payment names its invoice; an invoice event is the invoice)."""
+    data = event.get("data")
+    if not isinstance(data, dict):
+        return None
+    if data.get("invoice_id"):
+        return str(data["invoice_id"])
+    if str(event.get("type", "")).startswith("invoice") and data.get("id"):
+        return str(data["id"])
     return None
 
 

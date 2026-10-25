@@ -7,6 +7,7 @@
     POST    /orgs/{org}/invoices/{id}/payment-links/{link}/cancel
 
     POST /api/v1/public/payments/stripe/{token}         Stripe's signed webhook calls
+    POST /api/v1/public/payments/moyasar/{token}        Moyasar's webhook calls (checked against Moyasar's API)
     GET  /api/v1/public/payments/test/{session}         the test provider's checkout page (not in production)
     POST /api/v1/public/payments/test/{session}/pay
     GET  /api/v1/public/payments/done?status=paid       where the customer lands afterwards
@@ -14,7 +15,9 @@
 
 from __future__ import annotations
 
+import hmac
 import html
+import json
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
@@ -37,12 +40,14 @@ from novara.modules.organizations.models import Organization
 from novara.money import from_minor, to_minor
 from novara.payments import service as svc
 from novara.payments.models import PaymentLink, PaymentSettings
-from novara.payments.providers import BadSignature, Expired, Paid, ProviderError, stripe_event, verify_stripe
+from novara.payments.providers import (BadSignature, Expired, Moyasar, Paid, ProviderError, moyasar_invoice, stripe_event,
+                                       verify_stripe)
 from novara.tenancy import bind_tenant, current_tenant, system_scope
 
 MAX_BYTES = 256 * 1024
 STRIPE_KEY = r"^(sk|rk)_(test|live)_[A-Za-z0-9]{10,200}$"
 STRIPE_WEBHOOK_SECRET = r"^whsec_[A-Za-z0-9+/=_-]{10,200}$"
+MOYASAR_KEY = r"^sk_(test|live)_[A-Za-z0-9]{20,200}$"
 PAGE_HEADERS = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
                                            "frame-ancestors 'none'; base-uri 'none'",
                 "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"}
@@ -51,23 +56,33 @@ router = APIRouter(tags=["online payments"])
 public_router = APIRouter(tags=["online payments"])
 
 
+Provider = Literal["none", "stripe", "moyasar", "test"]
+
+
 class PaymentSettingsOut(BaseModel):
-    provider: Literal["none", "stripe", "test"]
+    provider: Provider
     stripe_key_hint: str
     has_stripe_key: bool
     has_webhook_secret: bool
     webhook_url: str
+    moyasar_key_hint: str
+    has_moyasar_key: bool
+    has_moyasar_webhook_secret: bool
+    moyasar_webhook_url: str
     test_provider_available: bool
 
 
 class PaymentSettingsIn(BaseModel):
-    provider: Literal["none", "stripe", "test"]
+    provider: Provider
     stripe_secret_key: str | None = Field(default=None, pattern=STRIPE_KEY)
     stripe_webhook_secret: str | None = Field(default=None, pattern=STRIPE_WEBHOOK_SECRET)
+    moyasar_secret_key: str | None = Field(default=None, pattern=MOYASAR_KEY)
+    # The secret token typed in when adding the webhook in Moyasar's dashboard.
+    moyasar_webhook_secret: str | None = Field(default=None, min_length=16, max_length=200, pattern=r"^\S+$")
 
 
 class PaymentProviderOut(BaseModel):
-    provider: Literal["none", "stripe", "test"]
+    provider: Provider
 
 
 class PaymentLinkIn(BaseModel):
@@ -94,6 +109,9 @@ def _settings_out(db: Session, settings, row: PaymentSettings) -> PaymentSetting
                        has_stripe_key=row.stripe_secret_key is not None,
                        has_webhook_secret=row.stripe_webhook_secret is not None,
                        webhook_url=svc.webhook_url(db, settings, row),
+                       moyasar_key_hint=row.moyasar_key_hint, has_moyasar_key=row.moyasar_secret_key is not None,
+                       has_moyasar_webhook_secret=row.moyasar_webhook_secret is not None,
+                       moyasar_webhook_url=svc.webhook_url(db, settings, row, "moyasar"),
                        test_provider_available=svc.test_provider_allowed(settings))
 
 
@@ -140,14 +158,25 @@ def change_settings(body: PaymentSettingsIn, request: Request, ctx: OrgContext =
     if body.stripe_webhook_secret:
         row.stripe_webhook_secret = crypto.encrypt(settings, body.stripe_webhook_secret, context=org)
         changed.append("stripe_webhook_secret")
+    if body.moyasar_secret_key:
+        row.moyasar_secret_key = crypto.encrypt(settings, body.moyasar_secret_key, context=org)
+        row.moyasar_key_hint = body.moyasar_secret_key[:8] + "…" + body.moyasar_secret_key[-4:]
+        changed.append("moyasar_secret_key")
+    if body.moyasar_webhook_secret:
+        row.moyasar_webhook_secret = crypto.encrypt(settings, body.moyasar_webhook_secret, context=org)
+        changed.append("moyasar_webhook_secret")
     if body.provider == "stripe" and (row.stripe_secret_key is None or row.stripe_webhook_secret is None):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                             "Stripe needs the secret key and the webhook's signing secret (whsec_…)")
+    if body.provider == "moyasar" and (row.moyasar_secret_key is None or row.moyasar_webhook_secret is None):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "Moyasar needs the secret key and the webhook's secret token")
     row.provider = body.provider
     row.updated_by = ctx.user.id
     audit.record(db, actor_user_id=ctx.user.id, action="payments.settings_changed", target_type="organization",
                  target_id=org, details={"provider": body.provider, "changed": changed,
-                                         "stripe_key_hint": row.stripe_key_hint}, ip_address=client_ip(request))
+                                         "stripe_key_hint": row.stripe_key_hint,
+                                         "moyasar_key_hint": row.moyasar_key_hint}, ip_address=client_ip(request))
     db.commit()
     return _settings_out(db, settings, row)
 
@@ -276,6 +305,60 @@ async def stripe_webhook(token: str, request: Request, db: Session = Depends(get
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too large")
     return await run_in_threadpool(_stripe_call, db, request.app.state.settings, token, body,
                                    request.headers.get("stripe-signature", ""))
+
+
+def _moyasar_call(db: Session, settings, http, token: str, body: bytes) -> JSONResponse:
+    org_id = _org_by_webhook(db, crypto.token_hash(token))
+    if org_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown payment webhook address")
+    bind_tenant(db, org_id)
+    row = db.scalar(select(PaymentSettings))
+    expected = svc.secret(db, settings, row.moyasar_webhook_secret)
+    key = svc.secret(db, settings, row.moyasar_secret_key)
+    if expected is None or key is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown payment webhook address")
+    try:
+        event = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "rejected: the body isn't JSON")
+    given = event.get("secret_token") if isinstance(event, dict) else None
+    if not isinstance(given, str) or not hmac.compare_digest(given.encode(), expected.encode()):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "rejected: the secret token doesn't match")
+    invoice_id = moyasar_invoice(event)
+    if invoice_id is None:
+        return JSONResponse({"received": True, "result": "ignored"})
+    link = db.scalar(select(PaymentLink).where(PaymentLink.provider == "moyasar", PaymentLink.session_id == invoice_id))
+    if link is None:
+        return JSONResponse({"received": True, "result": "not ours"})  # an invoice made outside NOVARA
+    try:
+        meaning = Moyasar(key, http).fetch(invoice_id)                   # Moyasar's own answer decides
+    except ProviderError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))         # Moyasar calls again later
+    if meaning is None:
+        return JSONResponse({"received": True, "result": "not paid"})
+    if isinstance(meaning, Expired):
+        svc.expired(db, link)
+        db.commit()
+        return JSONResponse({"received": True, "result": "expired"})
+    result = svc.complete(db, link.id, amount_minor=meaning.amount_minor, currency=meaning.currency,
+                          reference=meaning.reference, paid_at=meaning.paid_at)
+    db.commit()
+    return JSONResponse({"received": True, "result": result})
+
+
+@public_router.post("/public/payments/moyasar/{token}")
+async def moyasar_webhook(token: str, request: Request, db: Session = Depends(get_db)):
+    """Moyasar's webhook calls for this organization: the secret token must match, then Moyasar's API is asked."""
+    if len(token) > 100:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown payment webhook address")
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too large")
+    body = await request.body()
+    if len(body) > MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too large")
+    return await run_in_threadpool(_moyasar_call, db, request.app.state.settings, request.app.state.payment_http,
+                                   token, body)
 
 
 def _page(title: str, body: str, code: int = 200) -> HTMLResponse:

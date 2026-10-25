@@ -7881,6 +7881,7 @@
       "enum": [
        "none",
        "stripe",
+       "moyasar",
        "test"
       ],
       "title": "Provider",
@@ -7895,10 +7896,37 @@
    },
    "PaymentSettingsIn": {
     "properties": {
+     "moyasar_secret_key": {
+      "anyOf": [
+       {
+        "pattern": "^sk_(test|live)_[A-Za-z0-9]{20,200}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Moyasar Secret Key"
+     },
+     "moyasar_webhook_secret": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "minLength": 16,
+        "pattern": "^\\S+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Moyasar Webhook Secret"
+     },
      "provider": {
       "enum": [
        "none",
        "stripe",
+       "moyasar",
        "test"
       ],
       "title": "Provider",
@@ -7937,6 +7965,14 @@
    },
    "PaymentSettingsOut": {
     "properties": {
+     "has_moyasar_key": {
+      "title": "Has Moyasar Key",
+      "type": "boolean"
+     },
+     "has_moyasar_webhook_secret": {
+      "title": "Has Moyasar Webhook Secret",
+      "type": "boolean"
+     },
      "has_stripe_key": {
       "title": "Has Stripe Key",
       "type": "boolean"
@@ -7945,10 +7981,19 @@
       "title": "Has Webhook Secret",
       "type": "boolean"
      },
+     "moyasar_key_hint": {
+      "title": "Moyasar Key Hint",
+      "type": "string"
+     },
+     "moyasar_webhook_url": {
+      "title": "Moyasar Webhook Url",
+      "type": "string"
+     },
      "provider": {
       "enum": [
        "none",
        "stripe",
+       "moyasar",
        "test"
       ],
       "title": "Provider",
@@ -7973,6 +8018,10 @@
      "has_stripe_key",
      "has_webhook_secret",
      "webhook_url",
+     "moyasar_key_hint",
+     "has_moyasar_key",
+     "has_moyasar_webhook_secret",
+     "moyasar_webhook_url",
      "test_provider_available"
     ],
     "title": "PaymentSettingsOut",
@@ -33190,6 +33239,47 @@
      }
     },
     "summary": "Done",
+    "tags": [
+     "online payments"
+    ]
+   }
+  },
+  "/api/v1/public/payments/moyasar/{token}": {
+   "post": {
+    "description": "Moyasar's webhook calls for this organization: the secret token must match, then Moyasar's API is asked.",
+    "operationId": "moyasar_webhook_api_v1_public_payments_moyasar__token__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "token",
+      "required": true,
+      "schema": {
+       "title": "Token",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Moyasar Webhook",
     "tags": [
      "online payments"
     ]

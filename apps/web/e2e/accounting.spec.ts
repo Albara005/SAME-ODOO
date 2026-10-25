@@ -327,6 +327,9 @@ test("online payment: the customer pays through a link and the invoice is paid w
   const provider = page.getByLabel("مزوّد الدفع");
   await provider.selectOption({ label: "Stripe" });
   await expect(page.getByLabel("عنوان الـ Webhook")).toHaveValue(/\/api\/v1\/public\/payments\/stripe\/nvpay_/);
+  await provider.selectOption({ label: "ميسّر (مدى، Apple Pay، البطاقات)" });
+  await expect(page.getByLabel("عنوان الـ Webhook")).toHaveValue(/\/api\/v1\/public\/payments\/moyasar\/nvpay_/);
+  await expect(page.getByLabel(/الرمز السري للـ Webhook/)).toBeVisible();
   await provider.selectOption({ label: "مزوّد تجريبي (للتطوير فقط)" });
   await page.getByRole("button", { name: "حفظ إعدادات الدفع" }).click();
   await expect(page.getByText("تم الحفظ")).toBeVisible();

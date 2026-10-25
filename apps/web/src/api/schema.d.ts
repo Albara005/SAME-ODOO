@@ -4712,6 +4712,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/payments/moyasar/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Moyasar Webhook
+         * @description Moyasar's webhook calls for this organization: the secret token must match, then Moyasar's API is asked.
+         */
+        post: operations["moyasar_webhook_api_v1_public_payments_moyasar__token__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/payments/stripe/{token}": {
         parameters: {
             query?: never;
@@ -7896,15 +7916,19 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "none" | "stripe" | "test";
+            provider: "none" | "stripe" | "moyasar" | "test";
         };
         /** PaymentSettingsIn */
         PaymentSettingsIn: {
+            /** Moyasar Secret Key */
+            moyasar_secret_key?: string | null;
+            /** Moyasar Webhook Secret */
+            moyasar_webhook_secret?: string | null;
             /**
              * Provider
              * @enum {string}
              */
-            provider: "none" | "stripe" | "test";
+            provider: "none" | "stripe" | "moyasar" | "test";
             /** Stripe Secret Key */
             stripe_secret_key?: string | null;
             /** Stripe Webhook Secret */
@@ -7912,15 +7936,23 @@ export interface components {
         };
         /** PaymentSettingsOut */
         PaymentSettingsOut: {
+            /** Has Moyasar Key */
+            has_moyasar_key: boolean;
+            /** Has Moyasar Webhook Secret */
+            has_moyasar_webhook_secret: boolean;
             /** Has Stripe Key */
             has_stripe_key: boolean;
             /** Has Webhook Secret */
             has_webhook_secret: boolean;
+            /** Moyasar Key Hint */
+            moyasar_key_hint: string;
+            /** Moyasar Webhook Url */
+            moyasar_webhook_url: string;
             /**
              * Provider
              * @enum {string}
              */
-            provider: "none" | "stripe" | "test";
+            provider: "none" | "stripe" | "moyasar" | "test";
             /** Stripe Key Hint */
             stripe_key_hint: string;
             /** Test Provider Available */
@@ -20988,6 +21020,37 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    moyasar_webhook_api_v1_public_payments_moyasar__token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

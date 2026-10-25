@@ -1824,6 +1824,12 @@ export const en = {
   "audit.a.payroll.end_of_service_posted": "End-of-service settlement posted",
   "audit.a.payroll.end_of_service_paid": "End-of-service settlement paid",
   "audit.a.payroll.end_of_service_cancelled": "End-of-service settlement cancelled",
+  "pay.providerMoyasar": "Moyasar (mada, Apple Pay, cards)",
+  "pay.moyasarKey": "Moyasar secret key",
+  "pay.moyasarKeyHint": "From Moyasar's dashboard, Settings → API keys (sk_live_… or sk_test_…).",
+  "pay.moyasarWebhookHint": "In Moyasar's dashboard, add a webhook with this address and a secret token, for payment and invoice events.",
+  "pay.moyasarToken": "The webhook's secret token",
+  "pay.moyasarTokenHint": "The same token you typed in Moyasar (at least 16 characters). Each call is also checked with Moyasar before anything is recorded.",
 } as const;
 
 export type MessageKey = keyof typeof en;

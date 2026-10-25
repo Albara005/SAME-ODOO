@@ -141,6 +141,8 @@ export function OnlinePaymentsCard() {
   const [provider, setProvider] = useState<Provider | null>(null);
   const [secretKey, setSecretKey] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
+  const [moyasarKey, setMoyasarKey] = useState("");
+  const [moyasarToken, setMoyasarToken] = useState("");
   const save = useMutation({
     mutationFn: () =>
       unwrap(api.PUT("/api/v1/orgs/{org_id}/payments/settings", {
@@ -149,6 +151,8 @@ export function OnlinePaymentsCard() {
           provider: provider ?? current.data?.provider ?? "none",
           stripe_secret_key: secretKey.trim() || null,
           stripe_webhook_secret: webhookSecret.trim() || null,
+          moyasar_secret_key: moyasarKey.trim() || null,
+          moyasar_webhook_secret: moyasarToken.trim() || null,
         },
       })),
     onSuccess: (s) => {
@@ -157,6 +161,8 @@ export function OnlinePaymentsCard() {
       setProvider(null);
       setSecretKey("");
       setWebhookSecret("");
+      setMoyasarKey("");
+      setMoyasarToken("");
       toast(t("common.saved"));
     },
   });
@@ -178,6 +184,7 @@ export function OnlinePaymentsCard() {
         <Field label={t("pay.provider")}>
           <Select value={chosen} onChange={(e) => setProvider(e.target.value as Provider)}>
             <option value="none">{t("pay.providerNone")}</option>
+            <option value="moyasar">{t("pay.providerMoyasar")}</option>
             <option value="stripe">Stripe</option>
             {s.test_provider_available && <option value="test">{t("pay.providerTest")}</option>}
           </Select>
@@ -199,6 +206,25 @@ export function OnlinePaymentsCard() {
               optional={s.has_webhook_secret}>
               <Input type="password" value={webhookSecret} onChange={(e) => setWebhookSecret(e.target.value)} autoComplete="off"
                 placeholder="whsec_…" ltr />
+            </Field>
+          </>
+        )}
+        {chosen === "moyasar" && (
+          <>
+            <Field label={t("pay.moyasarKey")} hint={s.has_moyasar_key ? `${t("pay.stored")} ${s.moyasar_key_hint}` : t("pay.moyasarKeyHint")}
+              optional={s.has_moyasar_key}>
+              <Input type="password" value={moyasarKey} onChange={(e) => setMoyasarKey(e.target.value)} autoComplete="off"
+                placeholder="sk_live_…" ltr />
+            </Field>
+            <Field label={t("pay.webhookUrl")} hint={t("pay.moyasarWebhookHint")}>
+              <div className="row">
+                <Input value={s.moyasar_webhook_url} readOnly ltr aria-label={t("pay.webhookUrl")} />
+                <Button size="sm" icon={<Copy size={14} />} onClick={() => copy(s.moyasar_webhook_url)}>{t("pay.copy")}</Button>
+              </div>
+            </Field>
+            <Field label={t("pay.moyasarToken")} hint={s.has_moyasar_webhook_secret ? t("pay.stored") : t("pay.moyasarTokenHint")}
+              optional={s.has_moyasar_webhook_secret}>
+              <Input type="password" value={moyasarToken} onChange={(e) => setMoyasarToken(e.target.value)} autoComplete="off" ltr />
             </Field>
           </>
         )}

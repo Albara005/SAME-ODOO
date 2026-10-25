@@ -1826,4 +1826,10 @@ export const ar: Record<MessageKey, string> = {
   "audit.a.payroll.end_of_service_posted": "رُحّلت تسوية نهاية خدمة",
   "audit.a.payroll.end_of_service_paid": "صُرفت تسوية نهاية خدمة",
   "audit.a.payroll.end_of_service_cancelled": "أُلغيت تسوية نهاية خدمة",
+  "pay.providerMoyasar": "ميسّر (مدى، Apple Pay، البطاقات)",
+  "pay.moyasarKey": "المفتاح السري في ميسّر",
+  "pay.moyasarKeyHint": "من لوحة ميسّر: الإعدادات ← مفاتيح API (sk_live_… أو sk_test_…).",
+  "pay.moyasarWebhookHint": "في لوحة ميسّر أضف Webhook بهذا العنوان ورمز سري، لأحداث المدفوعات والفواتير.",
+  "pay.moyasarToken": "الرمز السري للـ Webhook",
+  "pay.moyasarTokenHint": "الرمز نفسه الذي كتبته في ميسّر (16 حرفاً على الأقل). كل استدعاء يُتحقق منه أيضاً لدى ميسّر قبل تسجيل أي شيء.",
 };
