@@ -1505,6 +1505,22 @@ export const en = {
   "agents.knowledgeNoFiles": "No documents yet. Upload some in Documents first.",
   "agents.knowledgeDeleted": "(deleted file)",
   "inventory.kind.revaluation": "Revaluation",
+  "hr.carried": "{days} carried over from last year",
+  "hr.earnedSoFar": "{days} of {of} earned so far",
+  "hr.morning": "morning",
+  "hr.afternoon": "afternoon",
+  "hr.dayPart": "Whole or half day",
+  "hr.wholeDay": "The whole day",
+  "hr.morningHalf": "Morning (half day)",
+  "hr.afternoonHalf": "Afternoon (half day)",
+  "hr.accrual": "How the allowance is given",
+  "hr.accrual.upfront": "all at the start of the year",
+  "hr.accrual.monthly": "earned month by month",
+  "hr.prorated": "in proportion to the time employed",
+  "hr.prorate": "Give people who start or leave during the year a share in proportion to their time",
+  "hr.carryOver": "Days that can carry over",
+  "hr.carryOverHint": "Unused days that move into next year, at most this many (0: none).",
+  "hr.carryUpTo": "carries up to {days}",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -49,35 +50,111 @@ def working_days(db: Session, start: date, end: date) -> int:
     return n
 
 
-@dataclass(frozen=True)
-class Balance:
-    leave_type: LeaveType
-    allowance: int | None
-    approved: int
-    pending: int
-
-    @property
-    def remaining(self) -> int | None:
-        return None if self.allowance is None else self.allowance - self.approved - self.pending
+HALF = Decimal("0.5")
+CARRY_LOOKBACK_YEARS = 5
 
 
-def _held(db: Session, employee_id: str, type_id: str, year: int, status: str, skip: str | None = None) -> int:
-    stmt = select(func.coalesce(func.sum(LeaveRequest.days), 0)).where(
-        LeaveRequest.employee_id == employee_id, LeaveRequest.leave_type_id == type_id, LeaveRequest.status == status,
+def half_days(x: Decimal) -> Decimal:
+    """Rounded to the nearest half day (halves round up)."""
+    return (x * 2).quantize(Decimal(1), rounding=ROUND_HALF_UP) / 2
+
+
+def _employed_days(employee: Employee, year: int, until: date) -> int:
+    first = max(date(year, 1, 1), employee.hire_date or date(year, 1, 1))
+    last = min(date(year, 12, 31), until, employee.end_date or date(year, 12, 31))
+    return max((last - first).days + 1, 0)
+
+
+def _days_in(year: int) -> int:
+    return (date(year, 12, 31) - date(year, 1, 1)).days + 1
+
+
+def allowance(t: LeaveType, e: Employee, year: int) -> Decimal | None:
+    """The year's allowance, before anything carried over: the whole of it, or (prorate or monthly accrual)
+    in proportion to the days employed that year."""
+    if t.annual_days is None:
+        return None
+    if t.accrual == "upfront" and not t.prorate:
+        return Decimal(t.annual_days)
+    return half_days(Decimal(t.annual_days) * _employed_days(e, year, date(year, 12, 31)) / _days_in(year))
+
+
+def earned(t: LeaveType, e: Employee, year: int, on: date) -> Decimal | None:
+    """What can be used by ``on``: the allowance, or with monthly accrual what has been earned up to the
+    end of that month."""
+    full = allowance(t, e, year)
+    if full is None or t.accrual != "monthly":
+        return full
+    if on.year > year:
+        return full
+    if on.year < year:
+        return Decimal(0)
+    month_end = date(on.year, 12, 31) if on.month == 12 else date(on.year, on.month + 1, 1) - timedelta(days=1)
+    return half_days(Decimal(t.annual_days) * _employed_days(e, year, month_end) / _days_in(year))
+
+
+def _days(db: Session, employee_id: str, type_id: str, year: int, statuses: tuple[str, ...],
+          skip: str | None = None) -> Decimal:
+    stmt = select(LeaveRequest.days).where(
+        LeaveRequest.employee_id == employee_id, LeaveRequest.leave_type_id == type_id,
+        LeaveRequest.status.in_(statuses),
         LeaveRequest.start_date >= date(year, 1, 1), LeaveRequest.start_date <= date(year, 12, 31))
     if skip:
         stmt = stmt.where(LeaveRequest.id != skip)
-    return int(db.scalar(stmt) or 0)
+    return sum((Decimal(d) for d in db.scalars(stmt)), Decimal(0))  # summed here: SQLite keeps exact decimals as text
 
 
-def balances(db: Session, employee: Employee, year: int) -> list[Balance]:
+def carried(db: Session, t: LeaveType, e: Employee, year: int) -> Decimal:
+    """Unused days brought into ``year``: what each earlier year left (its allowance plus what it brought in,
+    less what was approved), at most carry_over_days, starting from the hire year or a few years back."""
+    if t.annual_days is None or not t.carry_over_days:
+        return Decimal(0)
+    first = max(year - CARRY_LOOKBACK_YEARS, e.hire_date.year if e.hire_date else year - CARRY_LOOKBACK_YEARS)
+    carry = Decimal(0)
+    for y in range(first, year):
+        left = (allowance(t, e, y) or Decimal(0)) + carry - _days(db, e.id, t.id, y, ("approved",))
+        carry = min(Decimal(t.carry_over_days), max(left, Decimal(0)))
+    return carry
+
+
+@dataclass(frozen=True)
+class Balance:
+    leave_type: LeaveType
+    allowance: Decimal | None   # this year's own allowance
+    carried: Decimal            # brought in from last year
+    earned: Decimal | None      # usable so far (the allowance, or what monthly accrual has earned by today)
+    approved: Decimal
+    pending: Decimal
+
+    @property
+    def remaining(self) -> Decimal | None:
+        """What can still be asked for now."""
+        return None if self.earned is None else self.earned + self.carried - self.approved - self.pending
+
+
+def balances(db: Session, employee: Employee, year: int, today: date | None = None) -> list[Balance]:
+    today = today or date.today()
     types = db.scalars(select(LeaveType).where(LeaveType.active.is_(True)).order_by(LeaveType.name))
-    return [Balance(t, t.annual_days, _held(db, employee.id, t.id, year, "approved"),
-                    _held(db, employee.id, t.id, year, "pending")) for t in types]
+    return [Balance(t, allowance(t, employee, year), carried(db, t, employee, year), earned(t, employee, year, today),
+                    _days(db, employee.id, t.id, year, ("approved",)), _days(db, employee.id, t.id, year, ("pending",)))
+            for t in types]
+
+
+def available(db: Session, employee: Employee, t: LeaveType, start: date, statuses: tuple[str, ...] = LIVE,
+              skip: str | None = None) -> Decimal | None:
+    """Days of this type still free for a leave starting on ``start`` (None: not tracked)."""
+    usable = earned(t, employee, start.year, start)
+    if usable is None:
+        return None
+    return usable + carried(db, t, employee, start.year) - _days(db, employee.id, t.id, start.year, statuses, skip)
+
+
+def fmt_days(days: Decimal) -> str:
+    return f"{days.normalize():f}"
 
 
 def check_request(db: Session, employee: Employee, leave_type: LeaveType, start: date, end: date,
-                  skip: str | None = None) -> int:
+                  skip: str | None = None, half_day: str | None = None) -> Decimal:
     """The request's working days, or LeaveError if it can't be made."""
     if employee.end_date and end > employee.end_date:
         raise LeaveError("the leave runs past the person's last day")
@@ -87,20 +164,25 @@ def check_request(db: Session, employee: Employee, leave_type: LeaveType, start:
         raise LeaveError("allowances are per calendar year: split the leave at the end of December")
     if employee.hire_date and start < employee.hire_date:
         raise LeaveError("the leave starts before the hire date")
-    days = working_days(db, start, end)
-    if days == 0:
+    if half_day is not None and (half_day not in ("am", "pm") or start != end):
+        raise LeaveError("a half day is the morning or the afternoon of a single day")
+    whole = working_days(db, start, end)
+    if whole == 0:
         raise LeaveError("those days are all weekend or public holidays")
-    overlap = db.scalar(select(LeaveRequest.id).where(
-        LeaveRequest.employee_id == employee.id, LeaveRequest.status.in_(LIVE),
-        LeaveRequest.start_date <= end, LeaveRequest.end_date >= start,
-        *([LeaveRequest.id != skip] if skip else [])).limit(1))
-    if overlap:
-        raise LeaveError("there is already a request on some of those days")
-    if leave_type.annual_days is not None:
-        held = sum(_held(db, employee.id, leave_type.id, start.year, s, skip) for s in LIVE)
-        if held + days > leave_type.annual_days:
-            left = max(leave_type.annual_days - held, 0)
-            raise LeaveError(f"only {left} day(s) of {leave_type.name} left in {start.year}")
+    days = HALF if half_day else Decimal(whole)
+    for other in db.scalars(select(LeaveRequest).where(
+            LeaveRequest.employee_id == employee.id, LeaveRequest.status.in_(LIVE),
+            LeaveRequest.start_date <= end, LeaveRequest.end_date >= start,
+            *([LeaveRequest.id != skip] if skip else []))):
+        other_half = half_day and other.half_day and other.half_day != half_day and other.start_date == start
+        if not other_half:
+            raise LeaveError("there is already a request on some of those days")
+    free = available(db, employee, leave_type, start, LIVE, skip)
+    if free is not None and days > free:
+        left = fmt_days(max(free, Decimal(0)))
+        if leave_type.accrual == "monthly":
+            raise LeaveError(f"only {left} day(s) of {leave_type.name} earned by the end of {start:%B %Y}")
+        raise LeaveError(f"only {left} day(s) of {leave_type.name} left in {start.year}")
     return days
 
 

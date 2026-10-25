@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
@@ -74,6 +76,9 @@ class LeaveTypeIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     annual_days: int | None = Field(default=None, gt=0, le=366)
     paid: bool = True
+    accrual: Literal["upfront", "monthly"] = "upfront"
+    prorate: bool = False
+    carry_over_days: int = Field(default=0, ge=0, le=366)
 
 
 class LeaveTypeUpdate(BaseModel):
@@ -81,6 +86,9 @@ class LeaveTypeUpdate(BaseModel):
     annual_days: int | None = Field(default=None, gt=0, le=366)
     paid: bool | None = None
     active: bool | None = None
+    accrual: Literal["upfront", "monthly"] | None = None
+    prorate: bool | None = None
+    carry_over_days: int | None = Field(default=None, ge=0, le=366)
 
 
 class LeaveTypeOut(BaseModel):
@@ -89,6 +97,9 @@ class LeaveTypeOut(BaseModel):
     annual_days: int | None
     paid: bool
     active: bool
+    accrual: str
+    prorate: bool
+    carry_over_days: int
 
 
 class PolicyIn(BaseModel):
@@ -121,16 +132,20 @@ class BalanceOut(BaseModel):
     leave_type_id: str
     leave_type: str
     paid: bool
-    allowance: int | None
-    approved: int
-    pending: int
-    remaining: int | None
+    accrual: str
+    allowance: float | None   # this year's own allowance (prorated if the type says so)
+    carried: float            # unused days brought in from last year
+    earned: float | None      # usable so far: the allowance, or what monthly accrual has earned by now
+    approved: float
+    pending: float
+    remaining: float | None   # what can still be asked for now
 
 
 class LeaveIn(BaseModel):
     leave_type_id: str
     start_date: date
     end_date: date
+    half_day: Literal["am", "pm"] | None = None  # the morning or the afternoon of a single day
     reason: str = Field(default="", max_length=500)
     employee_id: str | None = None  # someone else's: hr.manage only
 
@@ -148,7 +163,8 @@ class LeaveOut(BaseModel):
     leave_type: str
     start_date: date
     end_date: date
-    days: int
+    days: float
+    half_day: str | None
     reason: str
     status: str
     decided_at: datetime | None
@@ -220,9 +236,15 @@ def _employee_out(db: Session, e: Employee, away: set[str], depts: dict[str, str
                        away_today=e.id in away)
 
 
+def _num(d: Decimal | None) -> float | None:
+    return None if d is None else float(d)
+
+
 def _balances_out(bals: list[svc.Balance]) -> list[BalanceOut]:
     return [BalanceOut(leave_type_id=b.leave_type.id, leave_type=b.leave_type.name, paid=b.leave_type.paid,
-                       allowance=b.allowance, approved=b.approved, pending=b.pending, remaining=b.remaining)
+                       accrual=b.leave_type.accrual, allowance=_num(b.allowance), carried=float(b.carried),
+                       earned=_num(b.earned), approved=float(b.approved), pending=float(b.pending),
+                       remaining=_num(b.remaining))
             for b in bals]
 
 
@@ -236,8 +258,9 @@ def _leave_out(db: Session, ctx: OrgContext, r: LeaveRequest, cache: dict | None
                                                                       db.get(Department, e.department_id))
     decide = r.status == "pending" and svc.can_decide(db, ctx.user.id, ctx.permissions, e)
     return LeaveOut(id=r.id, employee_id=e.id, employee_name=e.full_name, department_name=dept.name if dept else None,
-                    leave_type_id=t.id, leave_type=t.name, start_date=r.start_date, end_date=r.end_date, days=r.days,
-                    reason=r.reason, status=r.status, decided_at=r.decided_at, decision_note=r.decision_note,
+                    leave_type_id=t.id, leave_type=t.name, start_date=r.start_date, end_date=r.end_date,
+                    days=float(r.days), half_day=r.half_day, reason=r.reason, status=r.status,
+                    decided_at=r.decided_at, decision_note=r.decision_note,
                     created_at=r.created_at, mine=e.user_id == ctx.user.id, can_decide=decide)
 
 
@@ -463,7 +486,8 @@ def employee_balances(employee_id: str, year: int | None = None, ctx: OrgContext
 
 
 def _type_out(t: LeaveType) -> LeaveTypeOut:
-    return LeaveTypeOut(id=t.id, name=t.name, annual_days=t.annual_days, paid=t.paid, active=t.active)
+    return LeaveTypeOut(id=t.id, name=t.name, annual_days=t.annual_days, paid=t.paid, active=t.active,
+                        accrual=t.accrual, prorate=t.prorate, carry_over_days=t.carry_over_days)
 
 
 @router.get("/orgs/{org_id}/hr/leave-types", response_model=list[LeaveTypeOut])
@@ -476,11 +500,13 @@ def create_leave_type(body: LeaveTypeIn, request: Request, ctx: OrgContext = Dep
                       db: Session = Depends(get_db)):
     if db.scalar(select(LeaveType.id).where(LeaveType.name == body.name)):
         raise HTTPException(status.HTTP_409_CONFLICT, "a leave type with that name exists")
-    t = LeaveType(name=body.name, annual_days=body.annual_days, paid=body.paid)
+    t = LeaveType(name=body.name, annual_days=body.annual_days, paid=body.paid, accrual=body.accrual,
+                  prorate=body.prorate, carry_over_days=body.carry_over_days)
     db.add(t)
     db.flush()
     audit.record(db, actor_user_id=ctx.user.id, action="leave_type.created", target_type="leave_type", target_id=t.id,
-                 details={"name": t.name, "annual_days": t.annual_days}, ip_address=client_ip(request))
+                 details={"name": t.name, "annual_days": t.annual_days, "accrual": t.accrual, "prorate": t.prorate,
+                          "carry_over_days": t.carry_over_days}, ip_address=client_ip(request))
     db.commit()
     return _type_out(t)
 
@@ -577,21 +603,22 @@ def request_leave(body: LeaveIn, request: Request, ctx: OrgContext = Depends(req
     if t is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "leave type not found")
     try:
-        days = svc.check_request(db, e, t, body.start_date, body.end_date)
+        days = svc.check_request(db, e, t, body.start_date, body.end_date, half_day=body.half_day)
     except svc.LeaveError as err:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(err))
     r = LeaveRequest(employee_id=e.id, leave_type_id=t.id, start_date=body.start_date, end_date=body.end_date,
-                     days=days, reason=body.reason, requested_by=ctx.user.id)
+                     days=days, half_day=body.half_day, reason=body.reason, requested_by=ctx.user.id)
     db.add(r)
     db.flush()
     audit.record(db, actor_user_id=ctx.user.id, action="leave.requested", target_type="leave_request", target_id=r.id,
                  details={"employee": e.full_name, "leave_type": t.name, "start": r.start_date.isoformat(),
-                          "end": r.end_date.isoformat(), "days": days}, ip_address=client_ip(request))
+                          "end": r.end_date.isoformat(), "days": svc.fmt_days(days), "half_day": r.half_day},
+                 ip_address=client_ip(request))
     org = ctx.organization
     _notify(db, [u for u in svc.deciders(db, e) if u != ctx.user.id],
             _say(org, f"طلب إجازة من {e.full_name}", f"Leave request from {e.full_name}"),
-            _say(org, f"{t.name}: {days} يوم عمل من {r.start_date} إلى {r.end_date}",
-                 f"{t.name}: {days} working day(s), {r.start_date} to {r.end_date}"), f"leave:{r.id}:new")
+            _say(org, f"{t.name}: {svc.fmt_days(days)} يوم عمل من {r.start_date} إلى {r.end_date}",
+                 f"{t.name}: {svc.fmt_days(days)} working day(s), {r.start_date} to {r.end_date}"), f"leave:{r.id}:new")
     db.commit()
     return _leave_out(db, ctx, r)
 
@@ -617,16 +644,14 @@ def approve_leave(request_id: str, body: DecisionIn, request: Request,
                   db: Session = Depends(get_db)):
     r, e = _decide(db, ctx, request_id)
     t = db.get(LeaveType, r.leave_type_id)
-    if t.annual_days is not None:
-        approved = svc.balances(db, e, r.start_date.year)
-        used = next((b.approved for b in approved if b.leave_type.id == t.id), 0)
-        if used + r.days > t.annual_days:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                f"approving would go over the {t.annual_days}-day {t.name} allowance")
+    free = svc.available(db, e, t, r.start_date, ("approved",), skip=r.id)
+    if free is not None and r.days > free:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            f"approving would go over the {t.name} allowance ({svc.fmt_days(max(free, Decimal(0)))} day(s) free)")
     r.status, r.decided_by, r.decided_at, r.decision_note = "approved", ctx.user.id, datetime.now(timezone.utc), body.note
     audit.record(db, actor_user_id=ctx.user.id, action="leave.approved", target_type="leave_request", target_id=r.id,
                  details={"employee": e.full_name, "leave_type": t.name, "start": r.start_date.isoformat(),
-                          "end": r.end_date.isoformat(), "days": r.days}, ip_address=client_ip(request))
+                          "end": r.end_date.isoformat(), "days": svc.fmt_days(r.days)}, ip_address=client_ip(request))
     if e.user_id:
         org = ctx.organization
         _notify(db, [e.user_id], _say(org, "وُوفق على إجازتك", "Your leave was approved"),

@@ -203,5 +203,20 @@ test("leave: HR sets up a department, the employee asks, the manager approves", 
   await empPage.getByLabel("السنة").selectOption(week.year);
   await expect(empPage.getByText("موافق عليها", { exact: true })).toBeVisible();
   await expect(empPage.getByText("المتبقي 16 من 21 يوم")).toBeVisible();
+
+  // A morning off the following Sunday: half a day.
+  const nextSunday = new Date(`${week.start}T12:00:00Z`);
+  nextSunday.setUTCDate(nextSunday.getUTCDate() + 7);
+  const half = nextSunday.toISOString().slice(0, 10);
+  await empPage.getByRole("button", { name: "طلب إجازة" }).click();
+  dialog = empPage.getByRole("dialog");
+  await dialog.getByLabel(/نوع الإجازة/).selectOption({ label: "سنوية" });
+  await dialog.getByLabel("من", { exact: true }).fill(half);
+  await dialog.getByLabel("إلى", { exact: true }).fill(half);
+  await dialog.getByLabel("يوم كامل أو نصف يوم").selectOption({ label: "الصباح (نصف يوم)" });
+  await expect(dialog.getByRole("status")).toContainText("0.5 يوم عمل");
+  await dialog.getByRole("button", { name: "إرسال الطلب" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(empPage.getByRole("cell", { name: /0\.5 · صباحاً/ })).toBeVisible();
   await empPage.close();
 });

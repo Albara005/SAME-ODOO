@@ -110,6 +110,10 @@ function MyLeave() {
                     {b.allowance == null ? t("hr.daysTaken", { days: b.approved }) : t("hr.daysLeft", { left: b.remaining ?? 0, of: b.allowance })}
                   </strong>
                   {b.pending > 0 && <span className="muted small">{t("hr.daysPending", { days: b.pending })}</span>}
+                  {b.carried > 0 && <span className="muted small">{t("hr.carried", { days: b.carried })}</span>}
+                  {b.accrual === "monthly" && b.allowance != null && b.earned != null && (
+                    <span className="muted small">{t("hr.earnedSoFar", { days: b.earned, of: b.allowance })}</span>
+                  )}
                 </Card>
               ))}
             </div>
@@ -205,7 +209,9 @@ function LeaveTable({ status, mineOnly = false }: { status?: string; mineOnly?: 
                         </td>
                         <td className="num small">{date(r.start_date)}</td>
                         <td className="num small">{date(r.end_date)}</td>
-                        <td className="end num">{r.days}</td>
+                        <td className="end num">
+                          {r.days}{r.half_day && <span className="muted small"> · {t(r.half_day === "am" ? "hr.morning" : "hr.afternoon")}</span>}
+                        </td>
                         <td>
                           <span className="stack-sm" style={{ gap: 2 }}>
                             <StatusBadge status={r.status} />
@@ -273,8 +279,9 @@ function RequestDialog({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const types = useLeaveTypes();
   const people = useHr("employees", (org_id) => unwrap(api.GET("/api/v1/orgs/{org_id}/hr/employees", { params: { path: { org_id } } })), can("hr.manage"));
-  const [form, setForm] = useState({ leave_type_id: "", start_date: "", end_date: "", reason: "", employee_id: "" });
+  const [form, setForm] = useState({ leave_type_id: "", start_date: "", end_date: "", reason: "", employee_id: "", half_day: "" });
   const ready = Boolean(form.start_date && form.end_date && form.end_date >= form.start_date);
+  const oneDay = ready && form.start_date === form.end_date;
   const days = useQuery({
     queryKey: ["hr", "leave-days", org.id, form.start_date, form.end_date],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/hr/leave-days", {
@@ -286,7 +293,8 @@ function RequestDialog({ onClose }: { onClose: () => void }) {
     mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/hr/leave-requests", {
       params: { path: { org_id: org.id } },
       body: { leave_type_id: form.leave_type_id, start_date: form.start_date, end_date: form.end_date, reason: form.reason,
-              employee_id: form.employee_id || null },
+              employee_id: form.employee_id || null,
+              half_day: oneDay && (form.half_day === "am" || form.half_day === "pm") ? form.half_day : null },
     })),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["hr"] });
@@ -321,7 +329,20 @@ function RequestDialog({ onClose }: { onClose: () => void }) {
             <Input type="date" required min={form.start_date || undefined} value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} ltr />
           </Field>
         </div>
-        {ready && days.data && <p className="muted small" role="status">{t("hr.workingDays", { days: days.data.days })}</p>}
+        {oneDay && (
+          <Field label={t("hr.dayPart")}>
+            <Select value={form.half_day} onChange={(e) => setForm({ ...form, half_day: e.target.value })}>
+              <option value="">{t("hr.wholeDay")}</option>
+              <option value="am">{t("hr.morningHalf")}</option>
+              <option value="pm">{t("hr.afternoonHalf")}</option>
+            </Select>
+          </Field>
+        )}
+        {ready && days.data && (
+          <p className="muted small" role="status">
+            {t("hr.workingDays", { days: oneDay && form.half_day && days.data.days > 0 ? 0.5 : days.data.days })}
+          </p>
+        )}
         <Field label={t("hr.reason")} optional>
           <Textarea value={form.reason} maxLength={500} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
         </Field>
@@ -587,13 +608,15 @@ function LeaveTypes() {
   const qc = useQueryClient();
   const toast = useToast();
   const types = useLeaveTypes();
-  const [form, setForm] = useState({ name: "", annual_days: "", paid: true });
+  const blank = { name: "", annual_days: "", paid: true, accrual: "upfront" as "upfront" | "monthly", prorate: true, carry_over_days: "0" };
+  const [form, setForm] = useState(blank);
   const add = useMutation({
     mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/hr/leave-types", {
       params: { path: { org_id: org.id } },
-      body: { name: form.name, annual_days: form.annual_days ? Number(form.annual_days) : null, paid: form.paid },
+      body: { name: form.name, annual_days: form.annual_days ? Number(form.annual_days) : null, paid: form.paid,
+              accrual: form.accrual, prorate: form.prorate, carry_over_days: Number(form.carry_over_days || 0) },
     })),
-    onSuccess: () => { setForm({ name: "", annual_days: "", paid: true }); void qc.invalidateQueries({ queryKey: ["hr"] }); },
+    onSuccess: () => { setForm(blank); void qc.invalidateQueries({ queryKey: ["hr"] }); },
   });
   const toggle = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) => unwrap(api.PATCH("/api/v1/orgs/{org_id}/hr/leave-types/{type_id}", {
@@ -614,6 +637,8 @@ function LeaveTypes() {
                     <strong>{x.name}</strong>{" "}
                     <span className="muted small">
                       · {x.annual_days ? t("hr.perYear", { days: x.annual_days }) : t("hr.noAllowance")}{!x.paid && ` · ${t("hr.unpaid")}`}
+                      {x.annual_days != null && ` · ${x.accrual === "monthly" ? t("hr.accrual.monthly") : x.prorate ? t("hr.prorated") : t("hr.accrual.upfront")}`}
+                      {x.carry_over_days > 0 && ` · ${t("hr.carryUpTo", { days: x.carry_over_days })}`}
                     </span>
                   </span>
                   <Button size="sm" variant="ghost" onClick={() => toggle.mutate({ id: x.id, active: !x.active })}>
@@ -634,6 +659,22 @@ function LeaveTypes() {
               <Input inputMode="numeric" pattern="[0-9]*" value={form.annual_days} onChange={(e) => setForm({ ...form, annual_days: e.target.value })} ltr />
             </Field>
           </div>
+          {form.annual_days && (
+            <div className="grid-2">
+              <Field label={t("hr.accrual")}>
+                <Select value={form.accrual} onChange={(e) => setForm({ ...form, accrual: e.target.value as "upfront" | "monthly" })}>
+                  <option value="upfront">{t("hr.accrual.upfront")}</option>
+                  <option value="monthly">{t("hr.accrual.monthly")}</option>
+                </Select>
+              </Field>
+              <Field label={t("hr.carryOver")} hint={t("hr.carryOverHint")}>
+                <Input inputMode="numeric" pattern="[0-9]*" value={form.carry_over_days} onChange={(e) => setForm({ ...form, carry_over_days: e.target.value })} ltr />
+              </Field>
+            </div>
+          )}
+          {form.annual_days && form.accrual === "upfront" && (
+            <Checkbox label={t("hr.prorate")} checked={form.prorate} onChange={(e) => setForm({ ...form, prorate: e.target.checked })} />
+          )}
           <Checkbox label={t("hr.paid")} checked={form.paid} onChange={(e) => setForm({ ...form, paid: e.target.checked })} />
           <div><Button type="submit" icon={<Plus size={16} />} loading={add.isPending}>{t("hr.addType")}</Button></div>
         </form>

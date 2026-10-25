@@ -4229,10 +4229,16 @@ export interface components {
         };
         /** BalanceOut */
         BalanceOut: {
+            /** Accrual */
+            accrual: string;
             /** Allowance */
             allowance: number | null;
             /** Approved */
             approved: number;
+            /** Carried */
+            carried: number;
+            /** Earned */
+            earned: number | null;
             /** Leave Type */
             leave_type: string;
             /** Leave Type Id */
@@ -5596,6 +5602,8 @@ export interface components {
              * Format: date
              */
             end_date: string;
+            /** Half Day */
+            half_day?: ("am" | "pm") | null;
             /** Leave Type Id */
             leave_type_id: string;
             /**
@@ -5635,6 +5643,8 @@ export interface components {
              * Format: date
              */
             end_date: string;
+            /** Half Day */
+            half_day: string | null;
             /** Id */
             id: string;
             /** Leave Type */
@@ -5655,8 +5665,19 @@ export interface components {
         };
         /** LeaveTypeIn */
         LeaveTypeIn: {
+            /**
+             * Accrual
+             * @default upfront
+             * @enum {string}
+             */
+            accrual: "upfront" | "monthly";
             /** Annual Days */
             annual_days?: number | null;
+            /**
+             * Carry Over Days
+             * @default 0
+             */
+            carry_over_days: number;
             /** Name */
             name: string;
             /**
@@ -5664,30 +5685,47 @@ export interface components {
              * @default true
              */
             paid: boolean;
+            /**
+             * Prorate
+             * @default false
+             */
+            prorate: boolean;
         };
         /** LeaveTypeOut */
         LeaveTypeOut: {
+            /** Accrual */
+            accrual: string;
             /** Active */
             active: boolean;
             /** Annual Days */
             annual_days: number | null;
+            /** Carry Over Days */
+            carry_over_days: number;
             /** Id */
             id: string;
             /** Name */
             name: string;
             /** Paid */
             paid: boolean;
+            /** Prorate */
+            prorate: boolean;
         };
         /** LeaveTypeUpdate */
         LeaveTypeUpdate: {
+            /** Accrual */
+            accrual?: ("upfront" | "monthly") | null;
             /** Active */
             active?: boolean | null;
             /** Annual Days */
             annual_days?: number | null;
+            /** Carry Over Days */
+            carry_over_days?: number | null;
             /** Name */
             name?: string | null;
             /** Paid */
             paid?: boolean | null;
+            /** Prorate */
+            prorate?: boolean | null;
         };
         /** LevelOut */
         LevelOut: {

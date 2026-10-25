@@ -578,10 +578,14 @@
    },
    "BalanceOut": {
     "properties": {
+     "accrual": {
+      "title": "Accrual",
+      "type": "string"
+     },
      "allowance": {
       "anyOf": [
        {
-        "type": "integer"
+        "type": "number"
        },
        {
         "type": "null"
@@ -591,7 +595,22 @@
      },
      "approved": {
       "title": "Approved",
-      "type": "integer"
+      "type": "number"
+     },
+     "carried": {
+      "title": "Carried",
+      "type": "number"
+     },
+     "earned": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Earned"
      },
      "leave_type": {
       "title": "Leave Type",
@@ -607,12 +626,12 @@
      },
      "pending": {
       "title": "Pending",
-      "type": "integer"
+      "type": "number"
      },
      "remaining": {
       "anyOf": [
        {
-        "type": "integer"
+        "type": "number"
        },
        {
         "type": "null"
@@ -625,7 +644,10 @@
      "leave_type_id",
      "leave_type",
      "paid",
+     "accrual",
      "allowance",
+     "carried",
+     "earned",
      "approved",
      "pending",
      "remaining"
@@ -4264,6 +4286,21 @@
       "title": "End Date",
       "type": "string"
      },
+     "half_day": {
+      "anyOf": [
+       {
+        "enum": [
+         "am",
+         "pm"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Half Day"
+     },
      "leave_type_id": {
       "title": "Leave Type Id",
       "type": "string"
@@ -4301,7 +4338,7 @@
      },
      "days": {
       "title": "Days",
-      "type": "integer"
+      "type": "number"
      },
      "decided_at": {
       "anyOf": [
@@ -4343,6 +4380,17 @@
       "title": "End Date",
       "type": "string"
      },
+     "half_day": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Half Day"
+     },
      "id": {
       "title": "Id",
       "type": "string"
@@ -4383,6 +4431,7 @@
      "start_date",
      "end_date",
      "days",
+     "half_day",
      "reason",
      "status",
      "decided_at",
@@ -4396,6 +4445,15 @@
    },
    "LeaveTypeIn": {
     "properties": {
+     "accrual": {
+      "default": "upfront",
+      "enum": [
+       "upfront",
+       "monthly"
+      ],
+      "title": "Accrual",
+      "type": "string"
+     },
      "annual_days": {
       "anyOf": [
        {
@@ -4409,6 +4467,13 @@
       ],
       "title": "Annual Days"
      },
+     "carry_over_days": {
+      "default": 0,
+      "maximum": 366.0,
+      "minimum": 0.0,
+      "title": "Carry Over Days",
+      "type": "integer"
+     },
      "name": {
       "maxLength": 80,
       "minLength": 1,
@@ -4418,6 +4483,11 @@
      "paid": {
       "default": true,
       "title": "Paid",
+      "type": "boolean"
+     },
+     "prorate": {
+      "default": false,
+      "title": "Prorate",
       "type": "boolean"
      }
     },
@@ -4429,6 +4499,10 @@
    },
    "LeaveTypeOut": {
     "properties": {
+     "accrual": {
+      "title": "Accrual",
+      "type": "string"
+     },
      "active": {
       "title": "Active",
       "type": "boolean"
@@ -4444,6 +4518,10 @@
       ],
       "title": "Annual Days"
      },
+     "carry_over_days": {
+      "title": "Carry Over Days",
+      "type": "integer"
+     },
      "id": {
       "title": "Id",
       "type": "string"
@@ -4455,6 +4533,10 @@
      "paid": {
       "title": "Paid",
       "type": "boolean"
+     },
+     "prorate": {
+      "title": "Prorate",
+      "type": "boolean"
      }
     },
     "required": [
@@ -4462,13 +4544,31 @@
      "name",
      "annual_days",
      "paid",
-     "active"
+     "active",
+     "accrual",
+     "prorate",
+     "carry_over_days"
     ],
     "title": "LeaveTypeOut",
     "type": "object"
    },
    "LeaveTypeUpdate": {
     "properties": {
+     "accrual": {
+      "anyOf": [
+       {
+        "enum": [
+         "upfront",
+         "monthly"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Accrual"
+     },
      "active": {
       "anyOf": [
        {
@@ -4493,6 +4593,19 @@
       ],
       "title": "Annual Days"
      },
+     "carry_over_days": {
+      "anyOf": [
+       {
+        "maximum": 366.0,
+        "minimum": 0.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Carry Over Days"
+     },
      "name": {
       "anyOf": [
        {
@@ -4516,6 +4629,17 @@
        }
       ],
       "title": "Paid"
+     },
+     "prorate": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Prorate"
      }
     },
     "title": "LeaveTypeUpdate",
