@@ -2903,6 +2903,95 @@
     "title": "DeploymentOut",
     "type": "object"
    },
+   "DomainIn": {
+    "properties": {
+     "hostname": {
+      "maxLength": 253,
+      "minLength": 3,
+      "title": "Hostname",
+      "type": "string"
+     }
+    },
+    "required": [
+     "hostname"
+    ],
+    "title": "DomainIn",
+    "type": "object"
+   },
+   "DomainOut": {
+    "properties": {
+     "cname_target": {
+      "title": "Cname Target",
+      "type": "string"
+     },
+     "hostname": {
+      "title": "Hostname",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "last_checked_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Checked At"
+     },
+     "last_error": {
+      "title": "Last Error",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "txt_name": {
+      "title": "Txt Name",
+      "type": "string"
+     },
+     "txt_value": {
+      "title": "Txt Value",
+      "type": "string"
+     },
+     "url": {
+      "title": "Url",
+      "type": "string"
+     },
+     "verified_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Verified At"
+     }
+    },
+    "required": [
+     "id",
+     "hostname",
+     "status",
+     "txt_name",
+     "txt_value",
+     "cname_target",
+     "url",
+     "verified_at",
+     "last_checked_at",
+     "last_error"
+    ],
+    "title": "DomainOut",
+    "type": "object"
+   },
    "DraftIn": {
     "properties": {
      "instructions": {
@@ -25304,6 +25393,255 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/studio/projects/{project_id}/domains": {
+   "get": {
+    "operationId": "list_domains_api_v1_orgs__org_id__studio_projects__project_id__domains_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DomainOut"
+         },
+         "title": "Response List Domains Api V1 Orgs  Org Id  Studio Projects  Project Id  Domains Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Domains",
+    "tags": [
+     "app-studio"
+    ]
+   },
+   "post": {
+    "description": "Put the production site on your own domain (it is served there once the DNS record proves it's yours).",
+    "operationId": "add_domain_api_v1_orgs__org_id__studio_projects__project_id__domains_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DomainIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DomainOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Add Domain",
+    "tags": [
+     "app-studio"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/studio/projects/{project_id}/domains/{domain_id}": {
+   "delete": {
+    "operationId": "remove_domain_api_v1_orgs__org_id__studio_projects__project_id__domains__domain_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "domain_id",
+      "required": true,
+      "schema": {
+       "title": "Domain Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Remove Domain",
+    "tags": [
+     "app-studio"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/studio/projects/{project_id}/domains/{domain_id}/verify": {
+   "post": {
+    "description": "Look for the TXT record now.",
+    "operationId": "verify_domain_api_v1_orgs__org_id__studio_projects__project_id__domains__domain_id__verify_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "domain_id",
+      "required": true,
+      "schema": {
+       "title": "Domain Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DomainOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Verify Domain",
+    "tags": [
+     "app-studio"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/studio/projects/{project_id}/files/{path}": {
    "delete": {
     "operationId": "delete_file_api_v1_orgs__org_id__studio_projects__project_id__files__path__delete",
@@ -28101,6 +28439,48 @@
     "summary": "Challenge Preflight",
     "tags": [
      "public data"
+    ]
+   }
+  },
+  "/api/v1/public/domains/check": {
+   "get": {
+    "description": "For a TLS proxy (Caddy on-demand TLS \"ask\"): 200 only for a proven domain whose site is live.",
+    "operationId": "check_domain_api_v1_public_domains_check_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "domain",
+      "required": true,
+      "schema": {
+       "maxLength": 253,
+       "title": "Domain",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Check Domain",
+    "tags": [
+     "published-sites"
     ]
    }
   },

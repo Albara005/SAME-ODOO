@@ -5,7 +5,7 @@ import posixpath
 import re
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -17,10 +17,10 @@ from novara.ai.router import _usd as usd
 from novara.deps import OrgContext, client_ip, get_db, require
 from novara.modules.access import permissions as P
 from novara.modules.audit import service as audit
-from novara.studio import builder
+from novara.studio import builder, domains
 from novara.studio import service as svc
 from novara.studio.files import MAX_FILE_BYTES, FileError, get_blob
-from novara.studio.models import AppDeployment, AppProject, AppVersion, SiteRoute
+from novara.studio.models import AppDeployment, AppProject, AppVersion, SiteDomain, SiteRoute
 from novara.studio.templates import TEMPLATES
 from novara.tenancy import bind_tenant
 
@@ -396,6 +396,11 @@ SITE_HEADERS = {
 
 @sites_router.get("/sites/{site_key}/{path:path}")
 def serve_site(site_key: str, path: str, request: Request, db: Session = Depends(get_db)) -> Response:
+    return site_response(db, request.app.state.storage, site_key, path)
+
+
+def site_response(db: Session, storage, site_key: str, path: str) -> Response:
+    """A file of a live site (index.html for a folder), or HTTPException 404."""
     route = db.get(SiteRoute, site_key)
     if route is None or not route.active:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "site not found")
@@ -411,8 +416,133 @@ def serve_site(site_key: str, path: str, request: Request, db: Session = Depends
         path = f"{path}/index.html"
     if path not in files:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "file not found")
-    body = get_blob(request.app.state.storage, route.organization_id, files[path])
+    body = get_blob(storage, route.organization_id, files[path])
     media = mimetypes.guess_type(path)[0] or "application/octet-stream"
     if media.startswith("text/") or media in ("application/javascript", "application/json", "image/svg+xml"):
         media += "; charset=utf-8"
     return Response(body, media_type=media, headers=SITE_HEADERS)
+
+
+# ---------------------------------------------------------------- custom domains
+
+
+class DomainIn(BaseModel):
+    hostname: str = Field(min_length=3, max_length=253)
+
+
+class DomainOut(BaseModel):
+    id: str
+    hostname: str
+    status: str                 # pending | verified
+    txt_name: str               # the TXT record that proves the domain
+    txt_value: str
+    cname_target: str           # where the hostname should point
+    url: str
+    verified_at: datetime | None
+    last_checked_at: datetime | None
+    last_error: str
+
+
+def _domain_out(request: Request, d: SiteDomain) -> DomainOut:
+    return DomainOut(id=d.id, hostname=d.hostname, status="verified" if d.verified_at else "pending",
+                     txt_name=f"{domains.CHALLENGE}.{d.hostname}", txt_value=d.token,
+                     cname_target=domains.cname_target(request.app.state.settings), url=f"https://{d.hostname}/",
+                     verified_at=d.verified_at, last_checked_at=d.last_checked_at, last_error=d.last_error)
+
+
+def _domain(db: Session, ctx: OrgContext, project: AppProject, domain_id: str) -> SiteDomain:
+    d = db.get(SiteDomain, domain_id)
+    # Not tenant-scoped (see SiteDomain): the organization is checked here.
+    if d is None or d.organization_id != ctx.organization.id or d.project_id != project.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "domain not found")
+    return d
+
+
+@router.get("/orgs/{org_id}/studio/projects/{project_id}/domains", response_model=list[DomainOut])
+def list_domains(project_id: str, request: Request, ctx: OrgContext = Depends(require(P.APPS_READ)),
+                 db: Session = Depends(get_db)):
+    p = _project(db, project_id)
+    rows = db.scalars(select(SiteDomain).where(SiteDomain.organization_id == ctx.organization.id,
+                                               SiteDomain.project_id == p.id).order_by(SiteDomain.created_at))
+    return [_domain_out(request, d) for d in rows]
+
+
+@router.post("/orgs/{org_id}/studio/projects/{project_id}/domains", response_model=DomainOut,
+             status_code=status.HTTP_201_CREATED)
+def add_domain(project_id: str, body: DomainIn, request: Request, ctx: OrgContext = Depends(require(P.APPS_DEPLOY)),
+               db: Session = Depends(get_db)):
+    """Put the production site on your own domain (it is served there once the DNS record proves it's yours)."""
+    p = _project(db, project_id)
+    try:
+        host = domains.normalise(body.hostname)
+    except domains.DomainError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+    if host in domains.own_hosts(request.app.state.settings):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "that is the platform's own address")
+    if db.scalar(select(SiteDomain.id).where(SiteDomain.organization_id == ctx.organization.id,
+                                             SiteDomain.hostname == host)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "this domain is already added to one of your projects")
+    if db.scalar(select(SiteDomain.id).where(SiteDomain.hostname == host, SiteDomain.verified_at.is_not(None))):
+        raise HTTPException(status.HTTP_409_CONFLICT, "this domain is already in use")
+    d = SiteDomain(organization_id=ctx.organization.id, project_id=p.id, hostname=host, token=domains.new_token(),
+                   created_by=ctx.user.id)
+    db.add(d)
+    db.flush()
+    audit.record(db, actor_user_id=ctx.user.id, action="app.domain_added", target_type="app_project", target_id=p.id,
+                 details={"hostname": host}, ip_address=client_ip(request))
+    db.commit()
+    return _domain_out(request, d)
+
+
+@router.post("/orgs/{org_id}/studio/projects/{project_id}/domains/{domain_id}/verify", response_model=DomainOut)
+def verify_domain(project_id: str, domain_id: str, request: Request, ctx: OrgContext = Depends(require(P.APPS_DEPLOY)),
+                  db: Session = Depends(get_db)):
+    """Look for the TXT record now."""
+    p = _project(db, project_id)
+    d = _domain(db, ctx, p, domain_id)
+    if d.verified_at is None and domains.verify(db, d, request.app.state.domain_lookup):
+        audit.record(db, actor_user_id=ctx.user.id, action="app.domain_verified", target_type="app_project",
+                     target_id=p.id, details={"hostname": d.hostname}, ip_address=client_ip(request))
+    try:
+        db.commit()
+    except IntegrityError:  # proven by another organization at the same moment
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "another organization has already proven this domain")
+    return _domain_out(request, d)
+
+
+@router.delete("/orgs/{org_id}/studio/projects/{project_id}/domains/{domain_id}", status_code=status.HTTP_204_NO_CONTENT,
+               response_model=None)
+def remove_domain(project_id: str, domain_id: str, request: Request, ctx: OrgContext = Depends(require(P.APPS_DEPLOY)),
+                  db: Session = Depends(get_db)) -> None:
+    p = _project(db, project_id)
+    d = _domain(db, ctx, p, domain_id)
+    domains.forget(d.hostname)
+    audit.record(db, actor_user_id=ctx.user.id, action="app.domain_removed", target_type="app_project", target_id=p.id,
+                 details={"hostname": d.hostname}, ip_address=client_ip(request))
+    db.delete(d)
+    db.commit()
+
+
+@sites_router.get("/api/v1/public/domains/check")
+def check_domain(domain: str = Query(max_length=253), db: Session = Depends(get_db)) -> Response:
+    """For a TLS proxy (Caddy on-demand TLS "ask"): 200 only for a proven domain whose site is live."""
+    try:
+        host = domains.normalise(domain)
+    except domains.DomainError:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    return Response(status_code=status.HTTP_200_OK if domains.production_route(db, host) else status.HTTP_404_NOT_FOUND)
+
+
+def serve_custom_domain(app, host: str, path: str) -> Response | None:
+    """For a request whose Host is a proven custom domain, its live production site; None for any other host."""
+    with app.state.sessionmaker() as db:
+        proven, key = domains.lookup(db, host)
+        if not proven:
+            return None
+        if key is None:
+            return Response("This site isn't published yet.", status_code=404, media_type="text/plain; charset=utf-8")
+        try:
+            return site_response(db, app.state.storage, key, path.lstrip("/"))
+        except HTTPException as e:
+            return Response(str(e.detail), status_code=e.status_code, media_type="text/plain; charset=utf-8")

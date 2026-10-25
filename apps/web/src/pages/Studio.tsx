@@ -22,7 +22,7 @@ type Project = Schemas["ProjectOut"];
 type Version = Schemas["novara__studio__router__VersionOut"];
 type Check = Schemas["CheckOut"];
 type DataKey = Schemas["DataKeyOut"];
-type Tab = "build" | "changes" | "versions" | "deployments" | "data";
+type Tab = "build" | "changes" | "versions" | "deployments" | "domains" | "data";
 
 const slugify = (s: string) =>
   s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
@@ -196,6 +196,7 @@ function ProjectView({ project: p }: { project: Project }) {
           { key: "changes", label: t("studio.tab.changes") },
           { key: "versions", label: t("studio.tab.versions") },
           { key: "deployments", label: t("studio.tab.deployments") },
+          { key: "domains", label: t("studio.tab.domains") },
           { key: "data", label: t("studio.tab.data") },
         ]}
       />
@@ -203,6 +204,7 @@ function ProjectView({ project: p }: { project: Project }) {
       {tab === "changes" && <ChangesTab project={p} />}
       {tab === "versions" && <VersionsTab project={p} onChanged={refresh} />}
       {tab === "deployments" && <DeploymentsTab project={p} />}
+      {tab === "domains" && <DomainsTab project={p} />}
       {tab === "data" && <DataTab project={p} />}
       {cutting && (
         <CutVersionDialog project={p} onClose={() => setCutting(false)} onDone={(v) => {
@@ -847,6 +849,108 @@ function NewKeyCard({ dataKey, secret, onClose }: { dataKey: DataKey; secret: st
         </div>
       </div>
       <Button size="sm" variant="ghost" onClick={onClose}>{t("common.close")}</Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- custom domains
+
+type SiteDomain = Schemas["DomainOut"];
+
+/** The production site on the organization's own domain: add it, prove it with DNS, then it's served there. */
+function DomainsTab({ project: p }: { project: Project }) {
+  const { t, date } = useI18n();
+  const { org, can } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const ids = { org_id: org.id, project_id: p.id };
+  const [hostname, setHostname] = useState("");
+  const list = useQuery({
+    queryKey: ["domains", org.id, p.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/studio/projects/{project_id}/domains", { params: { path: ids } })),
+  });
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["domains", org.id, p.id] });
+  const add = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/studio/projects/{project_id}/domains", {
+      params: { path: ids }, body: { hostname: hostname.trim() } })),
+    onSuccess: () => { setHostname(""); refresh(); },
+  });
+  const verify = useMutation({
+    mutationFn: (id: string) => unwrap(api.POST("/api/v1/orgs/{org_id}/studio/projects/{project_id}/domains/{domain_id}/verify", {
+      params: { path: { ...ids, domain_id: id } } })),
+    onSuccess: (d) => { refresh(); toast(d.status === "verified" ? t("domains.verified") : t("domains.notYet"), d.status === "verified" ? "info" : "error"); },
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE("/api/v1/orgs/{org_id}/studio/projects/{project_id}/domains/{domain_id}", {
+      params: { path: { ...ids, domain_id: id } } })),
+    onSuccess: refresh,
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const copy = (text: string) => void navigator.clipboard?.writeText(text).then(() => toast(t("common.copied")), () => undefined);
+  const record = (type: string, name: string, value: string) => (
+    <tr>
+      <td className="mono small">{type}</td>
+      <td className="mono small" dir="ltr">{name}</td>
+      <td className="mono small" dir="ltr" style={{ wordBreak: "break-all" }}>{value}</td>
+      <td className="end"><IconButton label={t("domains.copy", { what: type })} onClick={() => copy(value)}><Copy size={14} /></IconButton></td>
+    </tr>
+  );
+  return (
+    <div className="stack">
+      <p className="muted">{t("domains.about")}</p>
+      {can("apps.deploy") && (
+        <form className="row" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
+          <div className="grow" style={{ maxWidth: 420 }}>
+            <Input value={hostname} onChange={(e) => setHostname(e.target.value)} placeholder="www.example.com" aria-label={t("domains.hostname")} ltr required />
+          </div>
+          <Button type="submit" variant="primary" icon={<Plus size={16} />} loading={add.isPending}>{t("domains.add")}</Button>
+        </form>
+      )}
+      {add.isError && <ErrorNotice error={add.error} />}
+      <QueryView query={list}>
+        {(rows: SiteDomain[]) => rows.length === 0 ? <Empty>{t("domains.none")}</Empty> : (
+          <div className="stack">
+            {rows.map((d) => (
+              <Card key={d.id} title={d.hostname}
+                actions={<Badge tone={d.status === "verified" ? "success" : "warning"}>{t(d.status === "verified" ? "domains.statusVerified" : "domains.statusPending")}</Badge>}>
+                <div className="stack-sm">
+                  {d.status === "verified" ? (
+                    <p className="small">
+                      {t("domains.liveAt")} <a href={d.url} target="_blank" rel="noreferrer noopener" dir="ltr">{d.url}</a>
+                      {d.verified_at && <span className="muted"> · {t("domains.verifiedOn", { date: date(d.verified_at) })}</span>}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="small">{t("domains.instructions")}</p>
+                      <div className="table-wrap">
+                        <table>
+                          <thead><tr><th>{t("domains.type")}</th><th>{t("domains.name")}</th><th>{t("domains.value")}</th><th /></tr></thead>
+                          <tbody>
+                            {record("TXT", d.txt_name, d.txt_value)}
+                            {record("CNAME", d.hostname, d.cname_target)}
+                          </tbody>
+                        </table>
+                      </div>
+                      {d.last_error && <p className="small danger-text" dir="auto">{d.last_error}</p>}
+                    </>
+                  )}
+                  {can("apps.deploy") && (
+                    <div className="row">
+                      {d.status !== "verified" && (
+                        <Button size="sm" loading={verify.isPending && verify.variables === d.id} onClick={() => verify.mutate(d.id)}>{t("domains.check")}</Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => window.confirm(t("domains.removeConfirm", { host: d.hostname })) && remove.mutate(d.id)}>
+                        {t("domains.remove")}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </QueryView>
     </div>
   );
 }

@@ -329,3 +329,30 @@ test("Bookings: hours and a service, a site asks, the team confirms and books so
   await expect(page.getByText("من Clinic")).toBeVisible();
   await page.screenshot({ path: "test-results/screens/bookings-ar.png", fullPage: true });
 });
+
+test("App Studio: the site on the organization's own domain, proven with a DNS record", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("domains"));
+  await createOrg(page, "متجر النطاق");
+  const orgId = page.url().match(/\/o\/([0-9a-f-]+)/)![1]!;
+  const token = await page.evaluate(() => localStorage.getItem("novara.token"));
+  const app = await (await page.request.post(`/api/v1/orgs/${orgId}/studio/projects`, {
+    headers: { Authorization: `Bearer ${token}` }, data: { name: "Shop", slug: "shop" } })).json();
+  await page.goto(`/o/${orgId}/studio/${app.id}`);
+  await page.getByRole("tab", { name: "النطاقات" }).click();
+  await page.getByLabel("النطاق").fill("Shop.Example-Store.sa");
+  await page.getByRole("button", { name: "إضافة نطاق" }).click();
+  await expect(page.getByRole("heading", { name: "shop.example-store.sa" })).toBeVisible();
+  await expect(page.getByText("بانتظار DNS")).toBeVisible();
+  const txt = page.getByRole("row", { name: /^TXT/ });
+  await expect(txt).toContainText("_novara-challenge.shop.example-store.sa");
+  const value = (await txt.locator("td").nth(2).textContent())!.trim();
+  await page.screenshot({ path: "test-results/screens/site-domains-ar.png", fullPage: true });
+
+  await page.getByRole("button", { name: "تحقّق الآن" }).click();
+  await expect(page.getByText("سجل DNS لم يظهر بعد")).toBeVisible();
+  await page.request.post(`/api/e2e/dns?name=_novara-challenge.shop.example-store.sa&value=${encodeURIComponent(value)}`);
+  await page.getByRole("button", { name: "تحقّق الآن" }).click();
+  await expect(page.getByText("اتصل النطاق")).toBeVisible();
+  await expect(page.getByText("متصل", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "https://shop.example-store.sa/" })).toBeVisible();
+});

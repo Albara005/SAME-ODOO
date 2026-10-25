@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, false
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, false, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -127,3 +127,26 @@ class SpentProof(TimestampMixin, TenantScoped, Base):
     salt: Mapped[str] = mapped_column(String(32), primary_key=True)
     ip_address: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
+
+class SiteDomain(IdMixin, TimestampMixin, Base):
+    """A customer's own domain for a project's production site (see domains.py). Like SiteRoute it is
+    not tenant-scoped: serving a request for the domain must find the site before any tenant is bound.
+    Several organizations may claim a hostname, but only the one that proves it (DNS) gets it."""
+
+    __tablename__ = "app_site_domains"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "hostname", name="uq_site_domain_org_host"),
+        Index("uq_site_domain_verified", "hostname", unique=True, postgresql_where=text("verified_at IS NOT NULL"),
+              sqlite_where=text("verified_at IS NOT NULL")),
+    )
+
+    organization_id: Mapped[str] = mapped_column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"),
+                                                 index=True, nullable=False)
+    project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    hostname: Mapped[str] = mapped_column(String(253), nullable=False, index=True)  # lower case, IDNA (punycode)
+    token: Mapped[str] = mapped_column(String(64), nullable=False)                  # goes in the TXT record
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))

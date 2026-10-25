@@ -19,6 +19,8 @@ pyOpenSSL==26.4.0
 httpx==0.28.1
 # Time zones for scheduled workflows, even where the OS has no zone database
 tzdata==2025.2
+# DNS lookups that prove a customer owns a domain for their site
+dnspython==2.7.0
 # Text inside uploaded PDFs, for search
 pypdf==5.1.0
 # Optional: PNG export of logos (needs the system library libcairo2)

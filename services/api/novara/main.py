@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import text
 
 from novara.ai.provider import AnthropicProvider, ModelProvider
@@ -19,7 +20,8 @@ from novara.config import Settings, load_settings
 from novara.creative.router import router as creative_router
 from novara.hosting.router import router as hosting_router
 from novara.studio.data_keys import public_router as public_data_router, router as data_keys_router
-from novara.studio.router import router as studio_router, sites_router
+from novara.studio import domains
+from novara.studio.router import router as studio_router, serve_custom_domain, sites_router
 from novara.db import Base, make_engine, make_sessionmaker
 from novara.modules.access.router import router as access_router
 from novara.modules.accounting.router import router as accounting_router
@@ -113,4 +115,20 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
               creative_router, hosting_router, live_router, data_keys_router, public_data_router, inbound_hooks_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(sites_router)  # public, unauthenticated: published App Studio sites
+
+    # Customers' own domains (studio/domains.py): a request for a proven domain gets that site. Every other
+    # host, the platform's own included, goes through to the routes above.
+    platform_hosts = domains.own_hosts(settings)
+    app.state.domain_lookup = domains.txt_records  # tests replace the DNS lookup
+
+    @app.middleware("http")
+    async def custom_domains(request: Request, call_next):
+        host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip().lower().rstrip(".")
+        if request.method in ("GET", "HEAD") and host and host not in platform_hosts and "." in host \
+                and not host.replace(".", "").isdigit() and not host.startswith("["):
+            response = await run_in_threadpool(serve_custom_domain, request.app, host, request.url.path)
+            if response is not None:
+                return response
+        return await call_next(request)
+
     return app

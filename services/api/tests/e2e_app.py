@@ -57,6 +57,15 @@ def create_app():
     mailer = MemoryMailer()
     app = _create_app(ai_provider=DemoProvider(), mailer=mailer)
 
+    dns: dict[str, list[str]] = {}
+    app.state.domain_lookup = lambda name: dns.get(name, [])  # no real DNS in the browser tests
+
+    @app.post("/api/e2e/dns", include_in_schema=False)
+    def set_txt(name: str, value: str) -> dict:
+        """The browser tests publish a domain's TXT record here."""
+        dns[name] = [value]
+        return {"ok": True}
+
     @app.get("/api/e2e/mail", include_in_schema=False)
     def mail_to(to: str) -> list[dict]:
         """The browser tests read the emailed links here (password reset, verification, invitations)."""
