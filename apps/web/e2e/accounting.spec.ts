@@ -356,3 +356,40 @@ test("online payment: the customer pays through a link and the invoice is paid w
   await expect(page.getByRole("cell", { name: "إلكترونياً (رابط دفع)" })).toBeVisible();
   await expect(page.getByRole("button", { name: "إنشاء رابط دفع" })).toHaveCount(0);
 });
+
+test("e-invoicing: onboard the device with ZATCA, then a posted invoice is signed and reported", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await signUpAndIn(page, uniqueEmail("zatca"));
+  await createOrg(page, "شركة الفوترة");
+
+  await nav(page, "المؤسسة");
+  await page.getByLabel(/الرقم الضريبي/).fill("399999999900003");
+  await page.getByRole("button", { name: "حفظ", exact: true }).click();
+  await expect(page.getByText("تم الحفظ")).toBeVisible();
+  await page.getByLabel("رقم السجل التجاري").fill("1010010000");
+  await page.getByLabel("الشارع").fill("الأمير سلطان");
+  await page.getByLabel("رقم المبنى").fill("2322");
+  await page.getByLabel("الحي").fill("المربع");
+  await page.getByLabel("المدينة").fill("الرياض");
+  await page.getByLabel("الرمز البريدي").fill("23333");
+  await page.getByLabel(/رمز التحقق لمرة واحدة/).fill("123345");
+  await page.getByRole("button", { name: "ربط الجهاز" }).click();
+  await expect(page.getByText("رُبط الجهاز", { exact: true })).toBeVisible();
+  await expect(page.getByText(/رُبط الجهاز في بيئة المطوّرين التجريبية/)).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/einvoicing-ar.png", fullPage: true });
+
+  const call = await apiFor(page);
+  const tax = await call("POST", "/taxes", { name: "ضريبة القيمة المضافة", rate: "15" });
+  const customer = await call("POST", "/customers", { name: "عميل نقدي" });
+  const inv = await call("POST", "/invoices", {
+    customer_id: customer.id, issue_date: new Date().toISOString().slice(0, 10),
+    lines: [{ description: "قهوة عربية", quantity: "2", unit_price: "50", tax_id: tax.id }],
+  });
+  await nav(page, "الفواتير");
+  await page.getByRole("link", { name: /مسودة|INV-/ }).first().click();
+  await page.getByRole("button", { name: "ترحيل الفاتورة" }).click();
+  await expect(page.getByText("أُبلغت الهيئة")).toBeVisible();
+  await expect(page.getByText(/فاتورة ضريبية مبسطة \(إبلاغ\)/)).toBeVisible();
+  await expect(page.getByRole("img", { name: "رمز QR للفاتورة الإلكترونية" })).toBeVisible();
+  expect(inv.id).toBeTruthy();
+});

@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import time
 
+import httpx
+
 from novara.ai.provider import ModelReply, stream_text, text_reply, tool_reply
 from novara.mail import MemoryMailer
 from novara.main import create_app as _create_app
@@ -65,6 +67,10 @@ def create_app():
         """The browser tests publish a domain's TXT record here."""
         dns[name] = [value]
         return {"ok": True}
+
+    # ZATCA's Fatoora API: a stand-in that issues certificates and checks each document's hash and signature.
+    from tests.fake_zatca import FakeZatca
+    app.state.einvoice_http = httpx.Client(transport=httpx.MockTransport(FakeZatca().handler))
 
     @app.get("/api/e2e/mail", include_in_schema=False)
     def mail_to(to: str) -> list[dict]:

@@ -20,6 +20,9 @@ class Customer(IdMixin, TimestampMixin, TenantScoped, Base):
     tax_number: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # VAT / TRN
     commercial_registration: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     address_line: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    # Saudi national address parts a standard e-invoice needs (ZATCA phase 2).
+    building_number: Mapped[str] = mapped_column(String(10), default="", server_default="", nullable=False)
+    district: Mapped[str] = mapped_column(String(100), default="", server_default="", nullable=False)
     city: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     postal_code: Mapped[str] = mapped_column(String(20), default="", nullable=False)
     country: Mapped[str] = mapped_column(String(2), default="", nullable=False)  # ISO 3166-1 alpha-2
@@ -41,6 +44,8 @@ class Vendor(IdMixin, TimestampMixin, TenantScoped, Base):
     tax_number: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     commercial_registration: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     address_line: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    building_number: Mapped[str] = mapped_column(String(10), default="", server_default="", nullable=False)
+    district: Mapped[str] = mapped_column(String(100), default="", server_default="", nullable=False)
     city: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     postal_code: Mapped[str] = mapped_column(String(20), default="", nullable=False)
     country: Mapped[str] = mapped_column(String(2), default="", nullable=False)

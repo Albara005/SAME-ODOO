@@ -255,7 +255,8 @@ function VendorDialog({ vendor, onClose }: { vendor?: Vendor; onClose: () => voi
         ? unwrap(api.PATCH("/api/v1/orgs/{org_id}/vendors/{vendor_id}", { params: { path: { org_id: org.id, vendor_id: vendor.id } }, body: fields }))
         : unwrap(api.POST("/api/v1/orgs/{org_id}/vendors", {
             params: { path: { org_id: org.id } },
-            body: { kind: "company", address_line: "", commercial_registration: "", country: "", notes: "", postal_code: "", ...fields },
+            body: { kind: "company", address_line: "", building_number: "", district: "", commercial_registration: "", country: "",
+              notes: "", postal_code: "", ...fields },
           }));
     },
     onSuccess: () => {

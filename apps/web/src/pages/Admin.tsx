@@ -8,6 +8,7 @@ import { useOrg } from "../auth/Org";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, useToast,
 } from "../components/ui";
+import { EInvoicingCard } from "../components/EInvoicing";
 import { OnlinePaymentsCard } from "../components/OnlinePayments";
 import type { MessageKey } from "../i18n/en";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
@@ -556,6 +557,7 @@ export function OrgSettingsPage() {
         </form>
       </Card>
       {can("org.manage") && <OnlinePaymentsCard />}
+      {can("org.manage") && <EInvoicingCard />}
       <RequireMfaCard />
     </div>
   );

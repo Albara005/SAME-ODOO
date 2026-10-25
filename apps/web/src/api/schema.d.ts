@@ -1814,6 +1814,135 @@ export interface paths {
         patch: operations["update_customer_api_v1_orgs__org_id__customers__customer_id__patch"];
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/einvoicing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Settings */
+        get: operations["read_settings_api_v1_orgs__org_id__einvoicing_get"];
+        /**
+         * Change Settings
+         * @description Seller details for e-invoices. The environment can only change while e-invoicing is off.
+         */
+        put: operations["change_settings_api_v1_orgs__org_id__einvoicing_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/einvoicing/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Documents */
+        get: operations["list_documents_api_v1_orgs__org_id__einvoicing_documents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/einvoicing/documents/{doc_id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Again */
+        post: operations["send_again_api_v1_orgs__org_id__einvoicing_documents__doc_id__send_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/einvoicing/documents/{doc_id}/xml": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Document Xml */
+        get: operations["document_xml_api_v1_orgs__org_id__einvoicing_documents__doc_id__xml_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/einvoicing/off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn Off
+         * @description Stop issuing e-invoices. Documents already issued stay as they are; onboarding again starts a new device.
+         */
+        post: operations["turn_off_api_v1_orgs__org_id__einvoicing_off_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/einvoicing/onboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Onboard
+         * @description Onboard the device with a one-time password from ZATCA's Fatoora portal (the sandbox takes 123345).
+         */
+        post: operations["onboard_api_v1_orgs__org_id__einvoicing_onboard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/einvoicing/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Einvoicing Status */
+        get: operations["einvoicing_status_api_v1_orgs__org_id__einvoicing_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/files": {
         parameters: {
             query?: never;
@@ -5341,6 +5470,7 @@ export interface components {
             customer_id: string;
             /** Customer Name */
             customer_name: string;
+            einvoice?: components["schemas"]["EInvoiceSummary"] | null;
             /** Id */
             id: string;
             /** Invoice Id */
@@ -5434,6 +5564,11 @@ export interface components {
              */
             address_line: string;
             /**
+             * Building Number
+             * @default
+             */
+            building_number: string;
+            /**
              * City
              * @default
              */
@@ -5448,6 +5583,11 @@ export interface components {
              * @default
              */
             country: string;
+            /**
+             * District
+             * @default
+             */
+            district: string;
             /** Email */
             email?: string | null;
             /**
@@ -5484,6 +5624,11 @@ export interface components {
             active: boolean;
             /** Address Line */
             address_line: string;
+            /**
+             * Building Number
+             * @default
+             */
+            building_number: string;
             /** City */
             city: string;
             /** Commercial Registration */
@@ -5495,6 +5640,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * District
+             * @default
+             */
+            district: string;
             /** Email */
             email: string;
             /** Id */
@@ -5518,12 +5668,16 @@ export interface components {
             active?: boolean | null;
             /** Address Line */
             address_line?: string | null;
+            /** Building Number */
+            building_number?: string | null;
             /** City */
             city?: string | null;
             /** Commercial Registration */
             commercial_registration?: string | null;
             /** Country */
             country?: string | null;
+            /** District */
+            district?: string | null;
             /** Email */
             email?: string | null;
             /** Kind */
@@ -5706,6 +5860,178 @@ export interface components {
             route: string;
             /** Tools */
             tools?: string[];
+        };
+        /** EInvoiceSettingsIn */
+        EInvoiceSettingsIn: {
+            /**
+             * Branch Name
+             * @default
+             */
+            branch_name: string;
+            /**
+             * Building Number
+             * @default
+             */
+            building_number: string;
+            /**
+             * City
+             * @default
+             */
+            city: string;
+            /**
+             * Crn
+             * @default
+             */
+            crn: string;
+            /**
+             * District
+             * @default
+             */
+            district: string;
+            /**
+             * Environment
+             * @default sandbox
+             * @enum {string}
+             */
+            environment: "sandbox" | "simulation" | "production";
+            /**
+             * Industry
+             * @default
+             */
+            industry: string;
+            /**
+             * Postal Code
+             * @default
+             */
+            postal_code: string;
+            /**
+             * Street
+             * @default
+             */
+            street: string;
+        };
+        /** EInvoiceSettingsOut */
+        EInvoiceSettingsOut: {
+            /**
+             * Branch Name
+             * @default
+             */
+            branch_name: string;
+            /**
+             * Building Number
+             * @default
+             */
+            building_number: string;
+            /** Certificate Expires At */
+            certificate_expires_at: string | null;
+            /**
+             * City
+             * @default
+             */
+            city: string;
+            /**
+             * Crn
+             * @default
+             */
+            crn: string;
+            /**
+             * District
+             * @default
+             */
+            district: string;
+            /** Documents */
+            documents: number;
+            /**
+             * Environment
+             * @default sandbox
+             * @enum {string}
+             */
+            environment: "sandbox" | "simulation" | "production";
+            /**
+             * Industry
+             * @default
+             */
+            industry: string;
+            /** Onboarded At */
+            onboarded_at: string | null;
+            /** Pending */
+            pending: number;
+            /**
+             * Postal Code
+             * @default
+             */
+            postal_code: string;
+            /** Problems */
+            problems: string[];
+            /** Rejected */
+            rejected: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "off" | "onboarded";
+            /**
+             * Street
+             * @default
+             */
+            street: string;
+            /** Vat Number */
+            vat_number: string;
+        };
+        /** EInvoiceStatusOut */
+        EInvoiceStatusOut: {
+            /** Active */
+            active: boolean;
+            /** Environment */
+            environment: ("sandbox" | "simulation" | "production") | null;
+        };
+        /** EInvoiceSummary */
+        EInvoiceSummary: {
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Attempts */
+            attempts: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Environment
+             * @enum {string}
+             */
+            environment: "sandbox" | "simulation" | "production";
+            /** Errors */
+            errors: string[];
+            /** Icv */
+            icv: number;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard" | "simplified";
+            /** Note */
+            note: string;
+            /** Number */
+            number: string;
+            /** Source Id */
+            source_id: string;
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "invoice" | "credit_note";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "reported" | "cleared" | "rejected";
+            /** Type Code */
+            type_code: string;
+            /** Warnings */
+            warnings: string[];
         };
         /** EmployeeIn */
         EmployeeIn: {
@@ -6008,6 +6334,7 @@ export interface components {
              * Format: date
              */
             due_date: string;
+            einvoice?: components["schemas"]["EInvoiceSummary"] | null;
             /** Id */
             id: string;
             /**
@@ -6710,6 +7037,11 @@ export interface components {
             read: boolean;
             /** Title */
             title: string;
+        };
+        /** OnboardIn */
+        OnboardIn: {
+            /** Otp */
+            otp: string;
         };
         /** OpeningHoursIn */
         OpeningHoursIn: {
@@ -8155,10 +8487,26 @@ export interface components {
              * @description Defaults to the output VAT account
              */
             account_id?: string | null;
+            /**
+             * Exemption Code
+             * @default
+             */
+            exemption_code: string;
+            /**
+             * Exemption Reason
+             * @default
+             */
+            exemption_reason: string;
             /** Name */
             name: string;
             /** Rate */
             rate: number | string;
+            /**
+             * Zatca Category
+             * @default
+             * @enum {string}
+             */
+            zatca_category: "" | "S" | "Z" | "E" | "O";
         };
         /** TaxLineOut */
         TaxLineOut: {
@@ -8179,19 +8527,40 @@ export interface components {
             account_id: string;
             /** Active */
             active: boolean;
+            /**
+             * Exemption Code
+             * @default
+             */
+            exemption_code: string;
+            /**
+             * Exemption Reason
+             * @default
+             */
+            exemption_reason: string;
             /** Id */
             id: string;
             /** Name */
             name: string;
             /** Rate */
             rate: string;
+            /**
+             * Zatca Category
+             * @default
+             */
+            zatca_category: string;
         };
         /** TaxUpdate */
         TaxUpdate: {
             /** Active */
             active?: boolean | null;
+            /** Exemption Code */
+            exemption_code?: string | null;
+            /** Exemption Reason */
+            exemption_reason?: string | null;
             /** Name */
             name?: string | null;
+            /** Zatca Category */
+            zatca_category?: ("" | "S" | "Z" | "E" | "O") | null;
         };
         /** TestCaseIn */
         TestCaseIn: {
@@ -8560,6 +8929,11 @@ export interface components {
              */
             address_line: string;
             /**
+             * Building Number
+             * @default
+             */
+            building_number: string;
+            /**
              * City
              * @default
              */
@@ -8574,6 +8948,11 @@ export interface components {
              * @default
              */
             country: string;
+            /**
+             * District
+             * @default
+             */
+            district: string;
             /** Email */
             email?: string | null;
             /**
@@ -13022,6 +13401,264 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_settings_api_v1_orgs__org_id__einvoicing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_settings_api_v1_orgs__org_id__einvoicing_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EInvoiceSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_documents_api_v1_orgs__org_id__einvoicing_documents_get: {
+        parameters: {
+            query?: {
+                status?: ("pending" | "reported" | "cleared" | "rejected") | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_again_api_v1_orgs__org_id__einvoicing_documents__doc_id__send_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    document_xml_api_v1_orgs__org_id__einvoicing_documents__doc_id__xml_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    turn_off_api_v1_orgs__org_id__einvoicing_off_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onboard_api_v1_orgs__org_id__einvoicing_onboard_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    einvoicing_status_api_v1_orgs__org_id__einvoicing_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EInvoiceStatusOut"];
                 };
             };
             /** @description Validation Error */

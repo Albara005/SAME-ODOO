@@ -6,6 +6,7 @@ import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { TotalsBox, useIdempotencyKey } from "../components/business";
 import { Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select } from "../components/ui";
+import { EInvoiceStatus } from "../components/EInvoicing";
 import { ZatcaQr } from "../components/ZatcaQr";
 import { useI18n } from "../i18n/I18n";
 import { isPositive } from "../lib/decimal";
@@ -89,6 +90,11 @@ function CreditNoteDetail({ note: n }: { note: Note }) {
         </div>
         {n.zatca_qr && <ZatcaQr payload={n.zatca_qr} />}
       </Card>
+      {n.einvoice && (
+        <div className="no-print">
+          <EInvoiceStatus doc={n.einvoice} onChange={() => void qc.invalidateQueries({ queryKey: ["credit-note", org.id, n.id] })} />
+        </div>
+      )}
       <div className="table-wrap">
         <table>
           <thead>

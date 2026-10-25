@@ -152,7 +152,7 @@ def test_a_stripe_link_is_paid_once_by_the_signed_webhook(api, shop, client, str
 def test_money_the_invoice_cant_take_is_reported_not_posted(api, shop, client, stripe):
     hook = use_stripe(api, shop)
     inv = posted_invoice(api, shop, [LINE])
-    link = new_link(api, shop, inv).json()
+    assert new_link(api, shop, inv).status_code == 201
     paid_by_hand = api.req("POST", ACCT, o(shop, f"/invoices/{inv['id']}/payments"),
                            json={"amount": "1000", "payment_date": "2026-04-05", "method": "bank"})
     assert paid_by_hand.status_code == 201

@@ -17,6 +17,8 @@ from novara.modules.inventory import service as stock
 from novara.modules.invoicing import credit, service as svc
 from novara.modules.invoicing.models import CreditNote, CreditNoteLine, CreditNoteTax, Invoice, Refund
 from novara.modules.invoicing.zatca import qr_payload
+from novara.einvoice import service as einvoice
+from novara.einvoice.schemas import EInvoiceSummary, summary as einvoice_summary
 from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
 from novara.money import fmt_decimal, from_minor, to_minor
@@ -82,6 +84,7 @@ class CreditNoteOut(BaseModel):
     stock_reference: str
     journal_entry_id: str
     zatca_qr: str | None
+    einvoice: EInvoiceSummary | None = None
     created_at: datetime
     lines: list[CreditLineOut]
     taxes: list[CreditTaxOut]
@@ -125,8 +128,12 @@ def credit_note_out(db: Session, note: CreditNote) -> CreditNoteOut:
     taxes = db.scalars(select(CreditNoteTax).where(CreditNoteTax.credit_note_id == note.id)).all()
     names = {t.id: t.name for t in db.scalars(select(Tax).where(Tax.id.in_([t.tax_id for t in taxes])))}
     org = db.get(Organization, note.organization_id)
-    qr = qr_payload(seller=org.name, vat_number=org.vat_number, issued_at=note.created_at,
-                    total=_money(note.total_minor, c), vat_total=_money(note.tax_minor, c)) if org.vat_number else None
+    doc = einvoice.document_for(db, "credit_note", note.id)
+    if doc is not None:
+        qr = einvoice.qr_of(doc)
+    else:
+        qr = qr_payload(seller=org.name, vat_number=org.vat_number, issued_at=note.created_at,
+                        total=_money(note.total_minor, c), vat_total=_money(note.tax_minor, c)) if org.vat_number else None
     return CreditNoteOut(
         id=note.id, number=note.number, invoice_id=note.invoice_id, invoice_number=invoice.number or "",
         customer_id=note.customer_id, customer_name=db.get(Customer, note.customer_id).name,
@@ -134,6 +141,7 @@ def credit_note_out(db: Session, note: CreditNote) -> CreditNoteOut:
         tax=_money(note.tax_minor, c), total=_money(note.total_minor, c), applied=_money(note.applied_minor, c),
         refunded=_money(note.refunded_minor, c), refundable=_money(_refundable(note), c),
         stock_reference=note.stock_reference, journal_entry_id=note.journal_entry_id, zatca_qr=qr,
+        einvoice=einvoice_summary(doc) if doc else None,
         created_at=note.created_at,
         lines=[CreditLineOut(invoice_line_id=l.invoice_line_id, description=l.description,
                              quantity=fmt_decimal(l.quantity), unit_price=fmt_decimal(l.unit_price),
@@ -150,8 +158,10 @@ def _domain(fn):
         return fn()
     except (svc.InvoiceStateError, stock.InsufficientStock) as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-    except (svc.InvoiceValidationError, stock.InventoryError) as e:
+    except (svc.InvoiceValidationError, stock.InventoryError, einvoice.EInvoiceError) as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+    except einvoice.EInvoiceState as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
 
 
 def _get_note(db: Session, note_id: str, *, lock: bool = False) -> CreditNote:
@@ -181,8 +191,10 @@ def create_credit_note(invoice_id: str, body: CreditNoteIn, request: Request, re
         response.status_code = status.HTTP_200_OK
         return credit_note_out(db, _get_note(db, previous))
     requests = [credit.CreditRequest(l.invoice_line_id, l.quantity, l.returned_quantity) for l in body.lines]
+    _domain(lambda: einvoice.check_buyer(db, invoice.customer_id))
     note = _domain(lambda: credit.create_credit_note(db, invoice, issue_date=body.issue_date, reason=body.reason,
                                                      requests=requests, user_id=ctx.user.id))
+    doc = _domain(lambda: einvoice.issue_for_credit_note(db, request.app.state.settings, note))
     idempotency.remember(db, "invoice.credit_note", idempotency_key, h, note.id)
     audit.record(db, actor_user_id=ctx.user.id, action="credit_note.created", target_type="credit_note",
                  target_id=note.id, details={"number": note.number, "invoice": invoice.number,
@@ -190,6 +202,9 @@ def create_credit_note(invoice_id: str, body: CreditNoteIn, request: Request, re
                                              **({"returned": note.stock_reference} if note.stock_reference else {})},
                  ip_address=client_ip(request))
     db.commit()
+    if doc is not None:
+        einvoice.submit(db, request.app.state.settings, doc, http=request.app.state.einvoice_http)
+        db.commit()
     return credit_note_out(db, note)
 
 

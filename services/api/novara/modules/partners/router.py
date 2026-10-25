@@ -23,6 +23,8 @@ class CustomerFields(BaseModel):
     tax_number: str = Field(default="", max_length=40)
     commercial_registration: str = Field(default="", max_length=40)
     address_line: str = Field(default="", max_length=300)
+    building_number: str = Field(default="", max_length=10)
+    district: str = Field(default="", max_length=100)
     city: str = Field(default="", max_length=100)
     postal_code: str = Field(default="", max_length=20)
     country: str = Field(default="", pattern="^([A-Z]{2})?$")
@@ -41,6 +43,8 @@ class CustomerUpdate(BaseModel):
     tax_number: str | None = Field(default=None, max_length=40)
     commercial_registration: str | None = Field(default=None, max_length=40)
     address_line: str | None = Field(default=None, max_length=300)
+    building_number: str | None = Field(default=None, max_length=10)
+    district: str | None = Field(default=None, max_length=100)
     city: str | None = Field(default=None, max_length=100)
     postal_code: str | None = Field(default=None, max_length=20)
     country: str | None = Field(default=None, pattern="^([A-Z]{2})?$")
@@ -59,6 +63,8 @@ class CustomerOut(BaseModel):
     tax_number: str
     commercial_registration: str
     address_line: str
+    building_number: str = ""
+    district: str = ""
     city: str
     postal_code: str
     country: str

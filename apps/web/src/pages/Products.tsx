@@ -13,6 +13,7 @@ import { useDebounced } from "../lib/useDebounced";
 
 type Product = Schemas["ProductOut"];
 type Tax = Schemas["TaxOut"];
+type TaxCategory = Schemas["TaxIn"]["zatca_category"];
 
 export function ProductsPage() {
   const { t, money } = useI18n();
@@ -186,11 +187,12 @@ function TaxesCard({ taxes }: { taxes: Tax[] }) {
   const { t } = useI18n();
   const { org } = useOrg();
   const qc = useQueryClient();
-  const [form, setForm] = useState({ name: "", rate: "" });
+  const blank = { name: "", rate: "", zatca_category: "" as TaxCategory, exemption_code: "", exemption_reason: "" };
+  const [form, setForm] = useState(blank);
   const create = useMutation({
     mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/taxes", { params: { path: { org_id: org.id } }, body: form })),
     onSuccess: () => {
-      setForm({ name: "", rate: "" });
+      setForm(blank);
       void qc.invalidateQueries({ queryKey: ["taxes", org.id] });
     },
   });
@@ -215,6 +217,22 @@ function TaxesCard({ taxes }: { taxes: Tax[] }) {
         >
           <Input aria-label={t("common.name")} placeholder={t("taxes.new")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={{ maxWidth: 220 }} required />
           <Input aria-label={t("taxes.rate")} placeholder={t("taxes.rate")} inputMode="decimal" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} style={{ maxWidth: 120 }} ltr required />
+          <Select aria-label={t("taxes.category")} value={form.zatca_category} style={{ maxWidth: 220 }}
+            onChange={(e) => setForm({ ...form, zatca_category: e.target.value as TaxCategory })}>
+            <option value="">{t("taxes.categoryAuto")}</option>
+            <option value="S">{t("taxes.categoryS")}</option>
+            <option value="Z">{t("taxes.categoryZ")}</option>
+            <option value="E">{t("taxes.categoryE")}</option>
+            <option value="O">{t("taxes.categoryO")}</option>
+          </Select>
+          {(form.zatca_category === "Z" || form.zatca_category === "E" || form.zatca_category === "O") && (
+            <>
+              <Input aria-label={t("taxes.exemptionCode")} placeholder="VATEX-SA-32" value={form.exemption_code} style={{ maxWidth: 160 }} ltr
+                onChange={(e) => setForm({ ...form, exemption_code: e.target.value.toUpperCase() })} />
+              <Input aria-label={t("taxes.exemptionReason")} placeholder={t("taxes.exemptionReason")} value={form.exemption_reason}
+                style={{ maxWidth: 220 }} onChange={(e) => setForm({ ...form, exemption_reason: e.target.value })} />
+            </>
+          )}
           <Button type="submit" loading={create.isPending} icon={<Plus size={16} />}>
             {t("common.add")}
           </Button>

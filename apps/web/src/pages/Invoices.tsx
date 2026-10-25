@@ -11,6 +11,7 @@ import {
 import {
   Button, Card, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
 } from "../components/ui";
+import { EInvoiceStatus } from "../components/EInvoicing";
 import { PaymentLinksCard } from "../components/OnlinePayments";
 import { ZatcaQr } from "../components/ZatcaQr";
 import { useI18n } from "../i18n/I18n";
@@ -369,6 +370,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
         </div>
         {inv.zatca_qr && <ZatcaQr payload={inv.zatca_qr} />}
       </Card>
+      {inv.einvoice && <div className="no-print"><EInvoiceStatus doc={inv.einvoice} onChange={() => refresh()} /></div>}
       <div className="table-wrap">
         <table>
           <thead>

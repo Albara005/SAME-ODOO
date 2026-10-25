@@ -2153,6 +2153,16 @@
       "title": "Customer Name",
       "type": "string"
      },
+     "einvoice": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/EInvoiceSummary"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "id": {
       "title": "Id",
       "type": "string"
@@ -2377,6 +2387,12 @@
       "title": "Address Line",
       "type": "string"
      },
+     "building_number": {
+      "default": "",
+      "maxLength": 10,
+      "title": "Building Number",
+      "type": "string"
+     },
      "city": {
       "default": "",
       "maxLength": 100,
@@ -2393,6 +2409,12 @@
       "default": "",
       "pattern": "^([A-Z]{2})?$",
       "title": "Country",
+      "type": "string"
+     },
+     "district": {
+      "default": "",
+      "maxLength": 100,
+      "title": "District",
       "type": "string"
      },
      "email": {
@@ -2460,6 +2482,11 @@
       "title": "Address Line",
       "type": "string"
      },
+     "building_number": {
+      "default": "",
+      "title": "Building Number",
+      "type": "string"
+     },
      "city": {
       "title": "City",
       "type": "string"
@@ -2475,6 +2502,11 @@
      "created_at": {
       "format": "date-time",
       "title": "Created At",
+      "type": "string"
+     },
+     "district": {
+      "default": "",
+      "title": "District",
       "type": "string"
      },
      "email": {
@@ -2554,6 +2586,18 @@
       ],
       "title": "Address Line"
      },
+     "building_number": {
+      "anyOf": [
+       {
+        "maxLength": 10,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Building Number"
+     },
      "city": {
       "anyOf": [
        {
@@ -2589,6 +2633,18 @@
        }
       ],
       "title": "Country"
+     },
+     "district": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "District"
      },
      "email": {
       "anyOf": [
@@ -3156,6 +3212,346 @@
      }
     },
     "title": "DraftIn",
+    "type": "object"
+   },
+   "EInvoiceSettingsIn": {
+    "properties": {
+     "branch_name": {
+      "default": "",
+      "maxLength": 64,
+      "title": "Branch Name",
+      "type": "string"
+     },
+     "building_number": {
+      "default": "",
+      "maxLength": 10,
+      "title": "Building Number",
+      "type": "string"
+     },
+     "city": {
+      "default": "",
+      "maxLength": 120,
+      "title": "City",
+      "type": "string"
+     },
+     "crn": {
+      "default": "",
+      "maxLength": 20,
+      "title": "Crn",
+      "type": "string"
+     },
+     "district": {
+      "default": "",
+      "maxLength": 120,
+      "title": "District",
+      "type": "string"
+     },
+     "environment": {
+      "default": "sandbox",
+      "enum": [
+       "sandbox",
+       "simulation",
+       "production"
+      ],
+      "title": "Environment",
+      "type": "string"
+     },
+     "industry": {
+      "default": "",
+      "maxLength": 64,
+      "title": "Industry",
+      "type": "string"
+     },
+     "postal_code": {
+      "default": "",
+      "maxLength": 10,
+      "title": "Postal Code",
+      "type": "string"
+     },
+     "street": {
+      "default": "",
+      "maxLength": 120,
+      "title": "Street",
+      "type": "string"
+     }
+    },
+    "title": "EInvoiceSettingsIn",
+    "type": "object"
+   },
+   "EInvoiceSettingsOut": {
+    "properties": {
+     "branch_name": {
+      "default": "",
+      "maxLength": 64,
+      "title": "Branch Name",
+      "type": "string"
+     },
+     "building_number": {
+      "default": "",
+      "maxLength": 10,
+      "title": "Building Number",
+      "type": "string"
+     },
+     "certificate_expires_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Certificate Expires At"
+     },
+     "city": {
+      "default": "",
+      "maxLength": 120,
+      "title": "City",
+      "type": "string"
+     },
+     "crn": {
+      "default": "",
+      "maxLength": 20,
+      "title": "Crn",
+      "type": "string"
+     },
+     "district": {
+      "default": "",
+      "maxLength": 120,
+      "title": "District",
+      "type": "string"
+     },
+     "documents": {
+      "title": "Documents",
+      "type": "integer"
+     },
+     "environment": {
+      "default": "sandbox",
+      "enum": [
+       "sandbox",
+       "simulation",
+       "production"
+      ],
+      "title": "Environment",
+      "type": "string"
+     },
+     "industry": {
+      "default": "",
+      "maxLength": 64,
+      "title": "Industry",
+      "type": "string"
+     },
+     "onboarded_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Onboarded At"
+     },
+     "pending": {
+      "title": "Pending",
+      "type": "integer"
+     },
+     "postal_code": {
+      "default": "",
+      "maxLength": 10,
+      "title": "Postal Code",
+      "type": "string"
+     },
+     "problems": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Problems",
+      "type": "array"
+     },
+     "rejected": {
+      "title": "Rejected",
+      "type": "integer"
+     },
+     "status": {
+      "enum": [
+       "off",
+       "onboarded"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "street": {
+      "default": "",
+      "maxLength": 120,
+      "title": "Street",
+      "type": "string"
+     },
+     "vat_number": {
+      "title": "Vat Number",
+      "type": "string"
+     }
+    },
+    "required": [
+     "status",
+     "vat_number",
+     "problems",
+     "onboarded_at",
+     "certificate_expires_at",
+     "documents",
+     "pending",
+     "rejected"
+    ],
+    "title": "EInvoiceSettingsOut",
+    "type": "object"
+   },
+   "EInvoiceStatusOut": {
+    "properties": {
+     "active": {
+      "title": "Active",
+      "type": "boolean"
+     },
+     "environment": {
+      "anyOf": [
+       {
+        "enum": [
+         "sandbox",
+         "simulation",
+         "production"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Environment"
+     }
+    },
+    "required": [
+     "active",
+     "environment"
+    ],
+    "title": "EInvoiceStatusOut",
+    "type": "object"
+   },
+   "EInvoiceSummary": {
+    "properties": {
+     "accepted_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Accepted At"
+     },
+     "attempts": {
+      "title": "Attempts",
+      "type": "integer"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "environment": {
+      "enum": [
+       "sandbox",
+       "simulation",
+       "production"
+      ],
+      "title": "Environment",
+      "type": "string"
+     },
+     "errors": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Errors",
+      "type": "array"
+     },
+     "icv": {
+      "title": "Icv",
+      "type": "integer"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "standard",
+       "simplified"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "number": {
+      "title": "Number",
+      "type": "string"
+     },
+     "source_id": {
+      "title": "Source Id",
+      "type": "string"
+     },
+     "source_type": {
+      "enum": [
+       "invoice",
+       "credit_note"
+      ],
+      "title": "Source Type",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "pending",
+       "reported",
+       "cleared",
+       "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "type_code": {
+      "title": "Type Code",
+      "type": "string"
+     },
+     "warnings": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+     }
+    },
+    "required": [
+     "id",
+     "source_type",
+     "source_id",
+     "number",
+     "kind",
+     "type_code",
+     "environment",
+     "icv",
+     "status",
+     "warnings",
+     "errors",
+     "note",
+     "attempts",
+     "accepted_at",
+     "created_at"
+    ],
+    "title": "EInvoiceSummary",
     "type": "object"
    },
    "EmployeeIn": {
@@ -3963,6 +4359,16 @@
       "format": "date",
       "title": "Due Date",
       "type": "string"
+     },
+     "einvoice": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/EInvoiceSummary"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "id": {
       "title": "Id",
@@ -5860,6 +6266,20 @@
      "created_at"
     ],
     "title": "NotificationOut",
+    "type": "object"
+   },
+   "OnboardIn": {
+    "properties": {
+     "otp": {
+      "pattern": "^\\d{6}$",
+      "title": "Otp",
+      "type": "string"
+     }
+    },
+    "required": [
+     "otp"
+    ],
+    "title": "OnboardIn",
     "type": "object"
    },
    "OpeningHoursIn": {
@@ -9822,6 +10242,19 @@
       "description": "Defaults to the output VAT account",
       "title": "Account Id"
      },
+     "exemption_code": {
+      "default": "",
+      "maxLength": 40,
+      "pattern": "^(VATEX-[A-Z]{2}-[A-Z0-9.-]{1,20})?$",
+      "title": "Exemption Code",
+      "type": "string"
+     },
+     "exemption_reason": {
+      "default": "",
+      "maxLength": 200,
+      "title": "Exemption Reason",
+      "type": "string"
+     },
      "name": {
       "maxLength": 100,
       "minLength": 1,
@@ -9840,6 +10273,18 @@
        }
       ],
       "title": "Rate"
+     },
+     "zatca_category": {
+      "default": "",
+      "enum": [
+       "",
+       "S",
+       "Z",
+       "E",
+       "O"
+      ],
+      "title": "Zatca Category",
+      "type": "string"
      }
     },
     "required": [
@@ -9892,6 +10337,16 @@
       "title": "Active",
       "type": "boolean"
      },
+     "exemption_code": {
+      "default": "",
+      "title": "Exemption Code",
+      "type": "string"
+     },
+     "exemption_reason": {
+      "default": "",
+      "title": "Exemption Reason",
+      "type": "string"
+     },
      "id": {
       "title": "Id",
       "type": "string"
@@ -9902,6 +10357,11 @@
      },
      "rate": {
       "title": "Rate",
+      "type": "string"
+     },
+     "zatca_category": {
+      "default": "",
+      "title": "Zatca Category",
       "type": "string"
      }
     },
@@ -9928,6 +10388,31 @@
       ],
       "title": "Active"
      },
+     "exemption_code": {
+      "anyOf": [
+       {
+        "maxLength": 40,
+        "pattern": "^(VATEX-[A-Z]{2}-[A-Z0-9.-]{1,20})?$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exemption Code"
+     },
+     "exemption_reason": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exemption Reason"
+     },
      "name": {
       "anyOf": [
        {
@@ -9940,6 +10425,24 @@
        }
       ],
       "title": "Name"
+     },
+     "zatca_category": {
+      "anyOf": [
+       {
+        "enum": [
+         "",
+         "S",
+         "Z",
+         "E",
+         "O"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Zatca Category"
      }
     },
     "title": "TaxUpdate",
@@ -10884,6 +11387,12 @@
       "title": "Address Line",
       "type": "string"
      },
+     "building_number": {
+      "default": "",
+      "maxLength": 10,
+      "title": "Building Number",
+      "type": "string"
+     },
      "city": {
       "default": "",
       "maxLength": 100,
@@ -10900,6 +11409,12 @@
       "default": "",
       "pattern": "^([A-Z]{2})?$",
       "title": "Country",
+      "type": "string"
+     },
+     "district": {
+      "default": "",
+      "maxLength": 100,
+      "title": "District",
       "type": "string"
      },
      "email": {
@@ -19110,6 +19625,440 @@
     "summary": "Update Customer",
     "tags": [
      "customers"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/einvoicing": {
+   "get": {
+    "operationId": "read_settings_api_v1_orgs__org_id__einvoicing_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EInvoiceSettingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Read Settings",
+    "tags": [
+     "e-invoicing"
+    ]
+   },
+   "put": {
+    "description": "Seller details for e-invoices. The environment can only change while e-invoicing is off.",
+    "operationId": "change_settings_api_v1_orgs__org_id__einvoicing_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EInvoiceSettingsIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EInvoiceSettingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Change Settings",
+    "tags": [
+     "e-invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/einvoicing/documents": {
+   "get": {
+    "operationId": "list_documents_api_v1_orgs__org_id__einvoicing_documents_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "pending",
+          "reported",
+          "cleared",
+          "rejected"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/EInvoiceSummary"
+         },
+         "title": "Response List Documents Api V1 Orgs  Org Id  Einvoicing Documents Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Documents",
+    "tags": [
+     "e-invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/einvoicing/documents/{doc_id}/send": {
+   "post": {
+    "operationId": "send_again_api_v1_orgs__org_id__einvoicing_documents__doc_id__send_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EInvoiceSummary"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Send Again",
+    "tags": [
+     "e-invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/einvoicing/documents/{doc_id}/xml": {
+   "get": {
+    "operationId": "document_xml_api_v1_orgs__org_id__einvoicing_documents__doc_id__xml_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Document Xml",
+    "tags": [
+     "e-invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/einvoicing/off": {
+   "post": {
+    "description": "Stop issuing e-invoices. Documents already issued stay as they are; onboarding again starts a new device.",
+    "operationId": "turn_off_api_v1_orgs__org_id__einvoicing_off_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EInvoiceSettingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Turn Off",
+    "tags": [
+     "e-invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/einvoicing/onboard": {
+   "post": {
+    "description": "Onboard the device with a one-time password from ZATCA's Fatoora portal (the sandbox takes 123345).",
+    "operationId": "onboard_api_v1_orgs__org_id__einvoicing_onboard_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OnboardIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EInvoiceSettingsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Onboard",
+    "tags": [
+     "e-invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/einvoicing/status": {
+   "get": {
+    "operationId": "einvoicing_status_api_v1_orgs__org_id__einvoicing_status_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EInvoiceStatusOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Einvoicing Status",
+    "tags": [
+     "e-invoicing"
     ]
    }
   },

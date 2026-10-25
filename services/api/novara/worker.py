@@ -21,6 +21,7 @@ from novara.automation import engine
 from novara.automation.events import scan_overdue, scan_schedules
 from novara.automation.models import Workflow
 from novara.db import utcnow
+from novara.einvoice import service as einvoice
 from novara.tenancy import bind_tenant, system_scope
 
 log = logging.getLogger("novara.worker")
@@ -53,6 +54,23 @@ def run_once(sessionmaker, provider, today: date | None = None, webhooks=None) -
     return results
 
 
+def send_einvoices(sessionmaker, settings, http=None) -> dict[str, int]:
+    """Send e-invoices still waiting for ZATCA (it didn't answer when they were issued)."""
+    with sessionmaker() as db:
+        org_ids = einvoice.organizations_with_pending(db)
+    sent = {}
+    for org_id in org_ids:
+        with sessionmaker() as db:
+            bind_tenant(db, org_id)
+            try:
+                sent[org_id] = einvoice.send_pending(db, settings, http)
+                db.commit()
+            except Exception:  # noqa: BLE001 - one organization's failure must not stop the others
+                log.exception("sending e-invoices failed for organization %s", org_id)
+                db.rollback()
+    return sent
+
+
 def main() -> None:
     from novara.main import create_app
 
@@ -65,6 +83,7 @@ def main() -> None:
     while True:
         log.info("processed: %s", run_once(app.state.sessionmaker, app.state.ai_provider,
                                            webhooks=app.state.webhooks))
+        log.info("e-invoices sent: %s", send_einvoices(app.state.sessionmaker, app.state.settings))
         if args.once:
             return
         time.sleep(args.interval)

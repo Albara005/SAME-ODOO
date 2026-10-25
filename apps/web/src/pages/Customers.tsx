@@ -14,12 +14,13 @@ import { useDebounced } from "../lib/useDebounced";
 type Customer = Schemas["CustomerOut"];
 type CustomerForm = {
   name: string; kind: "company" | "individual"; email: string; phone: string; tax_number: string;
-  commercial_registration: string; address_line: string; city: string; postal_code: string; country: string; notes: string;
+  commercial_registration: string; address_line: string; building_number: string; district: string; city: string;
+  postal_code: string; country: string; notes: string;
 };
 
 const EMPTY: CustomerForm = {
   name: "", kind: "company", email: "", phone: "", tax_number: "", commercial_registration: "", address_line: "",
-  city: "", postal_code: "", country: "SA", notes: "",
+  building_number: "", district: "", city: "", postal_code: "", country: "SA", notes: "",
 };
 
 export function CustomersPage() {
@@ -201,6 +202,14 @@ function CustomerDialog({ customer, onClose }: { customer: Customer | null; onCl
         <Field label={t("customers.address")} optional>
           <Input value={form.address_line} onChange={set("address_line")} />
         </Field>
+        <div className="grid-2">
+          <Field label={t("customers.buildingNumber")} hint={t("customers.nationalAddressHint")} optional>
+            <Input value={form.building_number} onChange={set("building_number")} maxLength={10} inputMode="numeric" ltr />
+          </Field>
+          <Field label={t("customers.district")} optional>
+            <Input value={form.district} onChange={set("district")} maxLength={100} />
+          </Field>
+        </div>
         <Field label={t("customers.notes")} optional>
           <Textarea value={form.notes} onChange={set("notes")} />
         </Field>

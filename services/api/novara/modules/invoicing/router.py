@@ -19,6 +19,8 @@ from novara.modules.invoicing.lines import LineIn, resolve_lines
 from novara.modules.invoicing.credit import credited_so_far
 from novara.modules.invoicing.models import CreditNote, Invoice, InvoiceLine, Payment
 from novara.modules.invoicing.zatca import qr_payload
+from novara.einvoice import service as einvoice
+from novara.einvoice.schemas import EInvoiceSummary, summary as einvoice_summary
 from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
 from novara.modules.projects import service as project_hours
@@ -104,8 +106,10 @@ class InvoiceOut(BaseModel):
     posted_at: datetime | None
     created_at: datetime
     credit_notes: list[CreditNoteRef] = []
-    # Base64 TLV for the e-invoice QR code (ZATCA phase 1), once posted and when the organization has a VAT number.
+    # Base64 TLV for the e-invoice QR code: phase 2 (signed) once e-invoicing is on, else phase 1 when the
+    # organization has a VAT number.
     zatca_qr: str | None = None
+    einvoice: EInvoiceSummary | None = None
     # Set when the invoice was created from a sales order (its draft is then edited through the order).
     sales_order_id: str | None = None
     sales_order_number: str | None = None
@@ -152,7 +156,10 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
     notes = db.scalars(select(CreditNote).where(CreditNote.invoice_id == inv.id).order_by(CreditNote.number)).all()
     credited = credited_so_far(db, inv) if notes else {}
     qr = None
-    if org.vat_number and inv.status not in ("draft", "cancelled") and inv.posted_at is not None:
+    doc = einvoice.document_for(db, "invoice", inv.id) if inv.status != "draft" else None
+    if doc is not None:
+        qr = einvoice.qr_of(doc)
+    elif org.vat_number and inv.status not in ("draft", "cancelled") and inv.posted_at is not None:
         qr = qr_payload(seller=org.name, vat_number=org.vat_number, issued_at=inv.posted_at,
                         total=_money(inv.total_minor, c), vat_total=_money(inv.tax_minor, c))
     return InvoiceOut(
@@ -163,7 +170,7 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
         amount_due=_money(inv.amount_due_minor, c),
         credit_notes=[CreditNoteRef(id=n.id, number=n.number, issue_date=n.issue_date, total=_money(n.total_minor, c))
                       for n in notes],
-        zatca_qr=qr,
+        zatca_qr=qr, einvoice=einvoice_summary(doc) if doc else None,
         journal_entry_id=inv.journal_entry_id, reversal_entry_id=inv.reversal_entry_id, posted_at=inv.posted_at,
         created_at=inv.created_at, sales_order_id=order.id if order else None,
         sales_order_number=order.number if order else None,
@@ -219,8 +226,10 @@ def _domain_errors(fn):
         return fn()
     except svc.InvoiceStateError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-    except svc.InvoiceValidationError as e:
+    except (svc.InvoiceValidationError, einvoice.EInvoiceError) as e:
         raise _unprocessable(str(e))
+    except einvoice.EInvoiceState as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
 
 
 @router.get("/orgs/{org_id}/invoices", response_model=list[InvoiceSummary])
@@ -326,11 +335,17 @@ def delete_draft(invoice_id: str, request: Request, ctx: OrgContext = Depends(re
 def post_invoice(invoice_id: str, request: Request, ctx: OrgContext = Depends(require(P.INVOICES_POST)),
                  db: Session = Depends(get_db)):
     inv = _get_invoice(db, invoice_id, lock=True)
+    _domain_errors(lambda: einvoice.check_buyer(db, inv.customer_id))
     entry = _domain_errors(lambda: svc.post_invoice(db, inv, user_id=ctx.user.id))
+    # E-invoicing on: the signed document is part of posting (same transaction), then it goes to ZATCA.
+    doc = _domain_errors(lambda: einvoice.issue_for_invoice(db, request.app.state.settings, inv))
     audit.record(db, actor_user_id=ctx.user.id, action="invoice.posted", target_type="invoice", target_id=inv.id,
                  details={"number": inv.number, "journal_entry": entry.number,
                           "total": _money(inv.total_minor, inv.currency)}, ip_address=client_ip(request))
     db.commit()
+    if doc is not None:
+        einvoice.submit(db, request.app.state.settings, doc, http=request.app.state.einvoice_http)
+        db.commit()
     return invoice_out(db, inv)
 
 

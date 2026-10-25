@@ -39,12 +39,18 @@ class Tax(IdMixin, TimestampMixin, TenantScoped, Base):
         org_unique_id(),
         same_org_fk("account_id", "accounts"),
         CheckConstraint("CAST(rate AS NUMERIC) >= 0 AND CAST(rate AS NUMERIC) <= 100", name="ck_tax_rate_range"),
+        CheckConstraint("zatca_category IN ('', 'S', 'Z', 'E', 'O')", name="ck_tax_zatca_category"),
     )
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     rate: Mapped[Decimal] = mapped_column(ExactDecimal(7, 4), nullable=False)  # percent
     account_id: Mapped[str] = mapped_column(String(36), nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # ZATCA's VAT category for e-invoices: S standard, Z zero rated, E exempt, O out of scope; empty means
+    # S for a positive rate and O otherwise. Z, E and O carry an exemption reason (VATEX code and text).
+    zatca_category: Mapped[str] = mapped_column(String(1), default="", server_default="", nullable=False)
+    exemption_code: Mapped[str] = mapped_column(String(40), default="", server_default="", nullable=False)
+    exemption_reason: Mapped[str] = mapped_column(String(200), default="", server_default="", nullable=False)
 
 
 class NumberSequence(IdMixin, TenantScoped, Base):

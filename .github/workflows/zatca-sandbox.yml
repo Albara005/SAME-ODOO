@@ -1,0 +1,23 @@
+name: zatca-sandbox
+
+# E-invoicing end to end against ZATCA's developer sandbox (novara/einvoice/sandbox.py): onboarding with the
+# sandbox's public one-time password, then simplified and standard invoices and credit notes that must come
+# back reported or cleared. Calls an outside service, so it only runs when started by hand:
+# Actions → zatca-sandbox → Run workflow. No secrets needed.
+on:
+  workflow_dispatch:
+
+jobs:
+  sandbox:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Onboard and send documents to the sandbox
+        run: python -m novara.einvoice.sandbox

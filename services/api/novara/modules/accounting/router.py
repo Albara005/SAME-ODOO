@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field, model_validator
@@ -24,15 +25,25 @@ from novara.money import fmt_decimal, from_minor, to_minor
 router = APIRouter(tags=["accounting"])
 
 
+ZatcaCategory = Literal["", "S", "Z", "E", "O"]
+
+
 class TaxIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     rate: Decimal = Field(ge=0, le=100, max_digits=7, decimal_places=4)
     account_id: str | None = Field(default=None, description="Defaults to the output VAT account")
+    # For e-invoices (ZATCA): empty picks S for a positive rate and O (out of scope) otherwise.
+    zatca_category: ZatcaCategory = ""
+    exemption_code: str = Field(default="", max_length=40, pattern=r"^(VATEX-[A-Z]{2}-[A-Z0-9.-]{1,20})?$")
+    exemption_reason: str = Field(default="", max_length=200)
 
 
 class TaxUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     active: bool | None = None
+    zatca_category: ZatcaCategory | None = None
+    exemption_code: str | None = Field(default=None, max_length=40, pattern=r"^(VATEX-[A-Z]{2}-[A-Z0-9.-]{1,20})?$")
+    exemption_reason: str | None = Field(default=None, max_length=200)
 
 
 class TaxOut(BaseModel):
@@ -41,6 +52,19 @@ class TaxOut(BaseModel):
     rate: str
     account_id: str
     active: bool
+    zatca_category: str = ""
+    exemption_code: str = ""
+    exemption_reason: str = ""
+
+
+def _check_category(rate: Decimal, category: str, code: str) -> None:
+    if category == "S" and rate <= 0:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "category S (standard) needs a rate above 0")
+    if category in ("Z", "E", "O") and rate != 0:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"category {category} is for a 0% rate")
+    if category in ("Z", "E") and not code:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "zero-rated and exempt taxes need ZATCA's exemption code (VATEX-SA-...)")
 
 
 class AccountOut(BaseModel):
@@ -158,7 +182,8 @@ class TrialBalanceOut(BaseModel):
 
 
 def tax_out(t: Tax) -> TaxOut:
-    return TaxOut(id=t.id, name=t.name, rate=fmt_decimal(t.rate), account_id=t.account_id, active=t.active)
+    return TaxOut(id=t.id, name=t.name, rate=fmt_decimal(t.rate), account_id=t.account_id, active=t.active,
+                  zatca_category=t.zatca_category, exemption_code=t.exemption_code, exemption_reason=t.exemption_reason)
 
 
 def account_out(a: Account) -> AccountOut:
@@ -194,7 +219,9 @@ def create_tax(body: TaxIn, request: Request, ctx: OrgContext = Depends(require(
         account = db.get(Account, body.account_id)
         if account is None or account.type != "liability":
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "tax account must be a liability account")
-    tax = Tax(name=body.name, rate=body.rate, account_id=account.id)
+    _check_category(body.rate, body.zatca_category, body.exemption_code)
+    tax = Tax(name=body.name, rate=body.rate, account_id=account.id, zatca_category=body.zatca_category,
+              exemption_code=body.exemption_code, exemption_reason=body.exemption_reason)
     db.add(tax)
     db.flush()
     audit.record(db, actor_user_id=ctx.user.id, action="tax.created", target_type="tax", target_id=tax.id,
@@ -211,6 +238,8 @@ def update_tax(tax_id: str, body: TaxUpdate, request: Request, ctx: OrgContext =
     if tax is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "tax not found")
     changes = body.model_dump(exclude_none=True)
+    _check_category(tax.rate, changes.get("zatca_category", tax.zatca_category),
+                    changes.get("exemption_code", tax.exemption_code))
     for field, value in changes.items():
         setattr(tax, field, value)
     audit.record(db, actor_user_id=ctx.user.id, action="tax.updated", target_type="tax", target_id=tax.id,
