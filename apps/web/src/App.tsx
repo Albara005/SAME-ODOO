@@ -40,6 +40,7 @@ const HostingPage = page(() => import("./pages/Hosting"), "HostingPage");
 const invoices = () => import("./pages/Invoices");
 const InvoiceDetailPage = page(invoices, "InvoiceDetailPage");
 const InvoiceEditorPage = page(invoices, "InvoiceEditorPage");
+const DebitNoteEditorPage = page(invoices, "DebitNoteEditorPage");
 const InvoicesPage = page(invoices, "InvoicesPage");
 const InventoryPage = page(() => import("./pages/Inventory"), "InventoryPage");
 const ProductsPage = page(() => import("./pages/Products"), "ProductsPage");
@@ -158,6 +159,7 @@ export function App() {
             <Route path="invoices/new" element={<InvoiceEditorPage />} />
             <Route path="invoices/:invoiceId" element={<InvoiceDetailPage />} />
             <Route path="invoices/:invoiceId/edit" element={<InvoiceEditorPage />} />
+            <Route path="invoices/:invoiceId/debit-note" element={<DebitNoteEditorPage />} />
             <Route path="sales" element={<SalesOrdersPage />} />
             <Route path="sales/new" element={<SalesOrderEditorPage />} />
             <Route path="sales/:orderId" element={<SalesOrderDetailPage />} />

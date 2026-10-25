@@ -2668,6 +2668,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/invoices/{invoice_id}/debit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Debit Note
+         * @description A draft debit note charging more on a posted invoice: the same customer and currency, lines of its own.
+         */
+        post: operations["create_debit_note_api_v1_orgs__org_id__invoices__invoice_id__debit_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/invoices/{invoice_id}/payment-links": {
         parameters: {
             query?: never;
@@ -5992,6 +6012,43 @@ export interface components {
             /** Days */
             days: number;
         };
+        /** DebitNoteIn */
+        DebitNoteIn: {
+            /** Due Date */
+            due_date?: string | null;
+            /** Exchange Rate */
+            exchange_rate?: number | string | null;
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Lines */
+            lines: components["schemas"]["LineIn"][];
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Reason */
+            reason: string;
+        };
+        /** DebitNoteRef */
+        DebitNoteRef: {
+            /** Id */
+            id: string;
+            /**
+             * Issue Date
+             * Format: date
+             */
+            issue_date: string;
+            /** Number */
+            number: string | null;
+            /** Status */
+            status: string;
+            /** Total */
+            total: string;
+        };
         /** DecisionIn */
         DecisionIn: {
             /**
@@ -6582,6 +6639,8 @@ export interface components {
              * @default
              */
             notes: string;
+            /** Reason */
+            reason?: string | null;
         };
         /** InvoiceOut */
         InvoiceOut: {
@@ -6616,6 +6675,15 @@ export interface components {
             customer_id: string;
             /** Customer Name */
             customer_name: string;
+            /** Debit Note Of Id */
+            debit_note_of_id?: string | null;
+            /** Debit Note Of Number */
+            debit_note_of_number?: string | null;
+            /**
+             * Debit Notes
+             * @default []
+             */
+            debit_notes: components["schemas"]["DebitNoteRef"][];
             /**
              * Due Date
              * Format: date
@@ -6636,6 +6704,12 @@ export interface components {
             issue_date: string;
             /** Journal Entry Id */
             journal_entry_id: string | null;
+            /**
+             * Kind
+             * @default invoice
+             * @enum {string}
+             */
+            kind: "invoice" | "debit_note";
             /** Lines */
             lines: components["schemas"]["LineOut"][];
             /** Notes */
@@ -6644,6 +6718,11 @@ export interface components {
             number: string | null;
             /** Posted At */
             posted_at: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
             /** Reversal Entry Id */
             reversal_entry_id: string | null;
             /** Sales Order Id */
@@ -6685,6 +6764,12 @@ export interface components {
              * Format: date
              */
             issue_date: string;
+            /**
+             * Kind
+             * @default invoice
+             * @enum {string}
+             */
+            kind: "invoice" | "debit_note";
             /** Number */
             number: string | null;
             /** Status */
@@ -15954,6 +16039,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CreditNoteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_debit_note_api_v1_orgs__org_id__invoices__invoice_id__debit_notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebitNoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceOut"];
                 };
             };
             /** @description Validation Error */

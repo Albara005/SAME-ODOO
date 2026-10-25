@@ -2849,6 +2849,111 @@
     "title": "DaysOut",
     "type": "object"
    },
+   "DebitNoteIn": {
+    "properties": {
+     "due_date": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due Date"
+     },
+     "exchange_rate": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Rate"
+     },
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/LineIn"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Lines",
+      "type": "array"
+     },
+     "notes": {
+      "default": "",
+      "maxLength": 5000,
+      "title": "Notes",
+      "type": "string"
+     },
+     "reason": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "issue_date",
+     "reason",
+     "lines"
+    ],
+    "title": "DebitNoteIn",
+    "type": "object"
+   },
+   "DebitNoteRef": {
+    "properties": {
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "issue_date": {
+      "format": "date",
+      "title": "Issue Date",
+      "type": "string"
+     },
+     "number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Number"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "total": {
+      "title": "Total",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "number",
+     "status",
+     "issue_date",
+     "total"
+    ],
+    "title": "DebitNoteRef",
+    "type": "object"
+   },
    "DecisionIn": {
     "properties": {
      "note": {
@@ -4375,6 +4480,18 @@
       "maxLength": 5000,
       "title": "Notes",
       "type": "string"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "maxLength": 1000,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
      }
     },
     "required": [
@@ -4451,6 +4568,36 @@
       "title": "Customer Name",
       "type": "string"
      },
+     "debit_note_of_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Debit Note Of Id"
+     },
+     "debit_note_of_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Debit Note Of Number"
+     },
+     "debit_notes": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/DebitNoteRef"
+      },
+      "title": "Debit Notes",
+      "type": "array"
+     },
      "due_date": {
       "format": "date",
       "title": "Due Date",
@@ -4491,6 +4638,15 @@
       ],
       "title": "Journal Entry Id"
      },
+     "kind": {
+      "default": "invoice",
+      "enum": [
+       "invoice",
+       "debit_note"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
      "lines": {
       "items": {
        "$ref": "#/components/schemas/LineOut"
@@ -4524,6 +4680,11 @@
        }
       ],
       "title": "Posted At"
+     },
+     "reason": {
+      "default": "",
+      "title": "Reason",
+      "type": "string"
      },
      "reversal_entry_id": {
       "anyOf": [
@@ -4649,6 +4810,15 @@
      "issue_date": {
       "format": "date",
       "title": "Issue Date",
+      "type": "string"
+     },
+     "kind": {
+      "default": "invoice",
+      "enum": [
+       "invoice",
+       "debit_note"
+      ],
+      "title": "Kind",
       "type": "string"
      },
      "number": {
@@ -24051,6 +24221,73 @@
     "summary": "Create Credit Note",
     "tags": [
      "credit notes"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/invoices/{invoice_id}/debit-notes": {
+   "post": {
+    "description": "A draft debit note charging more on a posted invoice: the same customer and currency, lines of its own.",
+    "operationId": "create_debit_note_api_v1_orgs__org_id__invoices__invoice_id__debit_notes_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "invoice_id",
+      "required": true,
+      "schema": {
+       "title": "Invoice Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DebitNoteIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InvoiceOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Debit Note",
+    "tags": [
+     "invoices"
     ]
    }
   },

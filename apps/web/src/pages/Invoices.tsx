@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, CheckCircle2, CreditCard, FileMinus, Pencil, Plus, Printer, Trash2 } from "lucide-react";
+import { Ban, CheckCircle2, CreditCard, FileMinus, FilePlus, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { useCallback, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
@@ -9,7 +9,7 @@ import {
   type LineDraft,
 } from "../components/business";
 import {
-  Button, Card, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
+  Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
 } from "../components/ui";
 import { EInvoiceStatus } from "../components/EInvoicing";
 import { PaymentLinksCard } from "../components/OnlinePayments";
@@ -90,6 +90,7 @@ export function InvoicesPage() {
                         <Link to={path(`invoices/${inv.id}`)} className="mono">
                           {inv.number ?? t("status.draft")}
                         </Link>
+                        {inv.kind === "debit_note" && <> <Badge tone="info">{t("debit.badge")}</Badge></>}
                       </td>
                       <td>{inv.customer_name}</td>
                       <td className="num small">{date(inv.issue_date)}</td>
@@ -133,20 +134,30 @@ export function InvoiceEditorPage() {
   return <InvoiceEditor invoice={invoiceId ? existing.data : undefined} />;
 }
 
-function InvoiceEditor({ invoice }: { invoice?: Invoice }) {
+/** A new debit note on a posted invoice: the invoice editor with the invoice's customer and currency. */
+export function DebitNoteEditorPage() {
+  const { invoiceId = "" } = useParams();
+  const original = useInvoice(invoiceId);
+  return <QueryView query={original}>{(inv) => <InvoiceEditor debitOf={inv} />}</QueryView>;
+}
+
+function InvoiceEditor({ invoice, debitOf }: { invoice?: Invoice; debitOf?: Invoice }) {
   const { t } = useI18n();
   const { org, path } = useOrg();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const customers = useCustomers();
+  const base = debitOf ?? invoice;
+  const debitNote = Boolean(debitOf || invoice?.debit_note_of_id);
   const [header, setHeader] = useState({
-    customer_id: invoice?.customer_id ?? "",
+    customer_id: base?.customer_id ?? "",
     issue_date: invoice?.issue_date ?? today(),
     due_date: invoice?.due_date ?? "",
     notes: invoice?.notes ?? "",
-    currency: invoice?.currency ?? org.default_currency,
-    exchange_rate: invoice && invoice.currency !== org.default_currency ? invoice.exchange_rate : "",
+    currency: base?.currency ?? org.default_currency,
+    exchange_rate: base && base.currency !== org.default_currency ? base.exchange_rate : "",
   });
+  const [reason, setReason] = useState(invoice?.reason ?? "");
   const foreign = header.currency !== org.default_currency;
   const [lines, setLines] = useState<LineDraft[]>(invoice ? toDraft(invoice) : [newLine()]);
   const save = useMutation({
@@ -155,12 +166,21 @@ function InvoiceEditor({ invoice }: { invoice?: Invoice }) {
         ...header, due_date: header.due_date || null, lines: lines.map(toLineIn),
         exchange_rate: foreign ? header.exchange_rate || null : null,
       };
+      if (debitOf) {
+        return unwrap(api.POST("/api/v1/orgs/{org_id}/invoices/{invoice_id}/debit-notes", {
+          params: { path: { org_id: org.id, invoice_id: debitOf.id } },
+          body: { issue_date: header.issue_date, due_date: header.due_date || null, notes: header.notes, reason,
+                  lines: body.lines, exchange_rate: body.exchange_rate },
+        }));
+      }
       return invoice
-        ? unwrap(api.PUT("/api/v1/orgs/{org_id}/invoices/{invoice_id}", { params: { path: { org_id: org.id, invoice_id: invoice.id } }, body }))
+        ? unwrap(api.PUT("/api/v1/orgs/{org_id}/invoices/{invoice_id}", {
+          params: { path: { org_id: org.id, invoice_id: invoice.id } }, body: debitNote ? { ...body, reason } : body }))
         : unwrap(api.POST("/api/v1/orgs/{org_id}/invoices", { params: { path: { org_id: org.id } }, body }));
     },
     onSuccess: (saved) => {
       void qc.invalidateQueries({ queryKey: ["invoices", org.id] });
+      if (saved.debit_note_of_id) void qc.invalidateQueries({ queryKey: ["invoice", org.id, saved.debit_note_of_id] });
       qc.setQueryData(["invoice", org.id, saved.id], saved);
       navigate(path(`invoices/${saved.id}`));
     },
@@ -174,12 +194,15 @@ function InvoiceEditor({ invoice }: { invoice?: Invoice }) {
 
   return (
     <form className="stack" onSubmit={submit}>
-      <PageHeader title={invoice ? t("invoices.edit") : t("invoices.new")} />
+      <PageHeader title={debitOf ? t("debit.of", { number: debitOf.number ?? "" })
+        : invoice?.debit_note_of_id ? t("debit.of", { number: invoice.debit_note_of_number ?? "" })
+          : invoice ? t("invoices.edit") : t("invoices.new")} />
       {save.isError && <ErrorNotice error={save.error} />}
+      {debitNote && <p className="notice notice-info small">{t("debit.hint")}</p>}
       <Card>
         <div className="grid-2">
           <Field label={t("invoices.customer")} error={err["customer_id"]}>
-            <Select value={header.customer_id} onChange={(e) => setHeader({ ...header, customer_id: e.target.value })} required>
+            <Select value={header.customer_id} disabled={debitNote} onChange={(e) => setHeader({ ...header, customer_id: e.target.value })} required>
               <option value="">{t("invoices.chooseCustomer")}</option>
               {(customers.data ?? []).map((c) => (
                 <option key={c.id} value={c.id}>
@@ -195,10 +218,15 @@ function InvoiceEditor({ invoice }: { invoice?: Invoice }) {
             <Input type="date" value={header.due_date} min={header.issue_date} onChange={(e) => setHeader({ ...header, due_date: e.target.value })} ltr />
           </Field>
           <Field label={t("invoices.currency")} hint={foreign ? t("invoices.foreignHint", { currency: header.currency }) : undefined}>
-            <Select value={header.currency} onChange={(e) => setHeader({ ...header, currency: e.target.value })}>
+            <Select value={header.currency} disabled={debitNote} onChange={(e) => setHeader({ ...header, currency: e.target.value })}>
               {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </Select>
           </Field>
+          {debitNote && (
+            <Field label={t("debit.reason")} hint={t("debit.reasonHint")} error={err["reason"]}>
+              <Input value={reason} maxLength={1000} required onChange={(e) => setReason(e.target.value)} />
+            </Field>
+          )}
           {foreign && (
             <Field label={t("invoices.exchangeRate", { currency: header.currency, base: org.default_currency })} error={err["exchange_rate"]}>
               <Input value={header.exchange_rate} inputMode="decimal" required ltr
@@ -246,6 +274,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
     void qc.invalidateQueries({ queryKey: ["invoice", org.id, inv.id] });
     void qc.invalidateQueries({ queryKey: ["invoices", org.id] });
     void qc.invalidateQueries({ queryKey: ["home", org.id] });
+    if (inv.debit_note_of_id) void qc.invalidateQueries({ queryKey: ["invoice", org.id, inv.debit_note_of_id] });
   };
   const onError = (e: Error) => toast(e instanceof ApiError ? e.message : t("common.error"), "error");
   const onlinePaid = useCallback(() => {
@@ -276,6 +305,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
   const isDraft = inv.status === "draft";
   const canPay = can("payments.write") && (inv.status === "posted" || inv.status === "partially_paid");
   const credited = isPositive(inv.amount_credited);
+  const canDebit = can("invoices.write") && !inv.debit_note_of_id && ["posted", "partially_paid", "paid", "credited"].includes(inv.status);
   const canCredit = can("invoices.credit") && CREDITABLE.includes(inv.status)
     && inv.lines.some((l) => isPositive(subtractDec(l.quantity, l.qty_credited)));
 
@@ -286,6 +316,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
         subtitle={
           <span className="row">
             <StatusBadge status={inv.status} />
+            {inv.kind === "debit_note" && <Badge tone="info">{t("debit.badge")}</Badge>}
             <span>{inv.customer_name}</span>
           </span>
         }
@@ -319,6 +350,11 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
               <Button icon={<FileMinus size={16} />} onClick={() => setCrediting(true)}>
                 {t("credit.new")}
               </Button>
+            )}
+            {canDebit && (
+              <Link className="btn" to={path(`invoices/${inv.id}/debit-note`)}>
+                <FilePlus size={16} aria-hidden /> {t("debit.new")}
+              </Link>
             )}
             {inv.status === "posted" && !credited && can("invoices.cancel") && (
               <Button variant="danger" icon={<Ban size={16} />} onClick={() => setCancelling(true)}>
@@ -355,6 +391,14 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
             <dd className="num">{date(inv.issue_date)}</dd>
             <dt>{t("invoices.dueDate")}</dt>
             <dd className="num">{date(inv.due_date)}</dd>
+            {inv.debit_note_of_id && (
+              <>
+                <dt>{t("debit.adjusts")}</dt>
+                <dd><Link className="mono" to={path(`invoices/${inv.debit_note_of_id}`)}>{inv.debit_note_of_number}</Link></dd>
+                <dt>{t("debit.reason")}</dt>
+                <dd dir="auto">{inv.reason}</dd>
+              </>
+            )}
             {inv.sales_order_id && (
               <>
                 <dt>{t("invoices.salesOrder")}</dt>
@@ -442,6 +486,20 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
       {inv.notes && (
         <Card tight>
           <p style={{ whiteSpace: "pre-wrap" }}>{inv.notes}</p>
+        </Card>
+      )}
+      {inv.debit_notes.length > 0 && (
+        <Card title={t("debit.title")} tight>
+          <ul className="stack-sm" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {inv.debit_notes.map((n) => (
+              <li key={n.id} className="row-between">
+                <Link className="mono" to={path(`invoices/${n.id}`)}>{n.number ?? t("status.draft")}</Link>
+                <StatusBadge status={n.status} />
+                <span className="small muted num">{date(n.issue_date)}</span>
+                <span className="num">{money(n.total, inv.currency)}</span>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
       {inv.credit_notes.length > 0 && (

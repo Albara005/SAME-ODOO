@@ -120,7 +120,16 @@ def post_invoice(db: Session, invoice: Invoice, *, user_id: str) -> JournalEntry
         raise InvoiceValidationError(f"an invoice in {invoice.currency} needs its exchange rate to {base}")
     rate = booked_rate(db, invoice)
     year = invoice.issue_date.year
-    invoice.number = next_number(db, f"invoice:{year}", f"INV-{year}-")
+    if invoice.debit_note_of_id:
+        original = db.get(Invoice, invoice.debit_note_of_id)
+        if original.status in ("draft", "cancelled"):
+            raise InvoiceStateError(f"the invoice this debit note adjusts is {original.status}")
+        if not invoice.reason.strip():
+            raise InvoiceValidationError("a debit note needs its reason")
+        invoice.number = next_number(db, f"debit_note:{year}", f"DN-{year}-")
+    else:
+        invoice.number = next_number(db, f"invoice:{year}", f"INV-{year}-")
+    kind = "Debit note" if invoice.debit_note_of_id else "Invoice"
     taxes = {t.id: t for t in db.scalars(select(Tax).where(Tax.id.in_([g.tax_id for g in groups])))}
     tax_accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_({t.account_id for t in taxes.values()})))}
 
@@ -133,7 +142,7 @@ def post_invoice(db: Session, invoice: Invoice, *, user_id: str) -> JournalEntry
             if invoice.currency != base else "")
     specs = [
         LineSpec(system_account(db, "receivable"), debit_minor=invoice.base_total_minor,
-                 customer_id=invoice.customer_id, label=f"Invoice {invoice.number}{note}"),
+                 customer_id=invoice.customer_id, label=f"{kind} {invoice.number}{note}"),
         LineSpec(system_account(db, "sales"), credit_minor=invoice.base_subtotal_minor, label=f"Sales {invoice.number}"),
     ]
     for g, base_tax in base_taxes:
@@ -142,7 +151,7 @@ def post_invoice(db: Session, invoice: Invoice, *, user_id: str) -> JournalEntry
                               label=f"{tax.name} on {invoice.number}"))
     entry = post_entry(
         db, entry_date=invoice.issue_date, currency=base, lines=specs,
-        memo=f"Invoice {invoice.number}{note}", source_type="invoice", source_id=invoice.id, created_by=user_id,
+        memo=f"{kind} {invoice.number}{note}", source_type="invoice", source_id=invoice.id, created_by=user_id,
     )
     invoice.status = "posted"
     invoice.journal_entry_id = entry.id

@@ -1830,6 +1830,14 @@ export const en = {
   "pay.moyasarWebhookHint": "In Moyasar's dashboard, add a webhook with this address and a secret token, for payment and invoice events.",
   "pay.moyasarToken": "The webhook's secret token",
   "pay.moyasarTokenHint": "The same token you typed in Moyasar (at least 16 characters). Each call is also checked with Moyasar before anything is recorded.",
+  "debit.new": "Debit note",
+  "debit.badge": "Debit note",
+  "debit.title": "Debit notes",
+  "debit.of": "Debit note on {number}",
+  "debit.adjusts": "Adjusts invoice",
+  "debit.reason": "Why more is charged",
+  "debit.reasonHint": "Shown on the debit note and sent to ZATCA with it.",
+  "debit.hint": "A debit note charges more on a posted invoice (an undercharged price, an extra item, a late fee). It has the invoice's customer and currency and is paid like an invoice.",
 } as const;
 
 export type MessageKey = keyof typeof en;

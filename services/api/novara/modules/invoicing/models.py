@@ -24,6 +24,7 @@ class Invoice(IdMixin, TimestampMixin, TenantScoped, Base):
         same_org_fk("customer_id", "customers"),
         same_org_fk("journal_entry_id", "journal_entries"),
         same_org_fk("reversal_entry_id", "journal_entries"),
+        same_org_fk("debit_note_of_id", "invoices"),
         CheckConstraint("amount_paid_minor >= 0 AND amount_credited_minor >= 0 "
                         "AND amount_paid_minor + amount_credited_minor <= total_minor", name="ck_invoice_paid_range"),
     )
@@ -55,6 +56,10 @@ class Invoice(IdMixin, TimestampMixin, TenantScoped, Base):
     posted_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+    # A debit note: charges more on an earlier invoice (an undercharged price, a late fee...). It is an invoice of its
+    # own (paid, credited and aged like one), numbered DN-, and e-invoiced as type 383 referring to that invoice.
+    debit_note_of_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    reason: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)  # a debit note's: why
 
     @property
     def amount_due_minor(self) -> int:

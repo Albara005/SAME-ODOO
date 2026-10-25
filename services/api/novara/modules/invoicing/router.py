@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field, model_validator
@@ -40,11 +41,31 @@ class InvoiceIn(BaseModel):
     # organization's currency per unit of this one) books the invoice in the ledger.
     currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
     exchange_rate: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=8)
+    # Debit notes only: why more is charged (kept as it was when left out).
+    reason: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")
     def _dates(self):
         if self.due_date is not None and self.due_date < self.issue_date:
             raise ValueError("due_date cannot be before issue_date")
+        return self
+
+
+class DebitNoteIn(BaseModel):
+    issue_date: date
+    due_date: date | None = None
+    reason: str = Field(min_length=1, max_length=1000)
+    notes: str = Field(default="", max_length=5000)
+    lines: list[LineIn] = Field(min_length=1, max_length=500)
+    # The invoice is in another currency: the rate for the debit note (default: the invoice's own).
+    exchange_rate: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=8)
+
+    @model_validator(mode="after")
+    def _dates(self):
+        if self.due_date is not None and self.due_date < self.issue_date:
+            raise ValueError("due_date cannot be before issue_date")
+        if not self.reason.strip():
+            raise ValueError("a debit note needs its reason")
         return self
 
 
@@ -91,10 +112,24 @@ class CreditNoteRef(BaseModel):
     total: str
 
 
+class DebitNoteRef(BaseModel):
+    id: str
+    number: str | None
+    status: str
+    issue_date: date
+    total: str
+
+
 class InvoiceOut(BaseModel):
     id: str
     number: str | None
     status: str
+    kind: Literal["invoice", "debit_note"] = "invoice"
+    # A debit note: the invoice it adjusts, and why.
+    debit_note_of_id: str | None = None
+    debit_note_of_number: str | None = None
+    reason: str = ""
+    debit_notes: list[DebitNoteRef] = []
     customer_id: str
     customer_name: str
     issue_date: date
@@ -132,6 +167,7 @@ class InvoiceSummary(BaseModel):
     id: str
     number: str | None
     status: str
+    kind: Literal["invoice", "debit_note"] = "invoice"
     customer_id: str
     customer_name: str
     issue_date: date
@@ -169,6 +205,9 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
     org = db.get(Organization, inv.organization_id)
     notes = db.scalars(select(CreditNote).where(CreditNote.invoice_id == inv.id).order_by(CreditNote.number)).all()
     credited = credited_so_far(db, inv) if notes else {}
+    original = db.get(Invoice, inv.debit_note_of_id) if inv.debit_note_of_id else None
+    debits = db.scalars(select(Invoice).where(Invoice.debit_note_of_id == inv.id)
+                        .order_by(Invoice.issue_date, Invoice.created_at)).all()
     qr = None
     doc = einvoice.document_for(db, "invoice", inv.id) if inv.status != "draft" else None
     if doc is not None:
@@ -177,7 +216,12 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
         qr = qr_payload(seller=org.name, vat_number=org.vat_number, issued_at=inv.posted_at,
                         total=_money(inv.total_minor, c), vat_total=_money(inv.tax_minor, c))
     return InvoiceOut(
-        id=inv.id, number=inv.number, status=inv.status, customer_id=inv.customer_id, customer_name=customer.name,
+        id=inv.id, number=inv.number, status=inv.status, kind="debit_note" if original else "invoice",
+        debit_note_of_id=original.id if original else None, debit_note_of_number=original.number if original else None,
+        reason=inv.reason,
+        debit_notes=[DebitNoteRef(id=d.id, number=d.number, status=d.status, issue_date=d.issue_date,
+                                  total=_money(d.total_minor, d.currency)) for d in debits],
+        customer_id=inv.customer_id, customer_name=customer.name,
         issue_date=inv.issue_date, due_date=inv.due_date, currency=c, notes=inv.notes,
         subtotal=_money(inv.subtotal_minor, c), tax=_money(inv.tax_minor, c), total=_money(inv.total_minor, c),
         amount_paid=_money(inv.amount_paid_minor, c), amount_credited=_money(inv.amount_credited_minor, c),
@@ -284,7 +328,8 @@ def list_invoices(
     out = []
     for inv, name in db.execute(stmt):
         due = inv.amount_due_minor
-        out.append(InvoiceSummary(id=inv.id, number=inv.number, status=inv.status, customer_id=inv.customer_id,
+        out.append(InvoiceSummary(id=inv.id, number=inv.number, status=inv.status,
+                                  kind="debit_note" if inv.debit_note_of_id else "invoice", customer_id=inv.customer_id,
                                   customer_name=name, issue_date=inv.issue_date, due_date=inv.due_date,
                                   currency=inv.currency, total=_money(inv.total_minor, inv.currency),
                                   amount_due=_money(due, inv.currency)))
@@ -316,6 +361,32 @@ def add_draft_invoice(db: Session, ctx: OrgContext, body: InvoiceIn, *, ip: str 
     return inv
 
 
+@router.post("/orgs/{org_id}/invoices/{invoice_id}/debit-notes", response_model=InvoiceOut,
+             status_code=status.HTTP_201_CREATED)
+def create_debit_note(invoice_id: str, body: DebitNoteIn, request: Request,
+                      ctx: OrgContext = Depends(require(P.INVOICES_WRITE)), db: Session = Depends(get_db)):
+    """A draft debit note charging more on a posted invoice: the same customer and currency, lines of its own."""
+    original = _get_invoice(db, invoice_id)
+    if original.status in ("draft", "cancelled"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"only a posted invoice can have a debit note (status: {original.status})")
+    if original.debit_note_of_id:
+        raise _unprocessable("a debit note adjusts an invoice, not another debit note")
+    if body.issue_date < original.issue_date:
+        raise _unprocessable("a debit note can't be dated before the invoice it adjusts")
+    foreign = original.currency != svc.base_currency(db)
+    header = InvoiceIn(customer_id=original.customer_id, issue_date=body.issue_date, due_date=body.due_date,
+                       notes=body.notes, lines=body.lines, currency=original.currency,
+                       exchange_rate=(body.exchange_rate or original.exchange_rate) if foreign else None)
+    inv = add_draft_invoice(db, ctx, header, ip=client_ip(request))
+    inv.debit_note_of_id, inv.reason = original.id, body.reason.strip()
+    audit.record(db, actor_user_id=ctx.user.id, action="invoice.debit_note_created", target_type="invoice",
+                 target_id=original.id, details={"number": original.number, "debit_note_id": inv.id,
+                                                 "total": _money(inv.total_minor, inv.currency)},
+                 ip_address=client_ip(request))
+    db.commit()
+    return invoice_out(db, inv)
+
+
 @router.get("/orgs/{org_id}/invoices/{invoice_id}", response_model=InvoiceOut)
 def read_invoice(invoice_id: str, _: OrgContext = Depends(require(P.INVOICES_READ)), db: Session = Depends(get_db)):
     return invoice_out(db, _get_invoice(db, invoice_id))
@@ -334,6 +405,13 @@ def replace_draft(invoice_id: str, body: InvoiceIn, request: Request,
     if project_hours.has_hours(db, inv.id):
         raise HTTPException(status.HTTP_409_CONFLICT,
                             "this draft bills a project's hours; delete it and invoice the hours again")
+    if inv.debit_note_of_id:
+        if body.customer_id != inv.customer_id or (body.currency or svc.base_currency(db)) != inv.currency:
+            raise _unprocessable("a debit note keeps the customer and currency of the invoice it adjusts")
+        if body.reason is not None:
+            if not body.reason.strip():
+                raise _unprocessable("a debit note needs its reason")
+            inv.reason = body.reason.strip()
     _apply_header(db, inv, body)
     new_lines = _build_lines(db, body)
     for old in svc.lines_of(db, inv):

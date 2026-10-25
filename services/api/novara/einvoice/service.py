@@ -264,7 +264,10 @@ def invoice_document(db: Session, inv: Invoice) -> ubl.Document:
     if untaxed:
         per_tax.append((None, Decimal(0), untaxed, 0))
     posted = _utc(inv.posted_at)
-    return ubl.Document(number=inv.number, uuid="", kind=kind, type="invoice", issue_date=inv.issue_date,
+    original = db.get(Invoice, inv.debit_note_of_id) if inv.debit_note_of_id else None
+    return ubl.Document(number=inv.number, uuid="", kind=kind, type="debit" if original else "invoice",
+                        billing_reference=original.number if original else "", reason=inv.reason if original else "",
+                        issue_date=inv.issue_date,
                         issue_time=posted.time().replace(microsecond=0, tzinfo=None), currency=inv.currency, icv=0, pih="",
                         seller=seller(org, active(db)), buyer=_buyer(customer, kind),
                         lines=_lines(lines, taxes, inv.currency), groups=_groups(per_tax, taxes, inv.currency),

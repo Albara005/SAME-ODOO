@@ -426,3 +426,36 @@ test("multi-currency: a dollar invoice is booked in riyals and its payment shows
   await expect(page.getByText(/فرق صرف/)).toContainText("50.00");                  // 1,000 x (3.80 - 3.75)
   await page.screenshot({ path: "test-results/screens/invoice-usd-ar.png", fullPage: true });
 });
+
+test("debit note: more is charged on a posted invoice, numbered DN- and linked both ways", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await signUpAndIn(page, uniqueEmail("debit"));
+  await createOrg(page, "شركة الإشعارات");
+  const call = await apiFor(page);
+  const customer = await call("POST", "/customers", { name: "مؤسسة الواحة" });
+  const inv = await call("POST", "/invoices", {
+    customer_id: customer.id, issue_date: "2026-04-01",
+    lines: [{ description: "تصميم شعار", quantity: "1", unit_price: "1200" }],
+  });
+  const posted = await call("POST", `/invoices/${inv.id}/post`);
+  const orgPath = page.url().match(/\/o\/[0-9a-f-]+/)![0];
+
+  await page.goto(`${orgPath}/invoices/${inv.id}`);
+  await page.getByRole("link", { name: "إشعار مدين" }).click();
+  await expect(page.getByRole("heading", { name: `إشعار مدين على ⁦${posted.number}⁩` })).toBeVisible();
+  await expect(page.getByLabel("العميل")).toBeDisabled();
+  await page.getByLabel("سبب المبلغ الإضافي").fill("مراجعة إضافية لم تُذكر في الفاتورة");
+  await page.getByLabel("الوصف 1").fill("مراجعة إضافية");
+  await page.getByLabel("الكمية 1").fill("1");
+  await page.getByLabel("سعر الوحدة 1").fill("300");
+  await page.getByRole("button", { name: "حفظ كمسودة" }).click();
+  await expect(page.getByText("يعدّل الفاتورة")).toBeVisible();
+  await page.getByRole("button", { name: "ترحيل الفاتورة" }).click();
+  await expect(page.getByRole("heading", { name: /^DN-2026-00001/ })).toBeVisible();
+  await expect(page.getByText("إشعار مدين").first()).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/debit-note-ar.png", fullPage: true });
+
+  await page.getByRole("link", { name: posted.number }).click();
+  await expect(page.getByRole("heading", { name: "الإشعارات المدينة" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "DN-2026-00001" })).toBeVisible();
+});
