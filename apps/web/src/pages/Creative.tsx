@@ -466,6 +466,8 @@ function Motion({ kit, onKit }: { kit: Kit; onKit: (k: Kit) => void }) {
   const toast = useToast();
   const manage = can("brand.manage");
   const [replay, setReplay] = useState(0);
+  // The choice shows at once; the server's answer replaces it (or puts the old one back if saving fails).
+  const [choice, setChoice] = useState<Personality | null>(null);
   const set = useMutation({
     mutationFn: (body: { motion_personality?: Personality; motion_speed?: number }) =>
       unwrap(api.PATCH("/api/v1/orgs/{org_id}/creative/brand-kits/{kit_id}", { params: { path: { org_id: org.id, kit_id: kit.id } }, body })),
@@ -475,8 +477,10 @@ function Motion({ kit, onKit }: { kit: Kit; onKit: (k: Kit) => void }) {
       toast(t("creative.motionSaved"));
     },
     onError: (e) => toast(errorText(e, t("common.error")), "error"),
+    onSettled: () => setChoice(null),
   });
   const m = kit.motion;
+  const shown = choice ?? m.personality;
   return (
     <Card title={t("creative.motion")} actions={
       <Button size="sm" icon={<Play size={14} />} onClick={() => setReplay((n) => n + 1)}>{t("creative.motionReplay")}</Button>
@@ -487,9 +491,9 @@ function Motion({ kit, onKit }: { kit: Kit; onKit: (k: Kit) => void }) {
           <fieldset className="motion-choices" disabled={!manage || set.isPending}>
             <legend className="sr-only">{t("creative.motionPersonality")}</legend>
             {PERSONALITIES.map((p) => (
-              <label key={p} className={`motion-choice${m.personality === p ? " is-selected" : ""}`}>
-                <input type="radio" name="motion-personality" value={p} checked={m.personality === p}
-                  onChange={() => set.mutate({ motion_personality: p })} />
+              <label key={p} className={`motion-choice${shown === p ? " is-selected" : ""}`}>
+                <input type="radio" name="motion-personality" value={p} checked={shown === p}
+                  onChange={() => { setChoice(p); set.mutate({ motion_personality: p }); }} />
                 <strong>{t(`creative.motion.${p}`)}</strong>
                 <span className="small muted">{t(`creative.motion.${p}Hint`)}</span>
               </label>
