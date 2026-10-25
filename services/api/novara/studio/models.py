@@ -46,6 +46,7 @@ class AppVersion(IdMixin, TimestampMixin, TenantScoped, Base):
     files: Mapped[dict] = mapped_column(JSON, nullable=False)  # {path: sha256}
     checks: Mapped[list] = mapped_column(JSON, nullable=False)  # [{check, status, message, path}]
     checks_passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    screenshots: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)  # {desktop|mobile: sha256 of a PNG}
     author_kind: Mapped[str] = mapped_column(String(20), default="user", nullable=False)  # user | assistant
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
 

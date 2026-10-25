@@ -27,6 +27,15 @@ jobs:
       - name: System libraries (libcairo for logo PNG export, age for encrypted backups)
         run: sudo apt-get update && sudo apt-get install -y libcairo2 age
       - run: pip install -r requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Playwright and Chromium for App Studio's browser checks
+        working-directory: ${{ runner.temp }}
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+          echo "NOVARA_BROWSER_NODE_PATH=$PWD/node_modules" >> "$GITHUB_ENV"
       - name: Tests (SQLite)
         run: pytest
       - name: Create PostgreSQL roles

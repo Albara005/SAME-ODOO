@@ -13,6 +13,7 @@ from novara.ai.router import _usd as usd
 from novara.ai.tools import Tool, ToolContext, ToolRefused
 from novara.creative import color as C
 from novara.creative import logo as L
+from novara.creative import motion as M
 from novara.creative import service as svc
 from novara.creative.models import BrandKit, BrandLogo
 from novara.deps import OrgContext, client_ip, get_db, require
@@ -41,6 +42,16 @@ class KitUpdate(BaseModel):
     primary: str | None = Field(default=None, pattern=r"^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$")
     secondary: str | None = Field(default=None, pattern=r"^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$")
     font_pair: str | None = Field(default=None, pattern="^(kufi|plex|naskh|system)$")
+    motion_personality: str | None = Field(default=None, pattern="^(calm|lively|crisp|still)$")
+    motion_speed: float | None = Field(default=None, ge=0.5, le=2)
+
+
+class MotionOut(BaseModel):
+    personality: str
+    speed: float
+    tokens: dict[str, str]
+    notes: list[str]
+    css: str
 
 
 class LogoOut(BaseModel):
@@ -63,6 +74,7 @@ class KitOut(BaseModel):
     checks_pass: bool
     notes: list[str]
     adjustments: list[dict]
+    motion: MotionOut
     logos: list[LogoOut]
 
 
@@ -89,8 +101,14 @@ def _kit_out(db: Session, k: BrandKit) -> KitOut:
     return KitOut(id=k.id, name=k.name, tagline=k.tagline, primary_color=k.primary_color,
                   secondary_color=k.secondary_color, font_pair=k.font_pair, tokens=k.system["modes"],
                   checks_pass=k.system["all_checks_pass"], notes=k.system["notes"],
-                  adjustments=_adjustments(k),
+                  adjustments=_adjustments(k), motion=_motion_out(k),
                   logos=[_logo_out(l) for l in _logos(db, k)])
+
+
+def _motion_out(k: BrandKit) -> MotionOut:
+    m = svc.motion(k)
+    return MotionOut(personality=m["personality"], speed=m["speed"], tokens=m["tokens"], notes=m["notes"],
+                     css=M.to_css(m))
 
 
 def _kit(db: Session, kit_id: str) -> BrandKit:
@@ -156,6 +174,10 @@ def update_kit(kit_id: str, body: KitUpdate, request: Request, ctx: OrgContext =
         if "secondary" in changes:
             k.secondary_color = _norm(changes["secondary"])
         k.system = svc.system_for(k.primary_color, k.secondary_color)
+    if changes.get("motion_personality") is not None or changes.get("motion_speed") is not None:
+        current = k.motion or M.DEFAULT
+        k.motion = {"personality": changes.get("motion_personality") or current["personality"],
+                    "speed": changes.get("motion_speed") or current["speed"]}
     audit.record(db, actor_user_id=ctx.user.id, action="brand.updated", target_type="brand_kit", target_id=k.id,
                  details=changes, ip_address=client_ip(request))
     db.commit()
@@ -165,6 +187,12 @@ def update_kit(kit_id: str, body: KitUpdate, request: Request, ctx: OrgContext =
 @router.get("/orgs/{org_id}/creative/brand-kits/{kit_id}/tokens.css")
 def kit_css(kit_id: str, _: OrgContext = Depends(require(P.BRAND_READ)), db: Session = Depends(get_db)) -> Response:
     return Response(svc.css(_kit(db, kit_id)), media_type="text/css; charset=utf-8")
+
+
+@router.get("/orgs/{org_id}/creative/brand-kits/{kit_id}/motion.js")
+def kit_motion_script(kit_id: str, _: OrgContext = Depends(require(P.BRAND_READ)), db: Session = Depends(get_db)) -> Response:
+    _kit(db, kit_id)
+    return Response(M.SCRIPT, media_type="text/javascript")
 
 
 @router.get("/orgs/{org_id}/creative/brand-kits/{kit_id}/tokens.json")
@@ -232,7 +260,8 @@ def export_kit(kit_id: str, _: OrgContext = Depends(require(P.BRAND_READ)), db: 
 @router.post("/orgs/{org_id}/creative/brand-kits/{kit_id}/apply/{project_id}")
 def apply_to_app(kit_id: str, project_id: str, request: Request, ctx: OrgContext = Depends(require(P.BRAND_READ)),
                  db: Session = Depends(get_db)):
-    """Put the brand's tokens into an App Studio project's styles.css (working copy; the user cuts a version)."""
+    """Put the brand's tokens and motion into an App Studio project (working copy; the user cuts a version):
+    the brand block in styles.css, motion.js, and a link to it from each page."""
     from novara.studio.files import FileError
     from novara.studio.models import AppProject
     from novara.studio.service import ProjectFiles
@@ -247,6 +276,12 @@ def apply_to_app(kit_id: str, project_id: str, request: Request, ctx: OrgContext
     try:
         existing = pf.read("styles.css").decode("utf-8") if "styles.css" in project.working_files else ""
         pf.write("styles.css", svc.apply_to_stylesheet(existing, k).encode("utf-8"))
+        pf.write("motion.js", M.SCRIPT.encode("utf-8"))
+        for path in [p for p in project.working_files if p.endswith(".html")]:
+            page = pf.read(path).decode("utf-8", errors="replace")
+            linked = svc.apply_motion_script(page)
+            if linked != page:
+                pf.write(path, linked.encode("utf-8"))
     except FileError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
     audit.record(db, actor_user_id=ctx.user.id, action="brand.applied_to_app", target_type="app_project",
@@ -258,7 +293,7 @@ def apply_to_app(kit_id: str, project_id: str, request: Request, ctx: OrgContext
 # ---------------------------------------------------------------- design agent
 
 DESIGN_SYSTEM = """You are the design agent in NOVARA Creative Studio. You help the user find a visual identity: \
-colours and logo concepts for their brand.
+colours, logo concepts and motion for their brand.
 
 How you work:
 - Understand the brand: what it does, who it serves, the feeling it should give. Ask nothing; make sensible \
@@ -267,6 +302,8 @@ choices and explain them briefly.
 and say when the platform had to adjust a colour for readability.
 - Use propose_logo to create 2-4 distinct concepts (different layouts and symbols). The platform draws them; \
 you choose from its vocabulary. Never write SVG or code.
+- Use choose_motion once to set how the brand moves, to match its feeling (a clinic: calm; a toy shop: lively; \
+a law firm or bank: crisp). The platform keeps it accessible.
 - Keep names exactly as the user gave them. Arabic names read right to left; the platform handles that.
 - Reply in the user's language with one line per concept: what it is and why it suits the brand.
 """
@@ -306,18 +343,37 @@ def _propose(t: ToolContext, a: ProposeArgs):
     return {"logo_id": logo.id, "stored": True}
 
 
+class MotionArgs(BaseModel):
+    personality: str = Field(pattern="^(calm|lively|crisp|still)$",
+                             description="calm: gentle and unhurried; lively: playful, a little bounce; crisp: quick "
+                                         "and precise; still: fades only, no movement")
+    speed: float = Field(default=1.0, ge=0.5, le=2, description="1 is the personality's own pace; 0.8 faster, 1.25 slower")
+    rationale: str = Field(default="", max_length=400)
+
+
+def _choose_motion(t: ToolContext, a: MotionArgs):
+    kit = t.extra["kit"]
+    kit.motion = {"personality": a.personality, "speed": a.speed}
+    t.db.flush()
+    m = svc.motion(kit)
+    return {"personality": a.personality, "durations": [m["tokens"][k] for k in ("motion-fast", "motion-base", "motion-slow")],
+            "notes": m["notes"]}
+
+
 DESIGN_TOOLS: dict[str, Tool] = {t.name: t for t in [
     Tool("preview_palette", "Build and check a colour system for a brand colour (nothing is saved).",
          P.BRAND_MANAGE, "read", PaletteArgs, _preview),
     Tool("propose_logo", "Draw a logo concept from a spec and add it to the brand kit as a concept.",
          P.BRAND_MANAGE, "edit", ProposeArgs, _propose),
+    Tool("choose_motion", "Set how the brand moves in apps (a motion personality and speed).",
+         P.BRAND_MANAGE, "edit", MotionArgs, _choose_motion),
 ]}
 
 
 @router.post("/orgs/{org_id}/creative/brand-kits/{kit_id}/concepts")
 def design_concepts(kit_id: str, body: ConceptIn, request: Request, ctx: OrgContext = Depends(require(P.BRAND_MANAGE)),
                     db: Session = Depends(get_db)):
-    """Ask the design agent for logo concepts. They are added to the kit; nothing else changes."""
+    """Ask the design agent for logo concepts (added to the kit) and how the brand moves; nothing else changes."""
     if not ctx.has(P.AI_USE):
         raise HTTPException(status.HTTP_403_FORBIDDEN, f"missing permission: {P.AI_USE}")
     k = _kit(db, kit_id)
@@ -337,4 +393,4 @@ def design_concepts(kit_id: str, body: ConceptIn, request: Request, ctx: OrgCont
     new = [l for l in _logos(db, k) if l.id not in before]
     db.commit()
     return {"reply": result.reply, "stop": result.stop, "concepts": [_logo_out(l) for l in new],
-            "cost_usd": usd(sum(u.cost_micros for u in result.usage))}
+            "motion": _motion_out(k), "cost_usd": usd(sum(u.cost_micros for u in result.usage))}

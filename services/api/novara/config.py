@@ -52,8 +52,15 @@ class Settings:
     vapid_private_key: str = ""
     vapid_subject: str = ""
     push_hosts: list[str] = field(default_factory=list)
+    # App Studio browser checks (novara/studio/browser.py): "on" loads each version's pages in headless Chromium.
+    # On by default outside production; in production turn it on where Chromium's sandbox works.
+    browser_checks: str = "off"
+    browser_sandbox: bool = True
+    browser_node_path: str = ""   # where Node.js finds the playwright package (NODE_PATH)
 
     def validate(self) -> None:
+        if self.browser_checks not in ("on", "off"):
+            raise RuntimeError("NOVARA_BROWSER_CHECKS must be on or off")
         if self.env == "production" and self.jwt_secret == _DEV_SECRET:
             raise RuntimeError("NOVARA_JWT_SECRET must be set in production")
         if len(self.jwt_secret) < 32:
@@ -74,6 +81,7 @@ class Settings:
 
 def load_settings() -> Settings:
     env = os.environ
+    production = env.get("NOVARA_ENV", "development") == "production"
     settings = Settings(
         env=env.get("NOVARA_ENV", "development"),
         database_url=env.get("NOVARA_DATABASE_URL", Settings.database_url),
@@ -104,6 +112,9 @@ def load_settings() -> Settings:
         vapid_private_key=env.get("NOVARA_VAPID_PRIVATE_KEY", ""),
         vapid_subject=env.get("NOVARA_VAPID_SUBJECT", ""),
         push_hosts=[h for h in env.get("NOVARA_PUSH_HOSTS", "").split(",") if h.strip()],
+        browser_checks=env.get("NOVARA_BROWSER_CHECKS", "off" if production else "on").lower(),
+        browser_sandbox=env.get("NOVARA_BROWSER_SANDBOX", "true" if production else "false").lower() != "false",
+        browser_node_path=env.get("NOVARA_BROWSER_NODE_PATH", env.get("NODE_PATH", "")),
     )
     settings.validate()
     return settings

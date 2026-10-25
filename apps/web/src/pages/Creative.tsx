@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Download, FileCode2, Paintbrush, Plus, Sparkles, Star, Wand2 } from "lucide-react";
+import { CheckCircle2, Download, FileCode2, Paintbrush, Play, Plus, Sparkles, Star, Wand2 } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
@@ -28,6 +28,8 @@ const HEX = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/;
 const FONTS = ["kufi", "plex", "naskh", "system"] as const;
 const LAYOUTS = ["horizontal", "stacked", "wordmark", "icon"] as const;
 const SYMBOLS = ["circle", "rounded_square", "hexagon", "diamond", "arch", "none"] as const;
+const PERSONALITIES = ["calm", "lively", "crisp", "still"] as const;
+const SPEEDS = ["0.75", "1", "1.25", "1.5"] as const;
 
 function usePalette(primary: string, secondary: string) {
   const { org } = useOrg();
@@ -323,6 +325,7 @@ function BrandKit({ kit }: { kit: Kit }) {
         </div>
       </Card>
       <Logos kit={kit} onKit={setKit} />
+      <Motion kit={kit} onKit={setKit} />
       {manage && can("ai.use") && <DesignAgent kit={kit} />}
       {applying && <ApplyDialog kit={kit} onClose={() => setApplying(false)} />}
     </div>
@@ -453,6 +456,84 @@ function LogoDialog({ kit, onClose, onDone }: { kit: Kit; onClose: () => void; o
       </form>
     </Dialog>
   );
+}
+
+type Personality = Kit["motion"]["personality"];
+
+function Motion({ kit, onKit }: { kit: Kit; onKit: (k: Kit) => void }) {
+  const { t } = useI18n();
+  const { org, can } = useOrg();
+  const toast = useToast();
+  const manage = can("brand.manage");
+  const [replay, setReplay] = useState(0);
+  const set = useMutation({
+    mutationFn: (body: { motion_personality?: Personality; motion_speed?: number }) =>
+      unwrap(api.PATCH("/api/v1/orgs/{org_id}/creative/brand-kits/{kit_id}", { params: { path: { org_id: org.id, kit_id: kit.id } }, body })),
+    onSuccess: (k) => {
+      onKit(k);
+      setReplay((n) => n + 1);
+      toast(t("creative.motionSaved"));
+    },
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const m = kit.motion;
+  return (
+    <Card title={t("creative.motion")} actions={
+      <Button size="sm" icon={<Play size={14} />} onClick={() => setReplay((n) => n + 1)}>{t("creative.motionReplay")}</Button>
+    }>
+      <div className="motion-layout">
+        <div className="stack-sm">
+          <p className="muted small">{t("creative.motionHint")}</p>
+          <fieldset className="motion-choices" disabled={!manage || set.isPending}>
+            <legend className="sr-only">{t("creative.motionPersonality")}</legend>
+            {PERSONALITIES.map((p) => (
+              <label key={p} className={`motion-choice${m.personality === p ? " is-selected" : ""}`}>
+                <input type="radio" name="motion-personality" value={p} checked={m.personality === p}
+                  onChange={() => set.mutate({ motion_personality: p })} />
+                <strong>{t(`creative.motion.${p}`)}</strong>
+                <span className="small muted">{t(`creative.motion.${p}Hint`)}</span>
+              </label>
+            ))}
+          </fieldset>
+          <Field label={t("creative.motionSpeed")}>
+            <Select value={String(m.speed)} disabled={!manage || set.isPending || m.personality === "still"}
+              onChange={(e) => set.mutate({ motion_speed: Number(e.target.value) })}>
+              {(SPEEDS as readonly string[]).includes(String(m.speed)) ? null : <option value={String(m.speed)}>{`×${m.speed}`}</option>}
+              {SPEEDS.map((v) => <option key={v} value={v}>{t(`creative.motionSpeed.${v}`)}</option>)}
+            </Select>
+          </Field>
+          <p className="small">{t("creative.motionDurations", {
+            fast: m.tokens["motion-fast"] ?? "", base: m.tokens["motion-base"] ?? "", slow: m.tokens["motion-slow"] ?? "" })}</p>
+          {m.notes.map((n) => <p key={n} className="small muted" dir="ltr">{n}</p>)}
+        </div>
+        <MotionPreview key={`${m.personality}-${m.speed}-${replay}`} css={m.css} tokens={kit.tokens.light as Tokens} name={kit.name} />
+      </div>
+    </Card>
+  );
+}
+
+/** The motion on sample content, in an iframe of its own: the generated CSS as an app would use it. */
+function MotionPreview({ css, tokens, name }: { css: string; tokens: Tokens; name: string }) {
+  const { t, lang } = useI18n();
+  const esc = (text: string) => text.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+  const cards = [1, 2, 3].map((n) =>
+    `<div class="card motion-rise motion-lift" style="--motion-order:${n + 1}">${esc(t("creative.motionSampleCard", { n }))}</div>`).join("");
+  const doc = `<!doctype html><html lang="${lang}" dir="${lang === "ar" ? "rtl" : "ltr"}"><head><meta charset="utf-8"><style>
+body{margin:0;padding:16px;font:14px/1.6 system-ui,"Segoe UI",Tahoma,sans-serif;background:${tokens["color-bg"]};color:${tokens["color-text"]}}
+h1{font-size:20px;margin:0 0 4px}p{margin:0 0 12px;color:${tokens["color-text-muted"]}}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.card{padding:16px 8px;border-radius:10px;background:${tokens["color-surface"]};border:1px solid ${tokens["color-border"]};text-align:center}
+.row{display:flex;gap:8px;align-items:center}
+button{font:inherit;padding:8px 16px;border:0;border-radius:8px;background:${tokens["color-primary"]};color:${tokens["color-on-primary"]};cursor:pointer}
+.badge{padding:2px 10px;border-radius:999px;background:${tokens["color-primary"]};color:${tokens["color-on-primary"]};font-size:12px;display:inline-block}
+${css}</style></head><body>
+<h1 class="motion-rise">${esc(t("creative.motionSample", { name }))}</h1>
+<p class="motion-fade" style="--motion-order:1">${esc(t("creative.motionSampleText"))}</p>
+<div class="cards">${cards}</div>
+<div class="row motion-slide" style="--motion-order:5"><button class="motion-press" type="button">${esc(t("creative.motionSampleButton"))}</button>
+<span class="badge motion-pulse">${esc(t("creative.motionSampleNew"))}</span></div>
+</body></html>`;
+  return <iframe className="motion-preview" title={t("creative.motionPreview")} sandbox="" srcDoc={doc} />;
 }
 
 function DesignAgent({ kit }: { kit: Kit }) {

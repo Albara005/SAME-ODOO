@@ -72,6 +72,7 @@ class VersionOut(BaseModel):
     author_kind: str
     checks_passed: bool
     checks: list[CheckOut]
+    screenshots: list[str]      # desktop, mobile: the home page in a browser, when the check ran
     files: int
     created_at: datetime
 
@@ -113,8 +114,8 @@ def _project_out(db: Session, p: AppProject) -> ProjectOut:
 
 def _version_out(v: AppVersion) -> VersionOut:
     return VersionOut(id=v.id, number=v.number, message=v.message, author_kind=v.author_kind,
-                      checks_passed=v.checks_passed, checks=[CheckOut(**c) for c in v.checks], files=len(v.files),
-                      created_at=v.created_at)
+                      checks_passed=v.checks_passed, checks=[CheckOut(**c) for c in v.checks],
+                      screenshots=sorted(v.screenshots or {}), files=len(v.files), created_at=v.created_at)
 
 
 def _site_url(request: Request, key: str) -> str:
@@ -278,6 +279,17 @@ def export_version(project_id: str, number: int, request: Request, _: OrgContext
     data = svc.export_zip(request.app.state.storage, p, _version(db, p, number))
     return Response(data, media_type="application/zip",
                     headers={"Content-Disposition": f'attachment; filename="{p.slug}-v{number}.zip"'})
+
+
+@router.get("/orgs/{org_id}/studio/projects/{project_id}/versions/{number}/screenshots/{kind}.png")
+def version_screenshot(project_id: str, number: int, kind: str, request: Request,
+                       _: OrgContext = Depends(require(P.APPS_READ)), db: Session = Depends(get_db)) -> Response:
+    p = _project(db, project_id)
+    sha = (_version(db, p, number).screenshots or {}).get(kind)
+    if sha is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such screenshot")
+    return Response(get_blob(request.app.state.storage, p.organization_id, sha), media_type="image/png",
+                    headers={"Cache-Control": "private, max-age=86400"})
 
 
 @router.post("/orgs/{org_id}/studio/projects/{project_id}/deployments", response_model=DeploymentOut,

@@ -8,7 +8,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, tokenStore, toApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { StarMark } from "../components/Art";
-import { StatusBadge, Tabs, download } from "../components/business";
+import { StatusBadge, Tabs, download, useBlobUrl } from "../components/business";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, Loading, PageHeader, QueryView, Select, Textarea,
   errorText, useToast,
@@ -553,12 +553,43 @@ function VersionsTab({ project: p, onChanged }: { project: Project; onChanged: (
                   </span>
                 </div>
                 {!v.checks_passed && <ChecksList checks={v.checks} />}
+                {v.checks_passed && v.checks.some((c) => c.status === "warn") && (
+                  <details className="small">
+                    <summary>{t("studio.warnings", { n: v.checks.filter((c) => c.status === "warn").length })}</summary>
+                    <ChecksList checks={v.checks} />
+                  </details>
+                )}
+                {v.screenshots.length > 0 && <VersionShots project={p} version={v.number} kinds={v.screenshots} />}
               </Card>
             ))}
           </div>
         )
       }
     </QueryView>
+  );
+}
+
+/** What the browser check saw: the home page on a desktop and a phone screen. */
+function VersionShots({ project: p, version, kinds }: { project: Project; version: number; kinds: string[] }) {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  const base = `/api/v1/orgs/${org.id}/studio/projects/${p.id}/versions/${version}/screenshots`;
+  return (
+    <figure className="version-shots" aria-label={t("studio.shots")}>
+      {(["desktop", "mobile"] as const).filter((k) => kinds.includes(k)).map((k) => (
+        <Shot key={k} src={`${base}/${k}.png`} label={t(k === "desktop" ? "studio.shotDesktop" : "studio.shotMobile")} kind={k} />
+      ))}
+    </figure>
+  );
+}
+
+function Shot({ src, label, kind }: { src: string; label: string; kind: "desktop" | "mobile" }) {
+  const url = useBlobUrl(src);
+  return (
+    <a className={`version-shot version-shot-${kind}`} href={url} target="_blank" rel="noreferrer">
+      {url ? <img src={url} alt={label} loading="lazy" /> : <span className="version-shot-blank" aria-hidden />}
+      <span className="small muted">{label}</span>
+    </a>
   );
 }
 

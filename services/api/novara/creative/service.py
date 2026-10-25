@@ -9,6 +9,7 @@ import zipfile
 
 from novara.creative import color as C
 from novara.creative import logo as L
+from novara.creative import motion as M
 from novara.creative.models import BrandKit, BrandLogo
 
 # Web font stacks for apps (the logo itself is outlined, so it needs no font at all).
@@ -45,16 +46,23 @@ def render_logo(kit: BrandKit, logo: BrandLogo, variant: str = "full") -> str:
     return L.render(spec, logo_colors(kit, variant), variant="icon" if variant == "icon" else "full")
 
 
+def motion(kit: BrandKit) -> dict:
+    m = kit.motion or M.DEFAULT
+    return M.build(m.get("personality", "calm"), float(m.get("speed", 1.0)))
+
+
 def css(kit: BrandKit) -> str:
     fonts = FONT_PAIRS[kit.font_pair]
-    return C.to_css(kit.system, extra={"font-heading": fonts["heading"], "font-body": fonts["body"],
-                                       # aliases for the App Studio static template's token names
-                                       "color-muted": "var(--color-text-muted)", "font": "var(--font-body)"})
+    colours = C.to_css(kit.system, extra={"font-heading": fonts["heading"], "font-body": fonts["body"],
+                                          # aliases for the App Studio static template's token names
+                                          "color-muted": "var(--color-text-muted)", "font": "var(--font-body)"})
+    return colours + "\n" + M.to_css(motion(kit))
 
 
 def tokens_json(kit: BrandKit) -> dict:
     return {"name": kit.name, "primary": kit.system["primary"], "secondary": kit.system["secondary"],
-            "fonts": FONT_PAIRS[kit.font_pair], "modes": kit.system["modes"], "scales": kit.system["scales"]}
+            "fonts": FONT_PAIRS[kit.font_pair], "modes": kit.system["modes"], "scales": kit.system["scales"],
+            "motion": motion(kit)}
 
 
 def guide(kit: BrandKit, logos: list[BrandLogo]) -> str:
@@ -86,6 +94,9 @@ Brand colour: `{kit.system['primary']}`""" + (f", secondary `{kit.system['second
 - Headings: {FONT_PAIRS[kit.font_pair]['heading']}
 - Body: {FONT_PAIRS[kit.font_pair]['body']}
 
+## Motion
+""" + _motion_guide(kit) + f"""
+
 ## Logo
 - Files: `logo.svg` (main), `logo-icon.svg` (square: app icons, favicons, avatars), `logo-mono.svg` (one colour),
   `logo-inverse.svg` (on dark backgrounds). PNG files are the same artwork rasterised.
@@ -99,6 +110,22 @@ Logo lettering is drawn from Noto Kufi Arabic (SIL Open Font License 1.1).
 """
 
 
+def _motion_guide(kit: BrandKit) -> str:
+    m = motion(kit)
+    t = m["tokens"]
+    usage = "\n".join(f"| `{name}` | {what} |" for name, what in M.USAGE)
+    notes = "".join(f"\n- {n}" for n in m["notes"])
+    return f"""Personality: **{m['personality']}** (speed x{m['speed']:g}). Durations: {t['motion-fast']} for hovers and presses,
+{t['motion-base']} for small elements, {t['motion-slow']} for sections entering; elements travel {t['motion-distance']}.
+Everything that moves is off for people who ask their device for reduced motion, nothing loops or flashes,
+and slides follow the reading direction (they mirror in Arabic). The classes are in `tokens.css`; `motion.js`
+reveals `data-reveal` elements on scroll.{notes}
+
+| Class | What it does |
+|---|---|
+{usage}"""
+
+
 def export_zip(kit: BrandKit, logos: list[BrandLogo]) -> bytes:
     buf = io.BytesIO()
     main = next((l for l in logos if l.primary), logos[0] if logos else None)
@@ -106,6 +133,7 @@ def export_zip(kit: BrandKit, logos: list[BrandLogo]) -> bytes:
         z.writestr("tokens.css", css(kit))
         z.writestr("tokens.json", json.dumps(tokens_json(kit), ensure_ascii=False, indent=2))
         z.writestr("brand-guide.md", guide(kit, logos))
+        z.writestr("motion.js", M.SCRIPT)
         if main is not None:
             for variant, name in (("full", "logo"), ("icon", "logo-icon"), ("mono", "logo-mono"),
                                   ("inverse", "logo-inverse")):
@@ -120,6 +148,16 @@ def export_zip(kit: BrandKit, logos: list[BrandLogo]) -> bytes:
                     z.writestr("PNG-NOT-INCLUDED.txt", "This server can't rasterise SVG (cairosvg/libcairo missing). "
                                                        "The SVG files are complete; export PNGs from them.\n")
     return buf.getvalue()
+
+
+MOTION_TAG = '<script src="motion.js" defer></script>'
+
+
+def apply_motion_script(html: str) -> str:
+    """Link motion.js from a page once, in its <head>; pages without a <head> are left as they are."""
+    if "motion.js" in html or "</head>" not in html:
+        return html
+    return html.replace("</head>", f"  {MOTION_TAG}\n</head>", 1)
 
 
 def apply_to_stylesheet(existing: str, kit: BrandKit) -> str:

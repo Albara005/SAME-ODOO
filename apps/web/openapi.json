@@ -4913,6 +4913,9 @@
       "title": "Logos",
       "type": "array"
      },
+     "motion": {
+      "$ref": "#/components/schemas/MotionOut"
+     },
      "name": {
       "title": "Name",
       "type": "string"
@@ -4959,6 +4962,7 @@
      "checks_pass",
      "notes",
      "adjustments",
+     "motion",
      "logos"
     ],
     "title": "KitOut",
@@ -4977,6 +4981,31 @@
        }
       ],
       "title": "Font Pair"
+     },
+     "motion_personality": {
+      "anyOf": [
+       {
+        "pattern": "^(calm|lively|crisp|still)$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Motion Personality"
+     },
+     "motion_speed": {
+      "anyOf": [
+       {
+        "maximum": 2.0,
+        "minimum": 0.5,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Motion Speed"
      },
      "name": {
       "anyOf": [
@@ -6145,6 +6174,45 @@
      "otpauth_uri"
     ],
     "title": "MfaSetupOut",
+    "type": "object"
+   },
+   "MotionOut": {
+    "properties": {
+     "css": {
+      "title": "Css",
+      "type": "string"
+     },
+     "notes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+     },
+     "personality": {
+      "title": "Personality",
+      "type": "string"
+     },
+     "speed": {
+      "title": "Speed",
+      "type": "number"
+     },
+     "tokens": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Tokens",
+      "type": "object"
+     }
+    },
+    "required": [
+     "personality",
+     "speed",
+     "tokens",
+     "notes",
+     "css"
+    ],
+    "title": "MotionOut",
     "type": "object"
    },
    "MoveOut": {
@@ -12815,6 +12883,13 @@
      "number": {
       "title": "Number",
       "type": "integer"
+     },
+     "screenshots": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Screenshots",
+      "type": "array"
      }
     },
     "required": [
@@ -12824,6 +12899,7 @@
      "author_kind",
      "checks_passed",
      "checks",
+     "screenshots",
      "files",
      "created_at"
     ],
@@ -18540,7 +18616,7 @@
   },
   "/api/v1/orgs/{org_id}/creative/brand-kits/{kit_id}/apply/{project_id}": {
    "post": {
-    "description": "Put the brand's tokens into an App Studio project's styles.css (working copy; the user cuts a version).",
+    "description": "Put the brand's tokens and motion into an App Studio project (working copy; the user cuts a version):\nthe brand block in styles.css, motion.js, and a link to it from each page.",
     "operationId": "apply_to_app_api_v1_orgs__org_id__creative_brand_kits__kit_id__apply__project_id__post",
     "parameters": [
      {
@@ -18604,7 +18680,7 @@
   },
   "/api/v1/orgs/{org_id}/creative/brand-kits/{kit_id}/concepts": {
    "post": {
-    "description": "Ask the design agent for logo concepts. They are added to the kit; nothing else changes.",
+    "description": "Ask the design agent for logo concepts (added to the kit) and how the brand moves; nothing else changes.",
     "operationId": "design_concepts_api_v1_orgs__org_id__creative_brand_kits__kit_id__concepts_post",
     "parameters": [
      {
@@ -18942,6 +19018,60 @@
      }
     ],
     "summary": "Choose Logo",
+    "tags": [
+     "creative-studio"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/creative/brand-kits/{kit_id}/motion.js": {
+   "get": {
+    "operationId": "kit_motion_script_api_v1_orgs__org_id__creative_brand_kits__kit_id__motion_js_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "kit_id",
+      "required": true,
+      "schema": {
+       "title": "Kit Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Kit Motion Script",
     "tags": [
      "creative-studio"
     ]
@@ -29422,6 +29552,78 @@
      }
     ],
     "summary": "Restore Version",
+    "tags": [
+     "app-studio"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/studio/projects/{project_id}/versions/{number}/screenshots/{kind}.png": {
+   "get": {
+    "operationId": "version_screenshot_api_v1_orgs__org_id__studio_projects__project_id__versions__number__screenshots__kind__png_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "project_id",
+      "required": true,
+      "schema": {
+       "title": "Project Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "number",
+      "required": true,
+      "schema": {
+       "title": "Number",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "path",
+      "name": "kind",
+      "required": true,
+      "schema": {
+       "title": "Kind",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Version Screenshot",
     "tags": [
      "app-studio"
     ]

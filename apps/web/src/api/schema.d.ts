@@ -1531,7 +1531,8 @@ export interface paths {
         put?: never;
         /**
          * Apply To App
-         * @description Put the brand's tokens into an App Studio project's styles.css (working copy; the user cuts a version).
+         * @description Put the brand's tokens and motion into an App Studio project (working copy; the user cuts a version):
+         *     the brand block in styles.css, motion.js, and a link to it from each page.
          */
         post: operations["apply_to_app_api_v1_orgs__org_id__creative_brand_kits__kit_id__apply__project_id__post"];
         delete?: never;
@@ -1551,7 +1552,7 @@ export interface paths {
         put?: never;
         /**
          * Design Concepts
-         * @description Ask the design agent for logo concepts. They are added to the kit; nothing else changes.
+         * @description Ask the design agent for logo concepts (added to the kit) and how the brand moves; nothing else changes.
          */
         post: operations["design_concepts_api_v1_orgs__org_id__creative_brand_kits__kit_id__concepts_post"];
         delete?: never;
@@ -1622,6 +1623,23 @@ export interface paths {
         put?: never;
         /** Choose Logo */
         post: operations["choose_logo_api_v1_orgs__org_id__creative_brand_kits__kit_id__logos__logo_id__primary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/creative/brand-kits/{kit_id}/motion.js": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kit Motion Script */
+        get: operations["kit_motion_script_api_v1_orgs__org_id__creative_brand_kits__kit_id__motion_js_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3918,6 +3936,23 @@ export interface paths {
          * @description Put an earlier version back into the working copy. Versions themselves never change.
          */
         post: operations["restore_version_api_v1_orgs__org_id__studio_projects__project_id__versions__number__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/studio/projects/{project_id}/versions/{number}/screenshots/{kind}.png": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Version Screenshot */
+        get: operations["version_screenshot_api_v1_orgs__org_id__studio_projects__project_id__versions__number__screenshots__kind__png_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6598,6 +6633,7 @@ export interface components {
             id: string;
             /** Logos */
             logos: components["schemas"]["LogoOut"][];
+            motion: components["schemas"]["MotionOut"];
             /** Name */
             name: string;
             /** Notes */
@@ -6615,6 +6651,10 @@ export interface components {
         KitUpdate: {
             /** Font Pair */
             font_pair?: string | null;
+            /** Motion Personality */
+            motion_personality?: string | null;
+            /** Motion Speed */
+            motion_speed?: number | null;
             /** Name */
             name?: string | null;
             /** Primary */
@@ -7059,6 +7099,21 @@ export interface components {
             otpauth_uri: string;
             /** Secret */
             secret: string;
+        };
+        /** MotionOut */
+        MotionOut: {
+            /** Css */
+            css: string;
+            /** Notes */
+            notes: string[];
+            /** Personality */
+            personality: string;
+            /** Speed */
+            speed: number;
+            /** Tokens */
+            tokens: {
+                [key: string]: string;
+            };
         };
         /** MoveOut */
         MoveOut: {
@@ -9542,6 +9597,8 @@ export interface components {
             message: string;
             /** Number */
             number: number;
+            /** Screenshots */
+            screenshots: string[];
         };
     };
     responses: never;
@@ -13077,6 +13134,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kit_motion_script_api_v1_orgs__org_id__creative_brand_kits__kit_id__motion_js_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kit_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -18771,6 +18860,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_screenshot_api_v1_orgs__org_id__studio_projects__project_id__versions__number__screenshots__kind__png_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: string;
+                number: number;
+                kind: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

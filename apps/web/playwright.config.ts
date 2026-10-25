@@ -37,6 +37,10 @@ export default defineConfig({
         NOVARA_LIVE_INTERVAL_SECONDS: "0.5",
         // A host name, not an IP address: passkeys are bound to it (browsers refuse IPs as the relying party).
         NOVARA_APP_BASE_URL: "http://localhost:4173",
+        // App Studio's browser checks use this app's own Playwright and Chromium.
+        NOVARA_BROWSER_CHECKS: "on",
+        NOVARA_BROWSER_SANDBOX: "false",
+        NOVARA_BROWSER_NODE_PATH: path.resolve(here, "node_modules"),
       },
       url: "http://127.0.0.1:8000/health",
       reuseExistingServer: false,

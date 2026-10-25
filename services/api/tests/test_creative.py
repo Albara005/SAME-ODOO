@@ -189,7 +189,7 @@ def test_design_agent_proposes_concepts_through_the_vocabulary_only(api, kit):
     palette = kit["ai"].requests[1]["messages"][-1]["content"][0]["content"]
     assert "all_checks_pass" in palette
     assert kit["ai"].requests[4]["messages"][-1]["content"][0].get("is_error") is True   # spiral refused
-    assert {t["name"] for t in kit["ai"].requests[0]["tools"]} == {"preview_palette", "propose_logo"}
+    assert {t["name"] for t in kit["ai"].requests[0]["tools"]} == {"preview_palette", "propose_logo", "choose_motion"}
 
 
 def test_brand_permissions(api, kit):

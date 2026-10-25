@@ -20,6 +20,8 @@ class BrandKit(IdMixin, TimestampMixin, TenantScoped, Base):
     font_pair: Mapped[str] = mapped_column(String(30), default="kufi", nullable=False)
     # Derived from the colours; regenerated whenever they change.
     system: Mapped[dict] = mapped_column(JSON, nullable=False)
+    # How the brand moves: {"personality": calm|lively|crisp|still, "speed": 0.5-2} (creative/motion.py).
+    motion: Mapped[dict] = mapped_column(JSON, default=lambda: {"personality": "calm", "speed": 1.0}, nullable=False)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
 
 

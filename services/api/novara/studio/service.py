@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from novara.db import utcnow
 from novara.modules.files.storage import ObjectStorage
+from novara.studio import browser
 from novara.studio import checks as C
 from novara.studio.files import FileError, check_limits, clean_path, get_blob, put_blob
 from novara.studio.models import AppDeployment, AppProject, AppVersion, SiteRoute
@@ -89,9 +90,16 @@ def is_dirty(db: Session, project: AppProject) -> bool:
     return latest is None or latest.files != project.working_files
 
 
+def check_files(project: AppProject, files: dict[str, bytes]) -> tuple[list[C.CheckResult], dict[str, bytes]]:
+    """The template's checks, then the pages in a browser (when the server can): results and screenshots."""
+    results = C.run_checks(TEMPLATES[project.template], files)
+    checker = browser.current()
+    report = checker.run(files) if checker is not None else browser.BrowserReport()
+    return results + report.results, report.screenshots
+
+
 def check_working_copy(storage: ObjectStorage, project: AppProject) -> list[C.CheckResult]:
-    pf = ProjectFiles(storage, project)
-    return C.run_checks(pf.template, pf.read_all())
+    return check_files(project, ProjectFiles(storage, project).read_all())[0]
 
 
 def cut_version(db: Session, storage: ObjectStorage, project: AppProject, *, message: str, user_id: str,
@@ -99,11 +107,12 @@ def cut_version(db: Session, storage: ObjectStorage, project: AppProject, *, mes
     """Snapshot the working copy as a new immutable version and record its check results."""
     if not is_dirty(db, project):
         raise StudioStateError("nothing changed since the last version")
-    results = check_working_copy(storage, project)
+    results, screenshots = check_files(project, ProjectFiles(storage, project).read_all())
     number = (db.scalar(select(func.coalesce(func.max(AppVersion.number), 0))
                         .where(AppVersion.project_id == project.id)) or 0) + 1
     version = AppVersion(project_id=project.id, number=number, message=message, files=dict(project.working_files),
                          checks=[r.as_dict() for r in results], checks_passed=C.passed(results),
+                         screenshots={kind: put_blob(storage, project.organization_id, png) for kind, png in screenshots.items()},
                          author_kind=author_kind, created_by=user_id)
     db.add(version)
     project.base_version = number

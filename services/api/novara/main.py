@@ -49,6 +49,7 @@ from novara.modules.organizations.router import router as organizations_router
 from novara.payments.router import public_router as public_payments_router, router as payments_router
 from novara.einvoice.router import router as einvoice_router
 from novara import push
+from novara.studio import browser as studio_browser
 
 # Import models so they are registered on Base.metadata.
 from novara.modules.access import models as _access_models  # noqa: F401
@@ -106,6 +107,8 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     # Web Push to members' devices: every notification goes out after its transaction commits.
     app.state.push = push.PushSender(settings, app.state.sessionmaker)
     push.configure(app.state.push)
+    # App Studio: each version's pages loaded in headless Chromium (when enabled and installed).
+    studio_browser.configure(studio_browser.BrowserChecker(settings))
 
     @app.exception_handler(PeriodLocked)
     def closed_books(_request: Request, exc: PeriodLocked) -> JSONResponse:

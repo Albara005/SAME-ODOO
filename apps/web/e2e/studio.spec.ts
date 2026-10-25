@@ -42,6 +42,22 @@ test("Creative Studio: brand kit, live palette, logo, recolour, apply to an app"
   await expect(page.getByText("تم تحديث الألوان")).toBeVisible();
   await page.screenshot({ path: "test-results/screens/creative-kit-ar.png", fullPage: true });
 
+  // Motion: a personality, its preview, and nothing moving for people who ask for reduced motion.
+  await page.getByRole("radio", { name: /حيوية/ }).check();
+  await expect(page.getByText(/حُدّثت الحركة/)).toBeVisible();
+  await expect(page.getByRole("radio", { name: /حيوية/ })).toBeChecked();
+  await page.getByLabel("السرعة").selectOption({ label: "أبطأ" });
+  await expect(page.getByText("دخول الأقسام \u2066475ms\u2069", { exact: false })).toBeVisible();
+  const heading = page.frameLocator('iframe[title="معاينة الحركة"]').getByRole("heading", { name: /مخبز الوردة/ });
+  await expect(heading).toBeVisible();
+  const animation = () => heading.evaluate((el) => getComputedStyle(el).animationName);
+  expect(await animation()).toBe("motion-rise");
+  await page.screenshot({ path: "test-results/screens/creative-motion-ar.png", fullPage: true });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "إعادة التشغيل" }).click();
+  await expect.poll(animation).toBe("none");
+  await page.emulateMedia({ reducedMotion: null });
+
   await page.getByRole("button", { name: "استخدامها في تطبيق" }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("التطبيق").selectOption({ label: "متجر الوردة" });
@@ -80,6 +96,12 @@ test("App Studio: edit, review the diff, version, preview, approved production",
 
   await page.getByRole("tab", { name: "الإصدارات" }).click();
   await expect(page.getByText("الفحوص ناجحة")).toBeVisible();
+  // The browser check loaded the page on a desktop and a phone screen and kept what it saw.
+  const shots = page.getByRole("figure", { name: "الصفحة الرئيسية في المتصفح" });
+  await expect(shots.getByRole("img", { name: "شاشة كبيرة" })).toBeVisible();
+  await expect(shots.getByRole("img", { name: "هاتف" })).toBeVisible();
+  expect(await shots.getByRole("img", { name: "هاتف" }).evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(390);
+  await page.screenshot({ path: "test-results/screens/studio-versions-ar.png" });
   await page.getByRole("button", { name: "معاينة" }).click();
   await expect(page.getByText(/المعاينة تعمل الآن/)).toBeVisible();
   await page.getByRole("button", { name: "الإنتاج" }).click();
