@@ -705,6 +705,9 @@ function DataTab({ project: p }: { project: Project }) {
                       <td>
                         <span className="row" style={{ gap: 4 }}>
                           {k.scopes.map((s) => <Badge key={s}>{t(`dataKeys.scope.${s}` as "dataKeys.scope.catalog")}</Badge>)}
+                          {(k.scopes.includes("orders") || k.scopes.includes("bookings")) && (k.require_proof
+                            ? <Badge tone="info">{t("dataKeys.proofOn")}</Badge>
+                            : <Badge tone="warning">{t("dataKeys.proofOff")}</Badge>)}
                         </span>
                       </td>
                       <td className="num small">{k.last_used_at ? date(k.last_used_at) : t("dataKeys.neverUsed")}</td>
@@ -743,6 +746,7 @@ function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; on
   const [availability, setAvailability] = useState(false);
   const [orders, setOrders] = useState(false);
   const [bookings, setBookings] = useState(false);
+  const [requireProof, setRequireProof] = useState(true);
   const create = useMutation({
     mutationFn: () =>
       unwrap(api.POST("/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys", {
@@ -750,6 +754,7 @@ function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; on
         body: {
           name: name.trim(),
           scopes: ["catalog", ...(availability ? ["availability"] : []), ...(orders ? ["orders"] : []), ...(bookings ? ["bookings"] : [])],
+          require_proof: requireProof,
         },
       })),
     onSuccess: onCreated,
@@ -771,6 +776,12 @@ function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; on
           <Checkbox label={t("dataKeys.scope.bookingsLong")} checked={bookings} disabled={!can("bookings.manage")}
             onChange={(e) => setBookings(e.target.checked)} />
         </fieldset>
+        {(orders || bookings) && (
+          <div className="stack-sm">
+            <Checkbox label={t("dataKeys.requireProof")} checked={requireProof} onChange={(e) => setRequireProof(e.target.checked)} />
+            <p className="muted small">{t("dataKeys.requireProofHint")}</p>
+          </div>
+        )}
         <p className="muted small">{t("dataKeys.publicWarning")}</p>
         <div className="form-actions">
           <Button onClick={onClose}>{t("common.cancel")}</Button>
@@ -786,19 +797,28 @@ function NewKeyCard({ dataKey, secret, onClose }: { dataKey: DataKey; secret: st
   const { t } = useI18n();
   const toast = useToast();
   const copy = (text: string) => void navigator.clipboard?.writeText(text).then(() => toast(t("common.copied")), () => undefined);
+  const origin = window.location.origin;
+  const requests = dataKey.scopes.includes("orders") || dataKey.scopes.includes("bookings");
+  const proof = requests && dataKey.require_proof;
+  const withProof = proof ? ", proof: await novaraProof(\"" + origin + "\", \"" + secret + "\")" : "";
   const snippet = [
     `const res = await fetch("${window.location.origin}/api/v1/public/catalog", {`,
     `  headers: { "X-Novara-Key": "${secret}" },`,
     `});`,
     `const { currency, products } = await res.json();`,
     `// products: [{ id, name, sku, price, price_with_tax${dataKey.scopes.includes("availability") ? ", available" : ""}, ... }]`,
+    ...(proof ? [
+      ``,
+      `// Requests carry a bot check the visitor's browser solves in about a second.`,
+      `// Add once to the page: <script src="${origin}/api/v1/public/proof.js"></script>`,
+    ] : []),
     ...(dataKey.scopes.includes("orders") ? [
       ``,
       `// An order request (it waits for your team in Sales):`,
       `await fetch("${window.location.origin}/api/v1/public/orders", {`,
       `  method: "POST",`,
       `  headers: { "X-Novara-Key": "${secret}", "Content-Type": "application/json" },`,
-      `  body: JSON.stringify({ name, email, phone, note, lines: [{ product_id, quantity: 2 }] }),`,
+      `  body: JSON.stringify({ name, email, phone, note, lines: [{ product_id, quantity: 2 }]${withProof} }),`,
       `});`,
     ] : []),
     ...(dataKey.scopes.includes("bookings") ? [
@@ -809,7 +829,7 @@ function NewKeyCard({ dataKey, secret, onClose }: { dataKey: DataKey; secret: st
       `await fetch("${window.location.origin}/api/v1/public/bookings", {`,
       `  method: "POST",`,
       `  headers: { "X-Novara-Key": "${secret}", "Content-Type": "application/json" },`,
-      `  body: JSON.stringify({ service_id, starts_at: times[0], name, email, phone, note }),`,
+      `  body: JSON.stringify({ service_id, starts_at: times[0], name, email, phone, note${withProof} }),`,
       `});`,
     ] : []),
   ].join("\n");

@@ -3888,6 +3888,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Challenge
+         * @description A proof-of-work challenge for the next order or booking request (see novara/studio/proof.py).
+         */
+        get: operations["public_challenge_api_v1_public_challenge_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        /** Challenge Preflight */
+        options: operations["challenge_preflight_api_v1_public_challenge_options"];
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/free-times": {
         parameters: {
             query?: never;
@@ -3927,6 +3948,26 @@ export interface paths {
         delete?: never;
         /** Orders Preflight */
         options: operations["orders_preflight_api_v1_public_orders_options"];
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/proof.js": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Proof Script
+         * @description The solver a site includes with <script src>; it defines novaraProof(base, key).
+         */
+        get: operations["proof_script_api_v1_public_proof_js_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
         head?: never;
         patch?: never;
         trace?: never;
@@ -4934,6 +4975,11 @@ export interface components {
         DataKeyIn: {
             /** Name */
             name: string;
+            /**
+             * Require Proof
+             * @default true
+             */
+            require_proof: boolean;
             /** Scopes */
             scopes: string[];
         };
@@ -4954,6 +5000,8 @@ export interface components {
             last_used_at: string | null;
             /** Name */
             name: string;
+            /** Require Proof */
+            require_proof: boolean;
             /** Revoked */
             revoked: boolean;
             /** Scopes */
@@ -17157,6 +17205,59 @@ export interface operations {
             };
         };
     };
+    public_challenge_api_v1_public_challenge_get: {
+        parameters: {
+            query?: {
+                key?: string | null;
+            };
+            header?: {
+                "x-novara-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    challenge_preflight_api_v1_public_challenge_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     public_free_times_api_v1_public_free_times_get: {
         parameters: {
             query: {
@@ -17250,6 +17351,26 @@ export interface operations {
         };
     };
     orders_preflight_api_v1_public_orders_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    proof_script_api_v1_public_proof_js_get: {
         parameters: {
             query?: never;
             header?: never;

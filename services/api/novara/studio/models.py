@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -114,3 +114,16 @@ class AppDataKey(IdMixin, TimestampMixin, TenantScoped, Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+    # Order and booking requests must carry a solved proof-of-work challenge (see proof.py).
+    # On for new keys; keys made before the check existed keep working until replaced.
+    require_proof: Mapped[bool] = mapped_column(Boolean, default=True, server_default=false(), nullable=False)
+
+
+class SpentProof(TimestampMixin, TenantScoped, Base):
+    """A proof-of-work challenge already used for a request, kept until it expires so it works once."""
+
+    __tablename__ = "spent_proofs"
+
+    salt: Mapped[str] = mapped_column(String(32), primary_key=True)
+    ip_address: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)

@@ -25,7 +25,7 @@ def project(api):
 
 def key_with(api, s, scopes, user=OWNER):
     return api.req("POST", user, f"/orgs/{s['org']}/studio/projects/{s['project']}/data-keys",
-                   json={"name": "Shop", "scopes": scopes})
+                   json={"name": "Shop", "scopes": scopes, "require_proof": False})  # proofs: test_proof_of_work.py
 
 
 def order(client, key, body=None, **extra):

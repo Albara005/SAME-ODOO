@@ -14,6 +14,9 @@ With the "bookings" scope it can list bookable services and their free times, an
     GET  /api/v1/public/free-times?service=...&day=YYYY-MM-DD
     POST /api/v1/public/bookings                  (see novara/modules/bookings/router.py)
 
+Order and booking requests carry a solved proof-of-work challenge (GET /api/v1/public/challenge,
+solved by /api/v1/public/proof.js; see novara/studio/proof.py) unless the key predates the check.
+
 Answers carry CORS headers for any origin, because sites run in a sandbox with an opaque
 origin and the data is public by the owner's choice.
 """
@@ -22,6 +25,7 @@ from __future__ import annotations
 
 import secrets
 from collections import defaultdict
+from pathlib import Path
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -45,6 +49,7 @@ from novara.modules.inventory.models import StockLevel
 from novara.modules.organizations.models import Organization
 from novara.modules.sales import web_orders
 from novara.money import fmt_decimal, from_minor, to_minor
+from novara.studio import proof
 from novara.studio.models import AppDataKey, AppProject
 from novara.tenancy import bind_tenant, system_scope
 
@@ -72,6 +77,8 @@ NO_STORE = {**PUBLIC_HEADERS, "Cache-Control": "no-store"}
 class DataKeyIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     scopes: list[str] = Field(min_length=1, max_length=len(SCOPES))
+    # Order and booking requests must carry a solved proof-of-work challenge (a CAPTCHA without puzzles).
+    require_proof: bool = True
 
 
 class DataKeyOut(BaseModel):
@@ -82,13 +89,15 @@ class DataKeyOut(BaseModel):
     created_at: datetime
     last_used_at: datetime | None
     revoked: bool
+    require_proof: bool
     # Only in the answer that creates the key; it can't be shown again.
     key: str | None = None
 
 
 def _out(k: AppDataKey, key: str | None = None) -> DataKeyOut:
     return DataKeyOut(id=k.id, name=k.name, hint=k.hint, scopes=k.scopes, created_at=k.created_at,
-                      last_used_at=k.last_used_at, revoked=k.revoked_at is not None, key=key)
+                      last_used_at=k.last_used_at, revoked=k.revoked_at is not None, require_proof=k.require_proof,
+                      key=key)
 
 
 def _project(db: Session, project_id: str) -> AppProject:
@@ -121,11 +130,12 @@ def create_key(project_id: str, body: DataKeyIn, request: Request, ctx: OrgConte
         scopes = sorted({*scopes, "catalog"})  # a site needs the catalog to show stock or to order
     raw = "nvpk_" + secrets.token_urlsafe(24)
     key = AppDataKey(project_id=project.id, name=body.name, key_hash=crypto.token_hash(raw), hint=raw[:12],
-                     scopes=scopes, created_by=ctx.user.id)
+                     scopes=scopes, created_by=ctx.user.id, require_proof=body.require_proof)
     db.add(key)
     db.flush()
     audit.record(db, actor_user_id=ctx.user.id, action="app.data_key_created", target_type="app_project",
-                 target_id=project.id, details={"name": key.name, "scopes": scopes, "hint": key.hint},
+                 target_id=project.id, details={"name": key.name, "scopes": scopes, "hint": key.hint,
+                                                "require_proof": key.require_proof},
                  ip_address=client_ip(request))
     db.commit()
     return _out(key, raw)
@@ -225,6 +235,7 @@ def public_order(request: Request, payload: dict = Body(...), key: str | None = 
     data_key = _key_for(db, raw) if raw else None
     if data_key is None or "orders" not in data_key.scopes:
         return JSONResponse({"detail": "invalid or revoked key"}, status_code=status.HTTP_401_UNAUTHORIZED, headers=NO_STORE)
+    solved = payload.pop("proof", None)
     try:
         body = web_orders.PublicOrderIn.model_validate(payload)
     except ValidationError as e:  # answered here, so the site's browser can read why (CORS)
@@ -232,6 +243,9 @@ def public_order(request: Request, payload: dict = Body(...), key: str | None = 
                             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, headers=NO_STORE)
     if body.website:  # the hidden field people leave empty: a bot. Say yes, keep nothing.
         return JSONResponse({"received": True, "reference": ""}, status_code=status.HTTP_201_CREATED, headers=NO_STORE)
+    refused = _check_proof(db, request, data_key, solved)
+    if refused is not None:
+        return refused
     try:
         order = web_orders.receive(db, data_key, body, ip=client_ip(request))
     except web_orders.RateLimited as e:
@@ -243,6 +257,46 @@ def public_order(request: Request, payload: dict = Body(...), key: str | None = 
     return JSONResponse({"received": True, "reference": order.number, "currency": order.currency,
                          "total": str(from_minor(order.total_minor, order.currency))},
                         status_code=status.HTTP_201_CREATED, headers=NO_STORE)
+
+
+# ---------------------------------------------------------------- proof of work
+
+
+PROOF_JS = (Path(__file__).parent / "proof.js").read_text(encoding="utf-8")
+
+
+def _check_proof(db: Session, request: Request, data_key: AppDataKey, solved: object) -> JSONResponse | None:
+    if not data_key.require_proof:
+        return None
+    try:
+        proof.spend(db, request.app.state.settings.jwt_secret, data_key, solved, client_ip(request))
+    except proof.ProofError as e:
+        return JSONResponse({"detail": str(e)}, status_code=status.HTTP_403_FORBIDDEN, headers=NO_STORE)
+    return None
+
+
+@public_router.options("/public/challenge")
+def challenge_preflight() -> Response:
+    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=NO_STORE)
+
+
+@public_router.get("/public/challenge")
+def public_challenge(request: Request, key: str | None = Query(default=None, max_length=100),
+                     x_novara_key: str | None = Header(default=None, max_length=100), db: Session = Depends(get_db)):
+    """A proof-of-work challenge for the next order or booking request (see novara/studio/proof.py)."""
+    raw = x_novara_key or key
+    data_key = _key_for(db, raw) if raw else None
+    if data_key is None or not {"orders", "bookings"} & set(data_key.scopes):
+        return _refused()
+    return JSONResponse(proof.issue(db, request.app.state.settings.jwt_secret, data_key, client_ip(request)),
+                        headers=NO_STORE)
+
+
+@public_router.get("/public/proof.js")
+def proof_script() -> Response:
+    """The solver a site includes with <script src>; it defines novaraProof(base, key)."""
+    return Response(PROOF_JS, media_type="application/javascript; charset=utf-8",
+                    headers={**PUBLIC_HEADERS, "Cache-Control": "public, max-age=86400"})
 
 
 # ---------------------------------------------------------------- bookings
@@ -301,6 +355,7 @@ def public_booking(request: Request, payload: dict = Body(...), key: str | None 
     data_key = _scoped(db, x_novara_key or key, "bookings")
     if data_key is None:
         return _refused()
+    solved = payload.pop("proof", None)
     try:
         body = bookings.PublicBookingIn.model_validate(payload)
     except ValidationError as e:
@@ -309,6 +364,9 @@ def public_booking(request: Request, payload: dict = Body(...), key: str | None 
     if body.website:  # the hidden field people leave empty: a bot. Say yes, keep nothing.
         return JSONResponse({"received": True, "reference": "", "status": "requested"},
                             status_code=status.HTTP_201_CREATED, headers=NO_STORE)
+    refused = _check_proof(db, request, data_key, solved)
+    if refused is not None:
+        return refused
     try:
         booking = bookings.receive(db, data_key, body, ip=client_ip(request))
     except bookings.RateLimited as e:

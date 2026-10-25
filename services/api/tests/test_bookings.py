@@ -100,7 +100,7 @@ def test_a_published_site_asks_and_the_team_confirms(api, client, cal):
     keys = f"/orgs/{s['org']}/studio/projects/{project}/data-keys"
     assert api.req("POST", OWNER, keys, json={"name": "x", "scopes": ["bookings"]}).status_code == 201
     catalog_only = api.req("POST", OWNER, keys, json={"name": "Shop", "scopes": ["catalog"]}).json()["key"]
-    key = api.req("POST", OWNER, keys, json={"name": "Bookings", "scopes": ["bookings"]}).json()["key"]
+    key = api.req("POST", OWNER, keys, json={"name": "Bookings", "scopes": ["bookings"], "require_proof": False}).json()["key"]
     h = {"X-Novara-Key": key}
 
     assert client.get("/api/v1/public/booking-services", headers={"X-Novara-Key": catalog_only}).status_code == 401
@@ -150,7 +150,7 @@ def test_site_requests_are_rate_limited(api, client, cal, monkeypatch):
     s = cal
     project = api.req("POST", OWNER, f"/orgs/{s['org']}/studio/projects", json={"name": "Clinic", "slug": "clinic2"}).json()["id"]
     key = api.req("POST", OWNER, f"/orgs/{s['org']}/studio/projects/{project}/data-keys",
-                  json={"name": "Bookings", "scopes": ["bookings"]}).json()["key"]
+                  json={"name": "Bookings", "scopes": ["bookings"], "require_proof": False}).json()["key"]
     monkeypatch.setattr(bookings, "IP_LIMIT", 2)
     day = s["day"]
     codes = [client.post("/api/v1/public/bookings", headers={"X-Novara-Key": key}, json={

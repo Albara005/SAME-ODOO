@@ -1470,6 +1470,10 @@ export const en = {
   "members.passkeyOn": "Passkey",
   "account.stepUp": "You signed in with your password only. To add or remove a way of signing in, sign in again with your passkey or authenticator code.",
   "passkey.requiredByOrg": "{orgs} requires two-step sign-in, so your last passkey stays while you're a member.",
+  "dataKeys.proofOn": "Bot check",
+  "dataKeys.proofOff": "No bot check",
+  "dataKeys.requireProof": "Check that requests come from a person (recommended)",
+  "dataKeys.requireProofHint": "No puzzles and no outside service: the visitor's browser does about a second of work for each request, which makes sending spam in bulk costly.",
 } as const;
 
 export type MessageKey = keyof typeof en;

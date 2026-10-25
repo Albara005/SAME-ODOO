@@ -232,13 +232,16 @@ test("App Studio: an order request from the site becomes a quotation in Sales", 
   await page.getByRole("dialog").getByLabel(/استقبال طلبات من الموقع/).check();
   await page.getByRole("dialog").getByRole("button", { name: "إنشاء المفتاح" }).click();
   await expect(page.getByLabel("مثال الشيفرة")).toContainText("/api/v1/public/orders");
+  await expect(page.getByLabel("مثال الشيفرة")).toContainText("/api/v1/public/proof.js");
   const key = (await page.getByLabel("المفتاح", { exact: true }).textContent())!.trim();
+  await expect(page.getByRole("row", { name: /الموقع/ }).getByText("تحقق من البشر")).toBeVisible();
 
-  // What a visitor's browser sends from the published site.
+  // What a visitor's browser sends from the published site: without the bot check it's refused,
+  // with it (solved by the real script, in the browser) it's received.
+  const order = { name: "مقهى الندى", email: "orders@nada.example.com", note: "التوصيل صباحاً", lines: [{ product_id: coffee.id, quantity: 3 }] };
+  expect((await page.request.post("/api/v1/public/orders", { headers: { "X-Novara-Key": key }, data: order })).status()).toBe(403);
   const sent = await page.request.post("/api/v1/public/orders", {
-    headers: { "X-Novara-Key": key },
-    data: { name: "مقهى الندى", email: "orders@nada.example.com", note: "التوصيل صباحاً", lines: [{ product_id: coffee.id, quantity: 3 }] },
-  });
+    headers: { "X-Novara-Key": key }, data: { ...order, proof: await solveInBrowser(page, key) } });
   expect(sent.status()).toBe(201);
   const { reference } = await sent.json();
 
@@ -252,6 +255,14 @@ test("App Studio: an order request from the site becomes a quotation in Sales", 
   await expect(page.getByText("مقهى الندى").first()).toBeVisible();
   await expect(page.getByRole("cell", { name: "قهوة عربية" })).toBeVisible();
 });
+
+/** Solve the bot check the way a published site does, with /api/v1/public/proof.js in the browser. */
+async function solveInBrowser(page: Page, key: string): Promise<{ challenge: string; nonce: string }> {
+  await page.addScriptTag({ url: "/api/v1/public/proof.js" });
+  return page.evaluate((k) => (window as unknown as {
+    novaraProof: (base: string, key: string) => Promise<{ challenge: string; nonce: string }>;
+  }).novaraProof(location.origin, k), key);
+}
 
 /** A day `ahead` days from now on the business's calendar (Riyadh). */
 function riyadhDay(ahead: number): string {
@@ -289,7 +300,8 @@ test("Bookings: hours and a service, a site asks, the team confirms and books so
   const { times } = await (await page.request.get(`/api/v1/public/free-times?service=${services[0].id}&day=${day}`, { headers: h })).json();
   expect(times[0]).toBe(`${day}T09:00:00+03:00`);
   const sent = await page.request.post("/api/v1/public/bookings", {
-    headers: h, data: { service_id: services[0].id, starts_at: times[2], name: "ريم", phone: "+966500000002", note: "الزيارة الأولى" } });
+    headers: h, data: { service_id: services[0].id, starts_at: times[2], name: "ريم", phone: "+966500000002", note: "الزيارة الأولى",
+                        proof: await solveInBrowser(page, h["X-Novara-Key"]) } });
   expect(sent.status()).toBe(201);
 
   await page.reload();

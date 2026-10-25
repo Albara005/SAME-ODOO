@@ -2557,6 +2557,11 @@
       "title": "Name",
       "type": "string"
      },
+     "require_proof": {
+      "default": true,
+      "title": "Require Proof",
+      "type": "boolean"
+     },
      "scopes": {
       "items": {
        "type": "string"
@@ -2616,6 +2621,10 @@
       "title": "Name",
       "type": "string"
      },
+     "require_proof": {
+      "title": "Require Proof",
+      "type": "boolean"
+     },
      "revoked": {
       "title": "Revoked",
       "type": "boolean"
@@ -2635,7 +2644,8 @@
      "scopes",
      "created_at",
      "last_used_at",
-     "revoked"
+     "revoked",
+     "require_proof"
     ],
     "title": "DataKeyOut",
     "type": "object"
@@ -27359,6 +27369,89 @@
     ]
    }
   },
+  "/api/v1/public/challenge": {
+   "get": {
+    "description": "A proof-of-work challenge for the next order or booking request (see novara/studio/proof.py).",
+    "operationId": "public_challenge_api_v1_public_challenge_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Key"
+      }
+     },
+     {
+      "in": "header",
+      "name": "x-novara-key",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "X-Novara-Key"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Public Challenge",
+    "tags": [
+     "public data"
+    ]
+   },
+   "options": {
+    "operationId": "challenge_preflight_api_v1_public_challenge_options",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Challenge Preflight",
+    "tags": [
+     "public data"
+    ]
+   }
+  },
   "/api/v1/public/free-times": {
    "get": {
     "description": "Times on a day (in the business's time zone) when the service can be booked.",
@@ -27551,6 +27644,26 @@
      }
     },
     "summary": "Public Order",
+    "tags": [
+     "public data"
+    ]
+   }
+  },
+  "/api/v1/public/proof.js": {
+   "get": {
+    "description": "The solver a site includes with <script src>; it defines novaraProof(base, key).",
+    "operationId": "proof_script_api_v1_public_proof_js_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Proof Script",
     "tags": [
      "public data"
     ]
