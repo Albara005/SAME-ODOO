@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, String, UniqueConstraint, text
+from sqlalchemy import JSON, BigInteger, Boolean, CheckConstraint, Date, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -100,3 +100,18 @@ class JournalLine(IdMixin, TenantScoped, Base):
     customer_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     vendor_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     label: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+
+
+class PeriodClose(IdMixin, TimestampMixin, TenantScoped, Base):
+    """A month closed (the books locked up to its last day) or reopened, with who did it and why.
+    Append-only: the lock date says what is closed now; these rows say how it got there."""
+
+    __tablename__ = "period_closes"
+    __table_args__ = (CheckConstraint("action IN ('closed', 'reopened')", name="ck_period_close_action"),)
+
+    period_end: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(10), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    # What was still a draft in the month when it was closed: {"invoices": n, "bills": n}.
+    drafts: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))

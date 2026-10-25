@@ -6491,6 +6491,187 @@
     "title": "PaymentOut",
     "type": "object"
    },
+   "PeriodCloseIn": {
+    "properties": {
+     "period_end": {
+      "format": "date",
+      "title": "Period End",
+      "type": "string"
+     }
+    },
+    "required": [
+     "period_end"
+    ],
+    "title": "PeriodCloseIn",
+    "type": "object"
+   },
+   "PeriodOut": {
+    "properties": {
+     "draft_bills": {
+      "title": "Draft Bills",
+      "type": "integer"
+     },
+     "draft_invoices": {
+      "title": "Draft Invoices",
+      "type": "integer"
+     },
+     "end": {
+      "format": "date",
+      "title": "End",
+      "type": "string"
+     },
+     "expenses": {
+      "title": "Expenses",
+      "type": "string"
+     },
+     "income": {
+      "title": "Income",
+      "type": "string"
+     },
+     "last_action": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Action"
+     },
+     "last_action_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Action At"
+     },
+     "last_action_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Action By"
+     },
+     "last_reason": {
+      "title": "Last Reason",
+      "type": "string"
+     },
+     "net": {
+      "title": "Net",
+      "type": "string"
+     },
+     "start": {
+      "format": "date",
+      "title": "Start",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "start",
+     "end",
+     "status",
+     "income",
+     "expenses",
+     "net",
+     "draft_invoices",
+     "draft_bills",
+     "last_action",
+     "last_action_by",
+     "last_action_at",
+     "last_reason"
+    ],
+    "title": "PeriodOut",
+    "type": "object"
+   },
+   "PeriodReopenIn": {
+    "properties": {
+     "period_end": {
+      "format": "date",
+      "title": "Period End",
+      "type": "string"
+     },
+     "reason": {
+      "maxLength": 500,
+      "minLength": 5,
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "period_end",
+     "reason"
+    ],
+    "title": "PeriodReopenIn",
+    "type": "object"
+   },
+   "PeriodsOut": {
+    "properties": {
+     "fiscal_year_end": {
+      "format": "date",
+      "title": "Fiscal Year End",
+      "type": "string"
+     },
+     "fiscal_year_start": {
+      "format": "date",
+      "title": "Fiscal Year Start",
+      "type": "string"
+     },
+     "locked_until": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Locked Until"
+     },
+     "months": {
+      "items": {
+       "$ref": "#/components/schemas/PeriodOut"
+      },
+      "title": "Months",
+      "type": "array"
+     },
+     "year_closed_until": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Year Closed Until"
+     }
+    },
+    "required": [
+     "fiscal_year_start",
+     "fiscal_year_end",
+     "locked_until",
+     "year_closed_until",
+     "months"
+    ],
+    "title": "PeriodsOut",
+    "type": "object"
+   },
    "PolicyIn": {
     "properties": {
      "weekend": {
@@ -12908,6 +13089,189 @@
      }
     ],
     "summary": "Set Lock",
+    "tags": [
+     "accounting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/accounting/periods": {
+   "get": {
+    "description": "The months of a fiscal year: closed or open, their result, and drafts still dated in them.",
+    "operationId": "get_periods_api_v1_orgs__org_id__accounting_periods_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Any day in the fiscal year (default: today)",
+      "in": "query",
+      "name": "year_of",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Any day in the fiscal year (default: today)",
+       "title": "Year Of"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PeriodsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Periods",
+    "tags": [
+     "accounting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/accounting/periods/close": {
+   "post": {
+    "description": "Close the books up to the last day of a month (and so every month before it).",
+    "operationId": "close_period_api_v1_orgs__org_id__accounting_periods_close_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PeriodCloseIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PeriodsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Close Period",
+    "tags": [
+     "accounting"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/accounting/periods/reopen": {
+   "post": {
+    "description": "Reopen the latest closed month, saying why.",
+    "operationId": "reopen_period_api_v1_orgs__org_id__accounting_periods_reopen_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PeriodReopenIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PeriodsOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reopen Period",
     "tags": [
      "accounting"
     ]

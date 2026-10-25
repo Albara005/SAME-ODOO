@@ -11,10 +11,10 @@ import {
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
 import { digitsFor, isPositive, isZero, parseDec, sumDec } from "../lib/decimal";
-import { today } from "../lib/format";
+import { addDays, fiscalYear, formatMoney, locale, today } from "../lib/format";
 import { BooksLock, ExportButton, qs, useAccountName } from "./Reports";
 
-type Tab = "journal" | "accounts" | "year";
+type Tab = "journal" | "accounts" | "months" | "year";
 type Account = Schemas["AccountOut"];
 type Entry = Schemas["JournalEntryOut"];
 
@@ -40,11 +40,13 @@ export function AccountingPage() {
         tabs={[
           { key: "journal", label: t("reports.journal") },
           { key: "accounts", label: t("accounting.chart") },
+          { key: "months", label: t("periods.tab") },
           { key: "year", label: t("yearEnd.tab") },
         ]}
       />
       {tab === "journal" && <Journal />}
       {tab === "accounts" && <ChartOfAccounts />}
+      {tab === "months" && <MonthlyClose />}
       {tab === "year" && <YearEnd />}
     </div>
   );
@@ -508,5 +510,154 @@ function YearEnd() {
         </Dialog>
       )}
     </Card>
+  );
+}
+
+// ---------------------------------------------------------------- closing month by month
+
+type Period = Schemas["PeriodOut"];
+
+/** The months of a fiscal year: result, drafts still dated in them, closed or open; close and reopen. */
+function MonthlyClose() {
+  const { t, lang, date } = useI18n();
+  const { org, can } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const startMonth = org.fiscal_year_start_month ?? 1;
+  const current = fiscalYear(startMonth, today()).start;
+  const previous = fiscalYear(startMonth, addDays(current, -1)).start;
+  const years = [current, previous, fiscalYear(startMonth, addDays(previous, -1)).start];
+  const [yearStart, setYearStart] = useState(current);
+  const [reopening, setReopening] = useState<Period | null>(null);
+  const params = { path: { org_id: org.id }, query: { year_of: yearStart } };
+  const data = useQuery({
+    queryKey: ["periods", org.id, yearStart],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/accounting/periods", { params })),
+  });
+  const done = (out: Schemas["PeriodsOut"]) => {
+    qc.setQueryData(["periods", org.id, yearStart], out);
+    void qc.invalidateQueries({ queryKey: ["books-lock", org.id] });
+    void qc.invalidateQueries({ queryKey: ["org", org.id] });
+    void qc.invalidateQueries({ queryKey: ["year-end", org.id] });
+  };
+  const close = useMutation({
+    mutationFn: (end: string) => unwrap(api.POST("/api/v1/orgs/{org_id}/accounting/periods/close", {
+      params: { path: { org_id: org.id } }, body: { period_end: end } })),
+    onSuccess: (out) => { done(out); toast(t("periods.closedToast")); },
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const monthName = (start: string) =>
+    new Intl.DateTimeFormat(locale(lang), { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${start}T00:00:00Z`));
+  const now = today();
+  return (
+    <Card title={t("periods.title")}>
+      <div className="stack">
+        <p className="muted small">{t("periods.about")}</p>
+        <div className="row">
+          <Field label={t("periods.year")}>
+            <Select value={yearStart} onChange={(e) => setYearStart(e.target.value)}>
+              {years.map((y) => (
+                <option key={y} value={y}>{monthName(y)} – {monthName(fiscalYear(startMonth, y).end.slice(0, 8) + "01")}</option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <QueryView query={data}>
+          {(out) => (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("periods.month")}</th>
+                    <th className="num">{t("periods.result")}</th>
+                    <th>{t("periods.drafts")}</th>
+                    <th>{t("periods.status")}</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {out.months.map((m) => {
+                    const drafts = m.draft_invoices + m.draft_bills;
+                    const latest = out.locked_until === m.end && !(out.year_closed_until && m.end <= out.year_closed_until);
+                    const closable = m.status !== "closed" && m.end < now;
+                    return (
+                      <tr key={m.end}>
+                        <td>
+                          <span className="stack-sm" style={{ gap: 2 }}>
+                            <strong>{monthName(m.start)}</strong>
+                            {m.last_action && (
+                              <span className="muted small">
+                                {t(m.last_action === "closed" ? "periods.closedBy" : "periods.reopenedBy",
+                                  { name: m.last_action_by ?? "—", date: m.last_action_at ? date(m.last_action_at) : "" })}
+                                {m.last_reason && <> · <span dir="auto">{m.last_reason}</span></>}
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="num">{formatMoney(m.net, org.default_currency, lang)}</td>
+                        <td>
+                          {drafts > 0
+                            ? <Badge tone="warning">{t("periods.draftCount", { invoices: m.draft_invoices, bills: m.draft_bills })}</Badge>
+                            : <span className="muted small">—</span>}
+                        </td>
+                        <td>
+                          <Badge tone={m.status === "closed" ? "info" : m.status === "partly_closed" ? "warning" : "neutral"}>
+                            {t(`periods.status.${m.status}` as MessageKey)}
+                          </Badge>
+                        </td>
+                        <td className="end">
+                          {can("accounting.close") && closable && (
+                            <Button size="sm" loading={close.isPending && close.variables === m.end}
+                              onClick={() => window.confirm(t(drafts ? "periods.confirmDrafts" : "periods.confirm",
+                                { month: monthName(m.start), date: m.end, n: drafts })) && close.mutate(m.end)}>
+                              {t("periods.close")}
+                            </Button>
+                          )}
+                          {can("accounting.close") && latest && (
+                            <Button size="sm" variant="ghost" onClick={() => setReopening(m)}>{t("periods.reopen")}</Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </QueryView>
+      </div>
+      {reopening && (
+        <ReopenDialog period={reopening} month={monthName(reopening.start)} onClose={() => setReopening(null)}
+          onDone={(out) => { done(out); setReopening(null); toast(t("periods.reopenedToast")); }} />
+      )}
+    </Card>
+  );
+}
+
+function ReopenDialog({ period, month, onClose, onDone }: {
+  period: Period; month: string; onClose: () => void; onDone: (out: Schemas["PeriodsOut"]) => void;
+}) {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  const [reason, setReason] = useState("");
+  const reopen = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/accounting/periods/reopen", {
+      params: { path: { org_id: org.id } }, body: { period_end: period.end, reason: reason.trim() } })),
+    onSuccess: onDone,
+  });
+  return (
+    <Dialog open onClose={onClose} title={t("periods.reopenTitle", { month })}>
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); reopen.mutate(); }}>
+        <p className="muted">{t("periods.reopenBody")}</p>
+        {reopen.isError && <ErrorNotice error={reopen.error} />}
+        <Field label={t("periods.reason")}>
+          <Input value={reason} required minLength={5} maxLength={500} onChange={(e) => setReason(e.target.value)} />
+        </Field>
+        <div className="form-actions">
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" variant="danger" loading={reopen.isPending} disabled={reason.trim().length < 5}>{t("periods.reopen")}</Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

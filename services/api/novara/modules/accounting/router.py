@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from novara import idempotency
 from novara.deps import OrgContext, client_ip, get_db, require, require_any
 from novara.modules.access import permissions as P
+from novara.modules.accounting import periods
 from novara.modules.accounting.models import ACCOUNT_TYPES, Account, JournalEntry, JournalLine, Tax
 from novara.modules.accounting.service import (CONTROL_ACCOUNTS, LedgerError, PeriodLocked, TrialBalanceRow, balance_sheet,
                                               close_year, ensure_chart, fiscal_year_of, last_year_end, natural_balance,
@@ -490,6 +491,98 @@ def set_lock(body: LockIn, request: Request, ctx: OrgContext = Depends(require(P
                  ip_address=client_ip(request))
     db.commit()
     return LockOut(locked_until=ctx.organization.books_locked_until)
+
+
+# ---------------------------------------------------------------- closing month by month
+
+
+class PeriodOut(BaseModel):
+    start: date
+    end: date
+    status: str                 # open | partly_closed | closed
+    income: str
+    expenses: str
+    net: str
+    draft_invoices: int
+    draft_bills: int
+    last_action: str | None     # closed | reopened
+    last_action_by: str | None
+    last_action_at: datetime | None
+    last_reason: str
+
+
+class PeriodsOut(BaseModel):
+    fiscal_year_start: date
+    fiscal_year_end: date
+    locked_until: date | None
+    year_closed_until: date | None   # the last fiscal year end closed into retained earnings
+    months: list[PeriodOut]
+
+
+class PeriodCloseIn(BaseModel):
+    period_end: date
+
+
+class PeriodReopenIn(BaseModel):
+    period_end: date
+    reason: str = Field(min_length=5, max_length=500)
+
+
+def _periods_out(db: Session, org, year_start: date) -> PeriodsOut:
+    from novara.modules.identity.models import User
+
+    rows = periods.periods(db, org, year_start)
+    users = {u.id: u for u in db.scalars(select(User).where(User.id.in_({r.last.user_id for r in rows if r.last and r.last.user_id})))}
+    c = org.default_currency
+    m = lambda minor: str(from_minor(minor, c))  # noqa: E731
+    months = [PeriodOut(start=r.start, end=r.end, status=r.status, income=m(r.income_minor), expenses=m(r.expenses_minor),
+                        net=m(r.income_minor - r.expenses_minor), draft_invoices=r.drafts["invoices"],
+                        draft_bills=r.drafts["bills"], last_action=r.last.action if r.last else None,
+                        last_action_by=(users[r.last.user_id].full_name or users[r.last.user_id].email)
+                        if r.last and r.last.user_id in users else None,
+                        last_action_at=r.last.created_at if r.last else None, last_reason=r.last.reason if r.last else "")
+              for r in rows]
+    return PeriodsOut(fiscal_year_start=year_start, fiscal_year_end=rows[-1].end, locked_until=org.books_locked_until,
+                      year_closed_until=last_year_end(db), months=months)
+
+
+@router.get("/orgs/{org_id}/accounting/periods", response_model=PeriodsOut)
+def get_periods(year_of: date | None = Query(default=None, description="Any day in the fiscal year (default: today)"),
+                ctx: OrgContext = Depends(require(P.ACCOUNTING_READ)), db: Session = Depends(get_db)):
+    """The months of a fiscal year: closed or open, their result, and drafts still dated in them."""
+    return _periods_out(db, ctx.organization, periods.fiscal_year_start(ctx.organization, year_of or date.today()))
+
+
+@router.post("/orgs/{org_id}/accounting/periods/close", response_model=PeriodsOut)
+def close_period(body: PeriodCloseIn, request: Request, ctx: OrgContext = Depends(require(P.ACCOUNTING_CLOSE)),
+                 db: Session = Depends(get_db)):
+    """Close the books up to the last day of a month (and so every month before it)."""
+    org = ctx.organization
+    try:
+        row = periods.close(db, org, body.period_end, ctx.user.id)
+    except periods.PeriodError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    audit.record(db, actor_user_id=ctx.user.id, action="books.period_closed", target_type="organization",
+                 target_id=org.id, details={"period_end": body.period_end.isoformat(), "drafts": row.drafts},
+                 ip_address=client_ip(request))
+    db.commit()
+    return _periods_out(db, org, periods.fiscal_year_start(org, body.period_end))
+
+
+@router.post("/orgs/{org_id}/accounting/periods/reopen", response_model=PeriodsOut)
+def reopen_period(body: PeriodReopenIn, request: Request, ctx: OrgContext = Depends(require(P.ACCOUNTING_CLOSE)),
+                  db: Session = Depends(get_db)):
+    """Reopen the latest closed month, saying why."""
+    org = ctx.organization
+    try:
+        periods.reopen(db, org, body.period_end, body.reason, ctx.user.id)
+    except periods.PeriodError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    audit.record(db, actor_user_id=ctx.user.id, action="books.period_reopened", target_type="organization",
+                 target_id=org.id, details={"period_end": body.period_end.isoformat(), "reason": body.reason.strip()},
+                 ip_address=client_ip(request))
+    db.commit()
+    return _periods_out(db, org, periods.fiscal_year_start(org, body.period_end))
 
 
 # ---------------------------------------------------------------- closing the year

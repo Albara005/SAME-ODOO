@@ -633,6 +633,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/accounting/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Periods
+         * @description The months of a fiscal year: closed or open, their result, and drafts still dated in them.
+         */
+        get: operations["get_periods_api_v1_orgs__org_id__accounting_periods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/accounting/periods/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Period
+         * @description Close the books up to the last day of a month (and so every month before it).
+         */
+        post: operations["close_period_api_v1_orgs__org_id__accounting_periods_close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/accounting/periods/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen Period
+         * @description Reopen the latest closed month, saying why.
+         */
+        post: operations["reopen_period_api_v1_orgs__org_id__accounting_periods_reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/accounting/profit-and-loss": {
         parameters: {
             query?: never;
@@ -6462,6 +6522,76 @@ export interface components {
             /** Reference */
             reference: string;
         };
+        /** PeriodCloseIn */
+        PeriodCloseIn: {
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+        };
+        /** PeriodOut */
+        PeriodOut: {
+            /** Draft Bills */
+            draft_bills: number;
+            /** Draft Invoices */
+            draft_invoices: number;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Expenses */
+            expenses: string;
+            /** Income */
+            income: string;
+            /** Last Action */
+            last_action: string | null;
+            /** Last Action At */
+            last_action_at: string | null;
+            /** Last Action By */
+            last_action_by: string | null;
+            /** Last Reason */
+            last_reason: string;
+            /** Net */
+            net: string;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /** Status */
+            status: string;
+        };
+        /** PeriodReopenIn */
+        PeriodReopenIn: {
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Reason */
+            reason: string;
+        };
+        /** PeriodsOut */
+        PeriodsOut: {
+            /**
+             * Fiscal Year End
+             * Format: date
+             */
+            fiscal_year_end: string;
+            /**
+             * Fiscal Year Start
+             * Format: date
+             */
+            fiscal_year_start: string;
+            /** Locked Until */
+            locked_until: string | null;
+            /** Months */
+            months: components["schemas"]["PeriodOut"][];
+            /** Year Closed Until */
+            year_closed_until: string | null;
+        };
         /** PolicyIn */
         PolicyIn: {
             /** Weekend */
@@ -9326,6 +9456,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LockOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_periods_api_v1_orgs__org_id__accounting_periods_get: {
+        parameters: {
+            query?: {
+                /** @description Any day in the fiscal year (default: today) */
+                year_of?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_period_api_v1_orgs__org_id__accounting_periods_close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeriodCloseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reopen_period_api_v1_orgs__org_id__accounting_periods_reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PeriodReopenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodsOut"];
                 };
             };
             /** @description Validation Error */

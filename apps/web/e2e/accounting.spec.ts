@@ -281,3 +281,38 @@ test("projects: a task, hours logged, and the billable hours invoiced", async ({
   await expect(page.getByRole("cell", { name: "موقع متاجر هلا: الصفحة الرئيسية" })).toBeVisible();
   await expect(page.getByText("1,293.75").first()).toBeVisible();   // 4.5 h x 250 = 1,125 + 15%
 });
+
+test("monthly closing: close last month with its drafts in view, then reopen it with a reason", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("months"));
+  await createOrg(page, "شركة الأشهر");
+  const call = await apiFor(page);
+  const now = new Date();
+  const last = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 10));
+  const day = last.toISOString().slice(0, 10);
+  const customer = await call("POST", "/customers", { name: "مؤسسة الضحى" });
+  const lines = [{ description: "استشارة", quantity: "1", unit_price: "750" }];
+  const invoice = await call("POST", "/invoices", { customer_id: customer.id, issue_date: day, lines });
+  await call("POST", `/invoices/${invoice.id}/post`);
+  await call("POST", "/invoices", { customer_id: customer.id, issue_date: day, lines });   // stays a draft
+
+  await nav(page, "المحاسبة");
+  await page.getByRole("tab", { name: "الإقفال الشهري" }).click();
+  await page.getByLabel("السنة المالية").selectOption(`${last.getUTCFullYear()}-01-01`);
+  const monthName = new Intl.DateTimeFormat("ar-SA-u-nu-latn-ca-gregory", { month: "long", year: "numeric", timeZone: "UTC" }).format(last);
+  const row = page.getByRole("row", { name: new RegExp(monthName) });
+  await expect(row).toContainText("750");
+  await expect(row.getByText("1 فاتورة، 0 فاتورة مورد")).toBeVisible();
+  page.once("dialog", (d) => { expect(d.message()).toContain("ما زالت 1 مسودة"); void d.accept(); });
+  await row.getByRole("button", { name: "إقفال حتى هنا" }).click();
+  await expect(page.getByText("أُقفل الشهر")).toBeVisible();
+  await expect(row.getByText("مقفل", { exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/monthly-close-ar.png", fullPage: true });
+
+  await row.getByRole("button", { name: "إعادة فتح" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("سبب إعادة الفتح").fill("فاتورة مورد متأخرة عن هذا الشهر");
+  await dialog.getByRole("button", { name: "إعادة فتح" }).click();
+  await expect(page.getByText("أُعيد فتح الشهر")).toBeVisible();
+  await expect(row.getByText("مفتوح", { exact: true })).toBeVisible();
+  await expect(row.getByText("فاتورة مورد متأخرة عن هذا الشهر")).toBeVisible();
+});
