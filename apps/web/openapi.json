@@ -9579,6 +9579,68 @@
     "title": "QuoteIn",
     "type": "object"
    },
+   "RateIn": {
+    "properties": {
+     "currency": {
+      "pattern": "^[A-Z]{3}$",
+      "title": "Currency",
+      "type": "string"
+     },
+     "day": {
+      "format": "date",
+      "title": "Day",
+      "type": "string"
+     },
+     "rate": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Rate"
+     }
+    },
+    "required": [
+     "currency",
+     "day",
+     "rate"
+    ],
+    "title": "RateIn",
+    "type": "object"
+   },
+   "RateOut": {
+    "properties": {
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "day": {
+      "format": "date",
+      "title": "Day",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "rate": {
+      "title": "Rate",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "currency",
+     "day",
+     "rate"
+    ],
+    "title": "RateOut",
+    "type": "object"
+   },
    "ReceiptIn": {
     "properties": {
      "counterpart": {
@@ -10069,6 +10131,238 @@
      "email"
     ],
     "title": "ResetRequestIn",
+    "type": "object"
+   },
+   "RevaluationIn": {
+    "properties": {
+     "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+     },
+     "rates": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "string"
+        }
+       ]
+      },
+      "maxProperties": 20,
+      "title": "Rates",
+      "type": "object"
+     }
+    },
+    "required": [
+     "as_of"
+    ],
+    "title": "RevaluationIn",
+    "type": "object"
+   },
+   "RevaluationLineOut": {
+    "properties": {
+     "booked": {
+      "title": "Booked",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "difference": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Difference"
+     },
+     "due": {
+      "title": "Due",
+      "type": "string"
+     },
+     "invoice_id": {
+      "title": "Invoice Id",
+      "type": "string"
+     },
+     "number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Number"
+     },
+     "revalued": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revalued"
+     }
+    },
+    "required": [
+     "invoice_id",
+     "number",
+     "currency",
+     "due",
+     "booked",
+     "revalued",
+     "difference"
+    ],
+    "title": "RevaluationLineOut",
+    "type": "object"
+   },
+   "RevaluationOut": {
+    "properties": {
+     "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+     },
+     "base_currency": {
+      "title": "Base Currency",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "difference": {
+      "title": "Difference",
+      "type": "string"
+     },
+     "entry_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entry Id"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/RevaluationLineOut"
+      },
+      "title": "Lines",
+      "type": "array"
+     },
+     "rates": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Rates",
+      "type": "object"
+     },
+     "reversal_entry_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reversal Entry Id"
+     },
+     "status": {
+      "enum": [
+       "posted",
+       "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "as_of",
+     "status",
+     "base_currency",
+     "rates",
+     "lines",
+     "difference",
+     "entry_id",
+     "reversal_entry_id",
+     "created_at"
+    ],
+    "title": "RevaluationOut",
+    "type": "object"
+   },
+   "RevaluationPreviewOut": {
+    "properties": {
+     "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+     },
+     "base_currency": {
+      "title": "Base Currency",
+      "type": "string"
+     },
+     "difference": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Difference"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/RevaluationLineOut"
+      },
+      "title": "Lines",
+      "type": "array"
+     },
+     "missing": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Missing",
+      "type": "array"
+     },
+     "rates": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Rates",
+      "type": "object"
+     }
+    },
+    "required": [
+     "as_of",
+     "base_currency",
+     "rates",
+     "missing",
+     "lines",
+     "difference"
+    ],
+    "title": "RevaluationPreviewOut",
     "type": "object"
    },
    "ReverseIn": {
@@ -21068,6 +21362,260 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/exchange-rates": {
+   "get": {
+    "operationId": "list_rates_api_v1_orgs__org_id__exchange_rates_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "currency",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^[A-Z]{3}$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Currency"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RateOut"
+         },
+         "title": "Response List Rates Api V1 Orgs  Org Id  Exchange Rates Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Rates",
+    "tags": [
+     "invoicing"
+    ]
+   },
+   "post": {
+    "operationId": "add_rate_api_v1_orgs__org_id__exchange_rates_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RateOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Add Rate",
+    "tags": [
+     "invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/exchange-rates/latest": {
+   "get": {
+    "operationId": "latest_rate_api_v1_orgs__org_id__exchange_rates_latest_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "currency",
+      "required": true,
+      "schema": {
+       "pattern": "^[A-Z]{3}$",
+       "title": "Currency",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "on",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "On"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/RateOut"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Response Latest Rate Api V1 Orgs  Org Id  Exchange Rates Latest Get"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Latest Rate",
+    "tags": [
+     "invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/exchange-rates/{rate_id}": {
+   "delete": {
+    "operationId": "delete_rate_api_v1_orgs__org_id__exchange_rates__rate_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "rate_id",
+      "required": true,
+      "schema": {
+       "title": "Rate Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete Rate",
+    "tags": [
+     "invoicing"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/files": {
    "get": {
     "operationId": "list_files_api_v1_orgs__org_id__files_get",
@@ -21351,6 +21899,225 @@
     "summary": "Download File",
     "tags": [
      "files"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/fx-revaluations": {
+   "get": {
+    "operationId": "list_revaluations_api_v1_orgs__org_id__fx_revaluations_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RevaluationOut"
+         },
+         "title": "Response List Revaluations Api V1 Orgs  Org Id  Fx Revaluations Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Revaluations",
+    "tags": [
+     "invoicing"
+    ]
+   },
+   "post": {
+    "operationId": "create_revaluation_api_v1_orgs__org_id__fx_revaluations_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RevaluationIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RevaluationOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Create Revaluation",
+    "tags": [
+     "invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/fx-revaluations/preview": {
+   "get": {
+    "operationId": "preview_api_v1_orgs__org_id__fx_revaluations_preview_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "as_of",
+      "required": true,
+      "schema": {
+       "format": "date",
+       "title": "As Of",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RevaluationPreviewOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Preview",
+    "tags": [
+     "invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/fx-revaluations/{doc_id}/cancel": {
+   "post": {
+    "operationId": "cancel_revaluation_api_v1_orgs__org_id__fx_revaluations__doc_id__cancel_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "doc_id",
+      "required": true,
+      "schema": {
+       "title": "Doc Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RevaluationOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Cancel Revaluation",
+    "tags": [
+     "invoicing"
     ]
    }
   },

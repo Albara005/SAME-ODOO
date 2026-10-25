@@ -1961,6 +1961,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/exchange-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Rates */
+        get: operations["list_rates_api_v1_orgs__org_id__exchange_rates_get"];
+        put?: never;
+        /** Add Rate */
+        post: operations["add_rate_api_v1_orgs__org_id__exchange_rates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/exchange-rates/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Latest Rate */
+        get: operations["latest_rate_api_v1_orgs__org_id__exchange_rates_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/exchange-rates/{rate_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Rate */
+        delete: operations["delete_rate_api_v1_orgs__org_id__exchange_rates__rate_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/files": {
         parameters: {
             query?: never;
@@ -2030,6 +2082,58 @@ export interface paths {
         get: operations["download_file_api_v1_orgs__org_id__files__file_id__content_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/fx-revaluations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Revaluations */
+        get: operations["list_revaluations_api_v1_orgs__org_id__fx_revaluations_get"];
+        put?: never;
+        /** Create Revaluation */
+        post: operations["create_revaluation_api_v1_orgs__org_id__fx_revaluations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/fx-revaluations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview */
+        get: operations["preview_api_v1_orgs__org_id__fx_revaluations_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/fx-revaluations/{doc_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Revaluation */
+        post: operations["cancel_revaluation_api_v1_orgs__org_id__fx_revaluations__doc_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8505,6 +8609,32 @@ export interface components {
             /** Size */
             size: string;
         };
+        /** RateIn */
+        RateIn: {
+            /** Currency */
+            currency: string;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Rate */
+            rate: number | string;
+        };
+        /** RateOut */
+        RateOut: {
+            /** Currency */
+            currency: string;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Id */
+            id: string;
+            /** Rate */
+            rate: string;
+        };
         /** ReceiptIn */
         ReceiptIn: {
             /**
@@ -8703,6 +8833,89 @@ export interface components {
              * Format: email
              */
             email: string;
+        };
+        /** RevaluationIn */
+        RevaluationIn: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Rates */
+            rates?: {
+                [key: string]: number | string;
+            };
+        };
+        /** RevaluationLineOut */
+        RevaluationLineOut: {
+            /** Booked */
+            booked: string;
+            /** Currency */
+            currency: string;
+            /** Difference */
+            difference: string | null;
+            /** Due */
+            due: string;
+            /** Invoice Id */
+            invoice_id: string;
+            /** Number */
+            number: string | null;
+            /** Revalued */
+            revalued: string | null;
+        };
+        /** RevaluationOut */
+        RevaluationOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Difference */
+            difference: string;
+            /** Entry Id */
+            entry_id: string | null;
+            /** Id */
+            id: string;
+            /** Lines */
+            lines: components["schemas"]["RevaluationLineOut"][];
+            /** Rates */
+            rates: {
+                [key: string]: string;
+            };
+            /** Reversal Entry Id */
+            reversal_entry_id: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "posted" | "cancelled";
+        };
+        /** RevaluationPreviewOut */
+        RevaluationPreviewOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string;
+            /** Difference */
+            difference: string | null;
+            /** Lines */
+            lines: components["schemas"]["RevaluationLineOut"][];
+            /** Missing */
+            missing: string[];
+            /** Rates */
+            rates: {
+                [key: string]: string;
+            };
         };
         /** ReverseIn */
         ReverseIn: {
@@ -14336,6 +14549,138 @@ export interface operations {
             };
         };
     };
+    list_rates_api_v1_orgs__org_id__exchange_rates_get: {
+        parameters: {
+            query?: {
+                currency?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_rate_api_v1_orgs__org_id__exchange_rates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    latest_rate_api_v1_orgs__org_id__exchange_rates_latest_get: {
+        parameters: {
+            query: {
+                currency: string;
+                on?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RateOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_rate_api_v1_orgs__org_id__exchange_rates__rate_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rate_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_files_api_v1_orgs__org_id__files_get: {
         parameters: {
             query?: never;
@@ -14483,6 +14828,137 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_revaluations_api_v1_orgs__org_id__fx_revaluations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevaluationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_revaluation_api_v1_orgs__org_id__fx_revaluations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevaluationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevaluationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_v1_orgs__org_id__fx_revaluations_preview_get: {
+        parameters: {
+            query: {
+                as_of: string;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevaluationPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_revaluation_api_v1_orgs__org_id__fx_revaluations__doc_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevaluationOut"];
                 };
             };
             /** @description Validation Error */

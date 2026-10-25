@@ -5,7 +5,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (JSON, BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, Text,
+                        UniqueConstraint, text)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -230,3 +231,49 @@ class Refund(IdMixin, TimestampMixin, TenantScoped, Base):
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
     base_amount_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+
+
+class ExchangeRate(IdMixin, TimestampMixin, TenantScoped, Base):
+    """Units of the organization's currency per unit of another, on a day (fx.py). Suggested on invoices and
+    payments in that currency, and used to revalue what is still owed at a period's end."""
+
+    __tablename__ = "exchange_rates"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "currency", "day", name="uq_exchange_rate_day"),
+        CheckConstraint("CAST(rate AS NUMERIC) > 0", name="ck_exchange_rate_positive"),
+    )
+
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    rate: Mapped[Decimal] = mapped_column(ExactDecimal(18, 8), nullable=False)
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class FxRevaluation(IdMixin, TimestampMixin, TenantScoped, Base):
+    """What customers still owe in other currencies, valued at a day's rates (fx.py). The difference from what it is
+    booked at is an unrealized gain or loss, posted on that day and reversed the next, so payments still compare with
+    the invoice's own rate."""
+
+    __tablename__ = "fx_revaluations"
+    __table_args__ = (
+        org_unique_id(),
+        same_org_fk("entry_id", "journal_entries"),
+        same_org_fk("reversal_entry_id", "journal_entries"),
+        same_org_fk("cancel_entry_id", "journal_entries"),
+        same_org_fk("cancel_reversal_entry_id", "journal_entries"),
+        CheckConstraint("status IN ('posted', 'cancelled')", name="ck_fx_revaluation_status"),
+        Index("uq_fx_revaluation_day", "organization_id", "as_of", unique=True,
+              postgresql_where=text("status = 'posted'"), sqlite_where=text("status = 'posted'")),
+    )
+
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(10), default="posted", nullable=False)
+    rates: Mapped[dict] = mapped_column(JSON, nullable=False)          # {currency: "3.76"}
+    # [{invoice_id, number, customer_id, currency, due_minor, booked_minor, revalued_minor, difference_minor}]
+    lines: Mapped[list] = mapped_column(JSON, nullable=False)
+    difference_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)   # the net gain (negative: a loss)
+    entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    reversal_entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    cancel_entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    cancel_reversal_entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))

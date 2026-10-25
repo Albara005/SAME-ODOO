@@ -44,6 +44,8 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     ("4000", "Sales Revenue", "income", "sales"),
     # Invoices in another currency: what the customer's payment was worth against what the invoice was booked at.
     ("4900", "Exchange Gains and Losses", "income", "fx_gain_loss"),
+    # What is still owed in another currency, valued at a period end's rate (reversed the next day).
+    ("4910", "Unrealized Exchange Gains and Losses", "income", "fx_unrealized"),
     ("5000", "Cost of Goods Sold", "expense", "cogs"),
     ("5100", "Inventory Adjustments", "expense", "inventory_adjustment"),
     # A vendor billing received goods at another price than the order's: the difference lands here.
