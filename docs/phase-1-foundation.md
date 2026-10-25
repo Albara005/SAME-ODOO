@@ -61,6 +61,8 @@
 | `NOVARA_ENCRYPTION_KEY` | مفتاح تشفير الأسرار في القاعدة (32 حرفاً على الأقل)، وإلزامي في الإنتاج |
 | `NOVARA_APP_BASE_URL` | عنوان الواجهة في روابط البريد، مثل `https://app.example.com` |
 | `NOVARA_SMTP_HOST`, `NOVARA_SMTP_PORT`, `NOVARA_SMTP_USER`, `NOVARA_SMTP_PASSWORD`, `NOVARA_SMTP_STARTTLS`, `NOVARA_MAIL_FROM` | خادم البريد. دونه تُكتب الرسائل في سجل الخادم (للتطوير) |
+| `NOVARA_VAPID_PRIVATE_KEY`, `NOVARA_VAPID_SUBJECT` | مفتاح إشعارات الأجهزة (Web Push) وعنوان التواصل (`mailto:` أو `https:`، والافتراضي عنوان المرسل في البريد). دونه في الإنتاج تبقى إشعارات الأجهزة معطلة. لإنشائه: `openssl ecparam -name prime256v1 -genkey -noout \| openssl pkcs8 -topk8 -nocrypt` |
+| `NOVARA_PUSH_HOSTS` | مضيفو خدمات إشعارات إضافيون مفصولون بفواصل، إن لزم (الافتراضي: Google وMozilla وApple وMicrosoft) |
 
 ## تخزين الملفات
 

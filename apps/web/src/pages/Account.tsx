@@ -10,6 +10,7 @@ import { refreshUser } from "../auth/refreshUser";
 import { BrandMark, SignOutButton, TopActions } from "../components/Layout";
 import { Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, Notice, QueryView, errorText, useToast } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
+import { currentSubscription, pushSupported, subscribeDevice, subscriptionJson } from "../lib/pwa";
 import { creationOptions, credentialJson, passkeysSupported } from "../lib/webauthn";
 
 export function AccountPage() {
@@ -38,6 +39,7 @@ export function AccountPage() {
         <PasswordCard />
         <TwoFactorCard enabled={user.mfa_enabled} locked={locked} hasPasskey={user.has_passkey} />
         <PasskeysCard locked={locked} />
+        <DevicePushCard />
         <SessionsCard />
       </div>
     </div>
@@ -494,6 +496,75 @@ export function describeAgent(ua: string): string {
     /Windows/.test(ua) ? "Windows" : /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iOS"
       : /Mac OS X/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "";
   return [browser, os].filter(Boolean).join(" · ") || ua.slice(0, 40) || "—";
+}
+
+/** Notifications on this device (Web Push), even with NOVARA closed. */
+function DevicePushCard() {
+  const { t } = useI18n();
+  const toast = useToast();
+  const qc = useQueryClient();
+  const supported = pushSupported();
+  const key = useQuery({
+    queryKey: ["push-key"],
+    queryFn: () => unwrap(api.GET("/api/v1/push/key")),
+    enabled: supported,
+    retry: false,
+  });
+  const devices = useQuery({ queryKey: ["push-devices"], queryFn: () => unwrap(api.GET("/api/v1/push/subscriptions")) });
+  const [local, setLocal] = useState<PushSubscription | null | undefined>(undefined);
+  useEffect(() => {
+    if (supported) void currentSubscription().then(setLocal, () => setLocal(null));
+  }, [supported]);
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["push-devices"] });
+  const enable = useMutation({
+    mutationFn: async () => {
+      const sub = await subscribeDevice(key.data!.public_key);
+      await unwrap(api.POST("/api/v1/push/subscriptions", { body: subscriptionJson(sub) }));
+      return sub;
+    },
+    onSuccess: (sub) => { setLocal(sub); refresh(); toast(t("push.enabled")); },
+    onError: (e) => toast(e instanceof Error && e.message === "denied" ? t("push.denied") : errorText(e, t("common.error")), "error"),
+  });
+  const disable = useMutation({
+    mutationFn: async () => {
+      if (!local) return;
+      await unwrap(api.POST("/api/v1/push/subscriptions/remove", { body: { endpoint: local.endpoint } }));
+      await local.unsubscribe();
+    },
+    onSuccess: () => { setLocal(null); refresh(); },
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const test = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/push/test")),
+    onSuccess: (r) => toast(r.sent ? t("push.testSent") : t("push.testNone")),
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const count = devices.data?.length ?? 0;
+  return (
+    <Card title={t("push.title")} actions={local ? <Badge tone="success">{t("push.onHere")}</Badge> : undefined}>
+      <div className="stack-sm">
+        <p className="muted small">{t("push.hint")}</p>
+        {!supported ? <p className="small">{t("push.unsupported")}</p>
+          : key.isError ? <p className="small">{t("push.notConfigured")}</p>
+            : (
+              <div className="row">
+                {local ? (
+                  <>
+                    <Button size="sm" loading={test.isPending} onClick={() => test.mutate()}>{t("push.test")}</Button>
+                    <Button size="sm" variant="danger" loading={disable.isPending} onClick={() => disable.mutate()}>{t("push.disable")}</Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant="primary" disabled={!key.data || local === undefined} loading={enable.isPending}
+                    onClick={() => enable.mutate()}>
+                    {t("push.enable")}
+                  </Button>
+                )}
+              </div>
+            )}
+        {count > 0 && <p className="muted small">{t("push.devices", { n: count })}</p>}
+      </div>
+    </Card>
+  );
 }
 
 function SessionsCard() {

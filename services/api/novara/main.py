@@ -48,6 +48,7 @@ from novara.modules.identity.router import router as identity_router
 from novara.modules.organizations.router import router as organizations_router
 from novara.payments.router import public_router as public_payments_router, router as payments_router
 from novara.einvoice.router import router as einvoice_router
+from novara import push
 
 # Import models so they are registered on Base.metadata.
 from novara.modules.access import models as _access_models  # noqa: F401
@@ -102,6 +103,9 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     app.state.payment_http = None
     # Calls to ZATCA's Fatoora API (e-invoicing); None opens a client per call. Tests put a mock transport here.
     app.state.einvoice_http = None
+    # Web Push to members' devices: every notification goes out after its transaction commits.
+    app.state.push = push.PushSender(settings, app.state.sessionmaker)
+    push.configure(app.state.push)
 
     @app.exception_handler(PeriodLocked)
     def closed_books(_request: Request, exc: PeriodLocked) -> JSONResponse:
@@ -123,7 +127,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router, credit_router,
               inventory_router, sales_router, web_orders_router, purchasing_router, vendor_credit_router, projects_router, hr_router, payroll_router, bookings_router, assistant_router, studio_router, agents_router, automation_router,
               creative_router, hosting_router, live_router, data_keys_router, public_data_router, inbound_hooks_router,
-              payments_router, public_payments_router, einvoice_router):
+              payments_router, public_payments_router, einvoice_router, push.router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(sites_router)  # public, unauthenticated: published App Studio sites
 

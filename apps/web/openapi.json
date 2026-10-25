@@ -3067,6 +3067,48 @@
     "title": "DeploymentOut",
     "type": "object"
    },
+   "DeviceOut": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "last_sent_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Sent At"
+     },
+     "service": {
+      "title": "Service",
+      "type": "string"
+     },
+     "user_agent": {
+      "title": "User Agent",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "service",
+     "user_agent",
+     "created_at",
+     "last_sent_at"
+    ],
+    "title": "DeviceOut",
+    "type": "object"
+   },
    "DomainIn": {
     "properties": {
      "hostname": {
@@ -9127,6 +9169,19 @@
     "title": "PurchaseOrderSummary",
     "type": "object"
    },
+   "PushKeyOut": {
+    "properties": {
+     "public_key": {
+      "title": "Public Key",
+      "type": "string"
+     }
+    },
+    "required": [
+     "public_key"
+    ],
+    "title": "PushKeyOut",
+    "type": "object"
+   },
    "QuoteIn": {
     "properties": {
      "kind": {
@@ -10203,6 +10258,49 @@
     "title": "StockOperationOut",
     "type": "object"
    },
+   "SubscriptionIn": {
+    "properties": {
+     "endpoint": {
+      "maxLength": 2000,
+      "minLength": 10,
+      "title": "Endpoint",
+      "type": "string"
+     },
+     "keys": {
+      "$ref": "#/components/schemas/SubscriptionKeys"
+     }
+    },
+    "required": [
+     "endpoint",
+     "keys"
+    ],
+    "title": "SubscriptionIn",
+    "type": "object"
+   },
+   "SubscriptionKeys": {
+    "properties": {
+     "auth": {
+      "maxLength": 64,
+      "minLength": 16,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "Auth",
+      "type": "string"
+     },
+     "p256dh": {
+      "maxLength": 200,
+      "minLength": 80,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "title": "P256Dh",
+      "type": "string"
+     }
+    },
+    "required": [
+     "p256dh",
+     "auth"
+    ],
+    "title": "SubscriptionKeys",
+    "type": "object"
+   },
    "TaskIn": {
     "properties": {
      "assignee_user_id": {
@@ -10965,6 +11063,21 @@
      "cost_usd"
     ],
     "title": "TurnOut",
+    "type": "object"
+   },
+   "UnsubscribeIn": {
+    "properties": {
+     "endpoint": {
+      "maxLength": 2000,
+      "minLength": 10,
+      "title": "Endpoint",
+      "type": "string"
+     }
+    },
+    "required": [
+     "endpoint"
+    ],
+    "title": "UnsubscribeIn",
     "type": "object"
    },
    "UsageOut": {
@@ -32022,6 +32135,170 @@
     "summary": "Proof Script",
     "tags": [
      "public data"
+    ]
+   }
+  },
+  "/api/v1/push/key": {
+   "get": {
+    "description": "The application server key browsers subscribe with.",
+    "operationId": "push_key_api_v1_push_key_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PushKeyOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Push Key",
+    "tags": [
+     "push"
+    ]
+   }
+  },
+  "/api/v1/push/subscriptions": {
+   "get": {
+    "operationId": "my_devices_api_v1_push_subscriptions_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "title": "Response My Devices Api V1 Push Subscriptions Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "My Devices",
+    "tags": [
+     "push"
+    ]
+   },
+   "post": {
+    "description": "Send this member's notifications to this device. The endpoint must be a browser push service.",
+    "operationId": "subscribe_api_v1_push_subscriptions_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SubscriptionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Subscribe",
+    "tags": [
+     "push"
+    ]
+   }
+  },
+  "/api/v1/push/subscriptions/remove": {
+   "post": {
+    "operationId": "unsubscribe_api_v1_push_subscriptions_remove_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UnsubscribeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Unsubscribe",
+    "tags": [
+     "push"
+    ]
+   }
+  },
+  "/api/v1/push/test": {
+   "post": {
+    "description": "Send a notification to the member's own devices, to see that it arrives.",
+    "operationId": "test_push_api_v1_push_test_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Test Push Api V1 Push Test Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Test Push",
+    "tags": [
+     "push"
     ]
    }
   },

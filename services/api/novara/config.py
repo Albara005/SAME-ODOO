@@ -47,6 +47,11 @@ class Settings:
     # Key for secrets stored encrypted in the database (two-factor secrets). Defaults to one
     # derived from the JWT secret; set it separately in production so the two can rotate apart.
     encryption_key: str = ""
+    # Web Push (novara/push.py): the VAPID key (PEM or base64url of the private value), who the push
+    # services may contact about it (mailto: or https:), and push service hosts beyond the usual ones.
+    vapid_private_key: str = ""
+    vapid_subject: str = ""
+    push_hosts: list[str] = field(default_factory=list)
 
     def validate(self) -> None:
         if self.env == "production" and self.jwt_secret == _DEV_SECRET:
@@ -96,6 +101,9 @@ def load_settings() -> Settings:
         smtp_starttls=env.get("NOVARA_SMTP_STARTTLS", "true").lower() != "false",
         mail_from=env.get("NOVARA_MAIL_FROM", Settings.mail_from),
         encryption_key=env.get("NOVARA_ENCRYPTION_KEY", ""),
+        vapid_private_key=env.get("NOVARA_VAPID_PRIVATE_KEY", ""),
+        vapid_subject=env.get("NOVARA_VAPID_SUBJECT", ""),
+        push_hosts=[h for h in env.get("NOVARA_PUSH_HOSTS", "").split(",") if h.strip()],
     )
     settings.validate()
     return settings

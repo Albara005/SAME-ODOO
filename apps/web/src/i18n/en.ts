@@ -1718,6 +1718,19 @@ export const en = {
   "invoices.exchangeDifference": "exchange difference",
   "invoices.paymentRate": "Rate on the payment date ({base} per {currency})",
   "invoices.paymentRateHint": "The invoice was booked at {rate}; the difference is an exchange gain or loss.",
+  "push.title": "Notifications on this device",
+  "push.hint": "Approvals, tasks and other notifications arrive here even when NOVARA is closed. Turn it on for each device you use.",
+  "push.enable": "Turn on for this device",
+  "push.disable": "Turn off here",
+  "push.test": "Send a test notification",
+  "push.onHere": "On here",
+  "push.enabled": "Notifications are on for this device",
+  "push.denied": "The browser blocked notifications: allow them in the site settings, then try again.",
+  "push.testSent": "Sent: it should appear in a moment",
+  "push.testNone": "No device to send to",
+  "push.unsupported": "This browser can't receive notifications.",
+  "push.notConfigured": "Notifications to devices aren't set up on this server yet.",
+  "push.devices": "Turned on for {n} device(s)",
 } as const;
 
 export type MessageKey = keyof typeof en;
