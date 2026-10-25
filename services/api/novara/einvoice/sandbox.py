@@ -4,7 +4,8 @@
 
 Creates a throwaway organization in a temporary SQLite database, onboards its device with the sandbox's
 public one-time password (123345), posts a simplified invoice (cash customer), a standard one (a buyer with a
-VAT number and address) with a discount, a second tax rate and an untaxed line, and credits both. Every
+VAT number and address) with a discount, a second tax rate and an untaxed line, credits both, and posts an
+invoice in dollars (its VAT also stated in riyals). Every
 document must come back reported or cleared, without errors. Needs network access to gw-fatoora.zatca.gov.sa;
 it is not part of the test suite (run by hand, or the "ZATCA sandbox" workflow).
 """
@@ -67,6 +68,12 @@ def main() -> int:
                 "issue_date": _today(), "reason": "Returned goods",
                 "lines": [{"invoice_line_id": inv["lines"][0]["id"], "quantity": "1"}]})
             failures += _report(note["number"], note["einvoice"])
+        usd = call("POST", o("/invoices"), json={"customer_id": b2b, "issue_date": _today(), "currency": "USD",
+                                                "exchange_rate": "3.75", "lines": [
+                                                    {"description": "Consulting", "quantity": "10", "unit_price": "100",
+                                                     "tax_id": vat15}]})
+        usd = call("POST", o(f"/invoices/{usd['id']}/post"))
+        failures += _report(f"{usd['number']} (USD)", usd["einvoice"])
         return 1 if failures else 0
 
 

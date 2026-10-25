@@ -50,6 +50,13 @@ def from_minor(minor: int, currency: str) -> Decimal:
     return (Decimal(minor).scaleb(-digits(currency))).quantize(quantum(currency))
 
 
+def convert(minor: int, currency: str, rate: Decimal, to_currency: str) -> int:
+    """An amount in another currency at rate (units of to_currency per unit of currency), rounded once."""
+    if currency == to_currency and rate == 1:
+        return minor
+    return to_minor(from_minor(minor, currency) * rate, to_currency)
+
+
 def parse_decimal(value: str | int | Decimal) -> Decimal:
     try:
         d = Decimal(str(value))

@@ -42,6 +42,13 @@ class Invoice(IdMixin, TimestampMixin, TenantScoped, Base):
     amount_paid_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     # The part of credit notes that reduced what the customer owes on this invoice.
     amount_credited_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    # In another currency than the organization's: units of its currency per unit of the invoice's, as booked.
+    # The ledger is kept in the organization's currency: base_* are the posted amounts there, and
+    # base_settled_minor is how much of the receivable payments and credit notes have cleared.
+    exchange_rate: Mapped[Decimal] = mapped_column(ExactDecimal(18, 8), default=Decimal(1), server_default="1", nullable=False)
+    base_subtotal_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    base_total_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    base_settled_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
     journal_entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     reversal_entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -54,6 +61,13 @@ class Invoice(IdMixin, TimestampMixin, TenantScoped, Base):
         if self.status in ("draft", "cancelled"):
             return 0
         return self.total_minor - self.amount_paid_minor - self.amount_credited_minor
+
+    @property
+    def base_due_minor(self) -> int:
+        """What is still due, in the organization's currency (the receivable's balance for this invoice)."""
+        if self.status in ("draft", "cancelled"):
+            return 0
+        return self.base_total_minor - self.base_settled_minor
 
 
 class InvoiceLine(IdMixin, TenantScoped, Base):
@@ -102,6 +116,11 @@ class Payment(IdMixin, TimestampMixin, TenantScoped, Base):
     journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+    # A payment of an invoice in another currency: the rate on the payment date, what reached the bank in the
+    # organization's currency, and the exchange gain (+) or loss (-) against the invoice's booked rate.
+    exchange_rate: Mapped[Decimal] = mapped_column(ExactDecimal(18, 8), default=Decimal(1), server_default="1", nullable=False)
+    base_amount_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    fx_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
 
 
 class CreditNote(IdMixin, TimestampMixin, TenantScoped, Base):
@@ -137,6 +156,11 @@ class CreditNote(IdMixin, TimestampMixin, TenantScoped, Base):
     journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
     stock_reference: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # goods returned
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+    # In the organization's currency, at the invoice's rate: the whole note, the part that settled the invoice,
+    # and what has been refunded (so the last refund leaves nothing behind).
+    base_total_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    base_applied_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    base_refunded_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
 
 
 class CreditNoteLine(IdMixin, TenantScoped, Base):
@@ -200,3 +224,4 @@ class Refund(IdMixin, TimestampMixin, TenantScoped, Base):
     journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+    base_amount_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)

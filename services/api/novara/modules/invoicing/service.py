@@ -14,6 +14,12 @@ Payments:  Dr Bank/Cash, Cr Accounts Receivable. A payment through an online pay
 (novara/payments) goes to Online Payments Clearing instead, until the provider pays it out.
 Cancelling a posted, unpaid invoice posts the exact reversal of its entry.
 Credit notes (``credit.py``) reduce what is due without touching the invoice itself.
+
+An invoice can be in another currency than the organization's, at an exchange rate. The ledger stays in
+the organization's currency: posting converts each amount at the invoice's rate (base_* fields). A payment
+is converted at its own date's rate; the receivable clears at the invoice's rate (the last payment clears
+exactly what is left), and the difference is an exchange gain or loss:
+    Dr Bank (at the payment's rate)   Cr Receivable (at the invoice's rate)   Dr/Cr Exchange Gains and Losses
 """
 
 from __future__ import annotations
@@ -30,7 +36,9 @@ from novara.db import utcnow
 from novara.modules.accounting.models import Account, JournalEntry, Tax
 from novara.modules.accounting.service import LineSpec, next_number, post_entry, reverse_entry, system_account
 from novara.modules.invoicing.models import Invoice, InvoiceLine, Payment
-from novara.money import from_minor, to_minor
+from novara.modules.organizations.models import Organization
+from novara.money import convert, from_minor, to_minor
+from novara.tenancy import current_tenant
 
 PAYMENT_METHODS = {"bank": "bank", "cash": "cash"}  # method -> system account key
 # Customers can also pay online; only a payment link records those (refunds and vendor payments can't).
@@ -83,6 +91,15 @@ def lines_of(db: Session, invoice: Invoice) -> list[InvoiceLine]:
     return list(db.scalars(select(InvoiceLine).where(InvoiceLine.invoice_id == invoice.id).order_by(InvoiceLine.position)))
 
 
+def base_currency(db: Session) -> str:
+    """The organization's currency: the one its books are kept in."""
+    return db.get(Organization, current_tenant(db)).default_currency
+
+
+def booked_rate(db: Session, invoice: Invoice) -> Decimal:
+    return invoice.exchange_rate if invoice.currency != base_currency(db) else Decimal(1)
+
+
 def lock_invoice(db: Session, invoice_id: str) -> Invoice | None:
     """Load the invoice with a row lock so concurrent post/pay/cancel requests serialize."""
     return db.scalar(select(Invoice).where(Invoice.id == invoice_id).with_for_update())
@@ -98,23 +115,34 @@ def post_invoice(db: Session, invoice: Invoice, *, user_id: str) -> JournalEntry
     if invoice.total_minor <= 0:
         raise InvoiceValidationError("invoice total must be greater than zero")
 
+    base = base_currency(db)
+    if invoice.currency != base and invoice.exchange_rate <= 0:
+        raise InvoiceValidationError(f"an invoice in {invoice.currency} needs its exchange rate to {base}")
+    rate = booked_rate(db, invoice)
     year = invoice.issue_date.year
     invoice.number = next_number(db, f"invoice:{year}", f"INV-{year}-")
     taxes = {t.id: t for t in db.scalars(select(Tax).where(Tax.id.in_([g.tax_id for g in groups])))}
     tax_accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_({t.account_id for t in taxes.values()})))}
 
+    to_base = lambda minor: convert(minor, invoice.currency, rate, base)  # noqa: E731
+    invoice.base_subtotal_minor = to_base(invoice.subtotal_minor)
+    base_taxes = [(g, to_base(g.tax_minor)) for g in groups]
+    invoice.base_total_minor = invoice.base_subtotal_minor + sum(t for _, t in base_taxes)
+    invoice.base_settled_minor = 0
+    note = (f" ({invoice.currency} {from_minor(invoice.total_minor, invoice.currency)} at {rate.normalize():f})"
+            if invoice.currency != base else "")
     specs = [
-        LineSpec(system_account(db, "receivable"), debit_minor=invoice.total_minor,
-                 customer_id=invoice.customer_id, label=f"Invoice {invoice.number}"),
-        LineSpec(system_account(db, "sales"), credit_minor=invoice.subtotal_minor, label=f"Sales {invoice.number}"),
+        LineSpec(system_account(db, "receivable"), debit_minor=invoice.base_total_minor,
+                 customer_id=invoice.customer_id, label=f"Invoice {invoice.number}{note}"),
+        LineSpec(system_account(db, "sales"), credit_minor=invoice.base_subtotal_minor, label=f"Sales {invoice.number}"),
     ]
-    for g in groups:
+    for g, base_tax in base_taxes:
         tax = taxes[g.tax_id]
-        specs.append(LineSpec(tax_accounts[tax.account_id], credit_minor=g.tax_minor,
+        specs.append(LineSpec(tax_accounts[tax.account_id], credit_minor=base_tax,
                               label=f"{tax.name} on {invoice.number}"))
     entry = post_entry(
-        db, entry_date=invoice.issue_date, currency=invoice.currency, lines=specs,
-        memo=f"Invoice {invoice.number}", source_type="invoice", source_id=invoice.id, created_by=user_id,
+        db, entry_date=invoice.issue_date, currency=base, lines=specs,
+        memo=f"Invoice {invoice.number}{note}", source_type="invoice", source_id=invoice.id, created_by=user_id,
     )
     invoice.status = "posted"
     invoice.journal_entry_id = entry.id
@@ -133,8 +161,11 @@ def register_payment(
     reference: str,
     user_id: str,
     idempotency_key: str | None = None,
+    exchange_rate: Decimal | None = None,
 ) -> tuple[Payment, bool]:
-    """Record a payment. Returns (payment, created). A repeated idempotency key returns the original payment."""
+    """Record a payment. Returns (payment, created). A repeated idempotency key returns the original payment.
+
+    For an invoice in another currency, exchange_rate is the rate on the payment date (required)."""
     if idempotency_key:
         existing = db.scalar(select(Payment).where(Payment.idempotency_key == idempotency_key))
         if existing is not None:
@@ -152,22 +183,35 @@ def register_payment(
         )
     if payment_date < invoice.issue_date:
         raise InvoiceValidationError("payment date cannot be before the invoice date")
-
+    base = base_currency(db)
+    foreign = invoice.currency != base
+    if foreign and (exchange_rate is None or exchange_rate <= 0):
+        raise InvoiceValidationError(f"a payment in {invoice.currency} needs the exchange rate to {base} on the payment date")
+    rate = exchange_rate if foreign else Decimal(1)
+    received = convert(amount_minor, invoice.currency, rate, base)
+    cleared = (invoice.base_due_minor if amount_minor == residual
+               else min(convert(amount_minor, invoice.currency, booked_rate(db, invoice), base), invoice.base_due_minor))
+    fx = received - cleared
+    lines = [
+        LineSpec(system_account(db, RECEIPT_METHODS[method]), debit_minor=received,
+                 label=f"Payment {invoice.number} {reference}".strip()),
+        LineSpec(system_account(db, "receivable"), credit_minor=cleared,
+                 customer_id=invoice.customer_id, label=f"Payment {invoice.number}"),
+    ]
+    if fx:
+        lines.append(LineSpec(system_account(db, "fx_gain_loss"), credit_minor=max(fx, 0), debit_minor=max(-fx, 0),
+                              label=f"Exchange {'gain' if fx > 0 else 'loss'} on {invoice.number}"))
     entry = post_entry(
-        db, entry_date=payment_date, currency=invoice.currency, created_by=user_id,
-        memo=f"Payment for {invoice.number}", source_type="payment", source_id=invoice.id,
-        lines=[
-            LineSpec(system_account(db, RECEIPT_METHODS[method]), debit_minor=amount_minor,
-                     label=f"Payment {invoice.number} {reference}".strip()),
-            LineSpec(system_account(db, "receivable"), credit_minor=amount_minor,
-                     customer_id=invoice.customer_id, label=f"Payment {invoice.number}"),
-        ],
+        db, entry_date=payment_date, currency=base, created_by=user_id,
+        memo=f"Payment for {invoice.number}", source_type="payment", source_id=invoice.id, lines=lines,
     )
     payment = Payment(
         invoice_id=invoice.id, payment_date=payment_date, amount_minor=amount_minor, method=method,
         reference=reference, journal_entry_id=entry.id, idempotency_key=idempotency_key, created_by=user_id,
+        exchange_rate=rate, base_amount_minor=received, fx_minor=fx,
     )
     db.add(payment)
+    invoice.base_settled_minor += cleared
     invoice.amount_paid_minor += amount_minor
     settle(invoice)
     db.flush()
@@ -207,7 +251,7 @@ class InvoiceLocked(RuntimeError):
 
 # Fields that may still change after posting (payment and cancellation bookkeeping).
 _MUTABLE_AFTER_POST = {"status", "amount_paid_minor", "amount_credited_minor", "reversal_entry_id", "cancelled_at",
-                       "number", "journal_entry_id", "posted_at", "posted_by"}
+                       "number", "journal_entry_id", "posted_at", "posted_by", "base_settled_minor"}
 
 
 @event.listens_for(Session, "before_flush")

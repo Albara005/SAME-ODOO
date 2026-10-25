@@ -1708,6 +1708,16 @@ export const en = {
   "einvoice.kind.standard": "Standard tax invoice (cleared)",
   "einvoice.kind.simplified": "Simplified tax invoice (reported)",
   "einvoice.counter": "No. {n} on this device",
+  "invoices.currency": "Currency",
+  "invoices.foreignHint": "Line prices are in {currency}; the books stay in the organization's currency.",
+  "invoices.exchangeRate": "Exchange rate: {base} per 1 {currency}",
+  "invoices.rateBooked": "Booked at ({base} per {currency})",
+  "invoices.inBase": "Total in {base}",
+  "invoices.dueInBase": "Due in {base}",
+  "invoices.paidInBase": "{amount} at {rate}",
+  "invoices.exchangeDifference": "exchange difference",
+  "invoices.paymentRate": "Rate on the payment date ({base} per {currency})",
+  "invoices.paymentRateHint": "The invoice was booked at {rate}; the difference is an exchange gain or loss.",
 } as const;
 
 export type MessageKey = keyof typeof en;

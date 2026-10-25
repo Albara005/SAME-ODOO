@@ -96,6 +96,7 @@ class Document:
     reason: str = ""                 # credit and debit notes: why (KSA-10)
     payment_means: str = "10"        # UN/ECE 4461: 10 cash, 30 credit transfer, 42 bank account, 48 card, 1 not defined
     notes: list[str] = field(default_factory=list)
+    tax_total_sar: Decimal | None = None   # a document in another currency: its VAT in SAR too (BT-111)
 
     @property
     def line_total(self) -> Decimal:
@@ -192,7 +193,7 @@ def build(doc: Document) -> etree._Element:
     for note in doc.notes:
         _el(root, CBC, "Note", note[:1000], languageID="ar")
     _el(root, CBC, "DocumentCurrencyCode", c)
-    _el(root, CBC, "TaxCurrencyCode", c)
+    _el(root, CBC, "TaxCurrencyCode", "SAR")
     if doc.billing_reference:
         _el(_el(_el(root, CAC, "BillingReference"), CAC, "InvoiceDocumentReference"), CBC, "ID", doc.billing_reference)
     icv = _el(root, CAC, "AdditionalDocumentReference")
@@ -209,8 +210,9 @@ def build(doc: Document) -> etree._Element:
     _el(means, CBC, "PaymentMeansCode", doc.payment_means)
     if doc.reason:
         _el(means, CBC, "InstructionNote", doc.reason[:1000])
-    # Two TaxTotal blocks: the first just the amount in the tax currency, the second with the breakdown.
-    _el(_el(root, CAC, "TaxTotal"), CBC, "TaxAmount", _money(doc.tax_total), currencyID=c)
+    # Two TaxTotal blocks: the first just the amount in the tax currency (SAR), the second with the breakdown.
+    sar = doc.tax_total if c == "SAR" or doc.tax_total_sar is None else doc.tax_total_sar
+    _el(_el(root, CAC, "TaxTotal"), CBC, "TaxAmount", _money(sar), currencyID="SAR")
     breakdown = _el(root, CAC, "TaxTotal")
     _el(breakdown, CBC, "TaxAmount", _money(doc.tax_total), currencyID=c)
     for g in doc.groups:

@@ -32,7 +32,7 @@ from novara.modules.invoicing.models import CreditNote, CreditNoteLine, CreditNo
 from novara.modules.invoicing.service import lines_of, tax_groups
 from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
-from novara.money import from_minor, round_money
+from novara.money import convert, from_minor, round_money
 from novara.tenancy import current_tenant, system_scope
 
 SAUDI_VAT = re.compile(r"^3\d{13}3$")
@@ -244,6 +244,15 @@ def _taxes(db: Session, ids) -> dict[str, Tax]:
     return {t.id: t for t in db.scalars(select(Tax).where(Tax.id.in_(ids)))} if ids else {}
 
 
+def _tax_in_sar(db: Session, currency: str, booked) -> Decimal | None:
+    """A document in another currency states its VAT in SAR too: what the books show for it."""
+    if currency == "SAR":
+        return None
+    if db.get(Organization, current_tenant(db)).default_currency != "SAR":
+        raise EInvoiceError("ZATCA e-invoices need the organization's books in SAR")
+    return from_minor(booked(), "SAR")
+
+
 def invoice_document(db: Session, inv: Invoice) -> ubl.Document:
     org = db.get(Organization, inv.organization_id)
     customer = db.get(Customer, inv.customer_id)
@@ -259,7 +268,8 @@ def invoice_document(db: Session, inv: Invoice) -> ubl.Document:
                         issue_time=posted.time().replace(microsecond=0, tzinfo=None), currency=inv.currency, icv=0, pih="",
                         seller=seller(org, active(db)), buyer=_buyer(customer, kind),
                         lines=_lines(lines, taxes, inv.currency), groups=_groups(per_tax, taxes, inv.currency),
-                        supply_date=inv.issue_date, payment_means="30" if kind == "standard" else "10")
+                        supply_date=inv.issue_date, payment_means="30" if kind == "standard" else "10",
+                        tax_total_sar=_tax_in_sar(db, inv.currency, lambda: inv.base_total_minor - inv.base_subtotal_minor))
 
 
 def credit_document(db: Session, note: CreditNote) -> ubl.Document:
@@ -280,7 +290,9 @@ def credit_document(db: Session, note: CreditNote) -> ubl.Document:
                         seller=seller(org, active(db)), buyer=_buyer(customer, kind),
                         lines=_lines(lines, taxes, note.currency), groups=_groups(per_tax, taxes, note.currency),
                         supply_date=note.issue_date, billing_reference=invoice.number,
-                        reason=note.reason or "Credit note", payment_means="30" if kind == "standard" else "10")
+                        reason=note.reason or "Credit note", payment_means="30" if kind == "standard" else "10",
+                        tax_total_sar=_tax_in_sar(db, note.currency,
+                                                  lambda: convert(note.tax_minor, note.currency, invoice.exchange_rate, "SAR")))
 
 
 def issue(db: Session, settings, source_type: str, source_id: str, doc: ubl.Document) -> EInvoiceDocument:
@@ -288,8 +300,6 @@ def issue(db: Session, settings, source_type: str, source_id: str, doc: ubl.Docu
     s = db.scalar(select(EInvoiceSettings).where(EInvoiceSettings.status == "onboarded").with_for_update())
     if s is None:
         raise EInvoiceState("e-invoicing isn't set up")
-    if doc.currency != "SAR":
-        raise EInvoiceError("ZATCA e-invoices are issued in SAR")
     s.icv += 1
     doc.icv, doc.pih, doc.uuid = s.icv, s.last_hash, str(uuid.uuid4())
     key = csr.load_key(_secret(db, settings, s.private_key))

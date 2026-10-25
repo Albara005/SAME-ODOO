@@ -40,6 +40,8 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     ("3000", "Owner's Equity", "equity", "equity"),
     ("3100", "Retained Earnings", "equity", "retained_earnings"),
     ("4000", "Sales Revenue", "income", "sales"),
+    # Invoices in another currency: what the customer's payment was worth against what the invoice was booked at.
+    ("4900", "Exchange Gains and Losses", "income", "fx_gain_loss"),
     ("5000", "Cost of Goods Sold", "expense", "cogs"),
     ("5100", "Inventory Adjustments", "expense", "inventory_adjustment"),
     # A vendor billing received goods at another price than the order's: the difference lands here.

@@ -6288,10 +6288,14 @@ export interface components {
         };
         /** InvoiceIn */
         InvoiceIn: {
+            /** Currency */
+            currency?: string | null;
             /** Customer Id */
             customer_id: string;
             /** Due Date */
             due_date?: string | null;
+            /** Exchange Rate */
+            exchange_rate?: number | string | null;
             /**
              * Issue Date
              * Format: date
@@ -6314,6 +6318,15 @@ export interface components {
             /** Amount Paid */
             amount_paid: string;
             /**
+             * Base Currency
+             * @default
+             */
+            base_currency: string;
+            /** Base Due */
+            base_due?: string | null;
+            /** Base Total */
+            base_total?: string | null;
+            /**
              * Created At
              * Format: date-time
              */
@@ -6335,6 +6348,11 @@ export interface components {
              */
             due_date: string;
             einvoice?: components["schemas"]["EInvoiceSummary"] | null;
+            /**
+             * Exchange Rate
+             * @default 1
+             */
+            exchange_rate: string;
             /** Id */
             id: string;
             /**
@@ -7492,6 +7510,8 @@ export interface components {
         PaymentIn: {
             /** Amount */
             amount: number | string;
+            /** Exchange Rate */
+            exchange_rate?: number | string | null;
             /** Method */
             method: string;
             /**
@@ -7550,11 +7570,20 @@ export interface components {
         PaymentOut: {
             /** Amount */
             amount: string;
+            /** Base Amount */
+            base_amount?: string | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+            /** Exchange Difference */
+            exchange_difference?: string | null;
+            /**
+             * Exchange Rate
+             * @default 1
+             */
+            exchange_rate: string;
             /** Id */
             id: string;
             /** Invoice Id */

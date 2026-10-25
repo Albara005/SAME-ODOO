@@ -20,6 +20,7 @@ import { today } from "../lib/format";
 
 type Invoice = Schemas["InvoiceOut"];
 const STATUSES = ["draft", "posted", "partially_paid", "paid", "credited", "cancelled"] as const;
+const CURRENCIES = ["SAR", "AED", "QAR", "KWD", "BHD", "OMR", "EGP", "JOD", "IQD", "MAD", "TND", "LYD", "TRY", "USD", "EUR", "GBP", "JPY"];
 const CREDITABLE = ["posted", "partially_paid", "paid", "credited"];
 
 function useInvoice(id: string) {
@@ -143,11 +144,17 @@ function InvoiceEditor({ invoice }: { invoice?: Invoice }) {
     issue_date: invoice?.issue_date ?? today(),
     due_date: invoice?.due_date ?? "",
     notes: invoice?.notes ?? "",
+    currency: invoice?.currency ?? org.default_currency,
+    exchange_rate: invoice && invoice.currency !== org.default_currency ? invoice.exchange_rate : "",
   });
+  const foreign = header.currency !== org.default_currency;
   const [lines, setLines] = useState<LineDraft[]>(invoice ? toDraft(invoice) : [newLine()]);
   const save = useMutation({
     mutationFn: () => {
-      const body = { ...header, due_date: header.due_date || null, lines: lines.map(toLineIn) };
+      const body = {
+        ...header, due_date: header.due_date || null, lines: lines.map(toLineIn),
+        exchange_rate: foreign ? header.exchange_rate || null : null,
+      };
       return invoice
         ? unwrap(api.PUT("/api/v1/orgs/{org_id}/invoices/{invoice_id}", { params: { path: { org_id: org.id, invoice_id: invoice.id } }, body }))
         : unwrap(api.POST("/api/v1/orgs/{org_id}/invoices", { params: { path: { org_id: org.id } }, body }));
@@ -187,10 +194,21 @@ function InvoiceEditor({ invoice }: { invoice?: Invoice }) {
           <Field label={t("invoices.dueDate")} error={err["due_date"]} optional>
             <Input type="date" value={header.due_date} min={header.issue_date} onChange={(e) => setHeader({ ...header, due_date: e.target.value })} ltr />
           </Field>
+          <Field label={t("invoices.currency")} hint={foreign ? t("invoices.foreignHint", { currency: header.currency }) : undefined}>
+            <Select value={header.currency} onChange={(e) => setHeader({ ...header, currency: e.target.value })}>
+              {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </Select>
+          </Field>
+          {foreign && (
+            <Field label={t("invoices.exchangeRate", { currency: header.currency, base: org.default_currency })} error={err["exchange_rate"]}>
+              <Input value={header.exchange_rate} inputMode="decimal" required ltr
+                onChange={(e) => setHeader({ ...header, exchange_rate: e.target.value })} />
+            </Field>
+          )}
         </div>
       </Card>
       <Card title={t("invoices.lines")}>
-        <LinesEditor lines={lines} onChange={setLines} currency={org.default_currency} />
+        <LinesEditor lines={lines} onChange={setLines} currency={header.currency} />
       </Card>
       <Field label={t("invoices.notes")} optional>
         <Textarea value={header.notes} onChange={(e) => setHeader({ ...header, notes: e.target.value })} />
@@ -363,6 +381,16 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
                   )}
                   <dt>{t("invoices.due")}</dt>
                   <dd className="num" style={{ textAlign: "end" }}><strong>{money(inv.amount_due, inv.currency)}</strong></dd>
+                  {inv.base_total && (
+                    <>
+                      <dt>{t("invoices.rateBooked", { currency: inv.currency, base: inv.base_currency })}</dt>
+                      <dd className="num" style={{ textAlign: "end" }}>{inv.exchange_rate}</dd>
+                      <dt>{t("invoices.inBase", { base: inv.base_currency })}</dt>
+                      <dd className="num" style={{ textAlign: "end" }}>{money(inv.base_total, inv.base_currency)}</dd>
+                      <dt>{t("invoices.dueInBase", { base: inv.base_currency })}</dt>
+                      <dd className="num" style={{ textAlign: "end" }}>{money(inv.base_due ?? "0", inv.base_currency)}</dd>
+                    </>
+                  )}
                 </>
               )
             }
@@ -450,7 +478,16 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
                       <tr key={p.id}>
                         <td className="num">{date(p.payment_date)}</td>
                         <td>{p.method === "bank" ? t("invoices.bank") : p.method === "online" ? t("invoices.online") : t("invoices.cash")}</td>
-                        <td>{p.reference}</td>
+                        <td>
+                          {p.reference}
+                          {p.base_amount && (
+                            <div className="small muted num">
+                              {t("invoices.paidInBase", { amount: money(p.base_amount, inv.base_currency), rate: p.exchange_rate })}
+                              {p.exchange_difference && p.exchange_difference !== "0.00" &&
+                                ` · ${t("invoices.exchangeDifference")} ${money(p.exchange_difference, inv.base_currency)}`}
+                            </div>
+                          )}
+                        </td>
                         <td className="end num">{money(p.amount, inv.currency)}</td>
                       </tr>
                     ))}
@@ -566,13 +603,15 @@ function PaymentDialog({ invoice, onClose, onDone }: { invoice: Invoice; onClose
   const { t } = useI18n();
   const { org } = useOrg();
   const [idempotencyKey] = useIdempotencyKey();
-  const [form, setForm] = useState({ amount: invoice.amount_due, payment_date: today(), method: "bank" as "bank" | "cash", reference: "" });
+  const foreign = invoice.currency !== invoice.base_currency;
+  const [form, setForm] = useState({ amount: invoice.amount_due, payment_date: today(), method: "bank" as "bank" | "cash", reference: "",
+    exchange_rate: foreign ? invoice.exchange_rate : "" });
   const pay = useMutation({
     mutationFn: () =>
       unwrap(
         api.POST("/api/v1/orgs/{org_id}/invoices/{invoice_id}/payments", {
           params: { path: { org_id: org.id, invoice_id: invoice.id }, header: { "idempotency-key": idempotencyKey } },
-          body: form,
+          body: { ...form, exchange_rate: foreign ? form.exchange_rate : null },
         }),
       ),
     onSuccess: onDone,
@@ -598,6 +637,13 @@ function PaymentDialog({ invoice, onClose, onDone }: { invoice: Invoice; onClose
           <Field label={t("invoices.reference")} optional>
             <Input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
           </Field>
+          {foreign && (
+            <Field label={t("invoices.paymentRate", { currency: invoice.currency, base: invoice.base_currency })}
+              hint={t("invoices.paymentRateHint", { rate: invoice.exchange_rate })} error={err["exchange_rate"]}>
+              <Input value={form.exchange_rate} inputMode="decimal" required ltr
+                onChange={(e) => setForm({ ...form, exchange_rate: e.target.value })} />
+            </Field>
+          )}
         </div>
         <div className="form-actions">
           <Button onClick={onClose}>{t("common.cancel")}</Button>

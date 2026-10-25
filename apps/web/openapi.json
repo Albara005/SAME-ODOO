@@ -4271,6 +4271,18 @@
    },
    "InvoiceIn": {
     "properties": {
+     "currency": {
+      "anyOf": [
+       {
+        "pattern": "^[A-Z]{3}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Currency"
+     },
      "customer_id": {
       "title": "Customer Id",
       "type": "string"
@@ -4286,6 +4298,21 @@
        }
       ],
       "title": "Due Date"
+     },
+     "exchange_rate": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Rate"
      },
      "issue_date": {
       "format": "date",
@@ -4330,6 +4357,33 @@
       "title": "Amount Paid",
       "type": "string"
      },
+     "base_currency": {
+      "default": "",
+      "title": "Base Currency",
+      "type": "string"
+     },
+     "base_due": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Due"
+     },
+     "base_total": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Total"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",
@@ -4369,6 +4423,11 @@
         "type": "null"
        }
       ]
+     },
+     "exchange_rate": {
+      "default": "1",
+      "title": "Exchange Rate",
+      "type": "string"
      },
      "id": {
       "title": "Id",
@@ -7443,6 +7502,21 @@
       ],
       "title": "Amount"
      },
+     "exchange_rate": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Rate"
+     },
      "method": {
       "pattern": "^(bank|cash)$",
       "title": "Method",
@@ -7587,9 +7661,36 @@
       "title": "Amount",
       "type": "string"
      },
+     "base_amount": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Amount"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",
+      "type": "string"
+     },
+     "exchange_difference": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Difference"
+     },
+     "exchange_rate": {
+      "default": "1",
+      "title": "Exchange Rate",
       "type": "string"
      },
      "id": {

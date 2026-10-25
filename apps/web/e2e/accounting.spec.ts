@@ -393,3 +393,33 @@ test("e-invoicing: onboard the device with ZATCA, then a posted invoice is signe
   await expect(page.getByRole("img", { name: "رمز QR للفاتورة الإلكترونية" })).toBeVisible();
   expect(inv.id).toBeTruthy();
 });
+
+test("multi-currency: a dollar invoice is booked in riyals and its payment shows the exchange difference", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await signUpAndIn(page, uniqueEmail("fx"));
+  await createOrg(page, "شركة العملات");
+  const call = await apiFor(page);
+  await call("POST", "/customers", { name: "Gulf Trading LLC" });
+  const orgPath = page.url().match(/\/o\/[0-9a-f-]+/)![0];
+  await page.goto(`${orgPath}/invoices/new`);
+  await page.getByLabel("العميل").selectOption({ label: "Gulf Trading LLC" });
+  await page.getByLabel("العملة").selectOption("USD");
+  await page.getByLabel(/سعر الصرف/).fill("3.75");
+  await page.getByLabel("الوصف 1").fill("Consulting");
+  await page.getByLabel("الكمية 1").fill("10");
+  await page.getByLabel("سعر الوحدة 1").fill("100");
+  await page.getByRole("button", { name: "حفظ كمسودة" }).click();
+  await page.getByRole("button", { name: "ترحيل الفاتورة" }).click();
+  await expect(page.getByText(/الإجمالي بـ/)).toBeVisible();
+  await expect(page.getByRole("definition").filter({ hasText: "3,750.00" }).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "تسجيل دفعة" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel(/سعر الصرف يوم الدفع/)).toHaveValue("3.75");
+  await dialog.getByLabel(/سعر الصرف يوم الدفع/).fill("3.80");
+  await dialog.getByRole("button", { name: "تسجيل دفعة" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("مدفوعة").first()).toBeVisible();
+  await expect(page.getByText(/فرق صرف/)).toContainText("50.00");                  // 1,000 x (3.80 - 3.75)
+  await page.screenshot({ path: "test-results/screens/invoice-usd-ar.png", fullPage: true });
+});

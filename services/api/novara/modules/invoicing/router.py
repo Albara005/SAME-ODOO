@@ -25,7 +25,7 @@ from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
 from novara.modules.projects import service as project_hours
 from novara.modules.sales.service import order_has_invoice_links, order_of_invoice
-from novara.money import fmt_decimal, from_minor, to_minor
+from novara.money import CURRENCY_DIGITS, fmt_decimal, from_minor, to_minor
 
 router = APIRouter(tags=["invoices"])
 
@@ -36,6 +36,10 @@ class InvoiceIn(BaseModel):
     due_date: date | None = None
     notes: str = Field(default="", max_length=5000)
     lines: list[LineIn] = Field(min_length=1, max_length=500)
+    # Another currency than the organization's: line prices are in it, and the rate (units of the
+    # organization's currency per unit of this one) books the invoice in the ledger.
+    currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
+    exchange_rate: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=8)
 
     @model_validator(mode="after")
     def _dates(self):
@@ -49,6 +53,8 @@ class PaymentIn(BaseModel):
     payment_date: date
     method: str = Field(pattern="^(bank|cash)$")
     reference: str = Field(default="", max_length=120)
+    # Invoices in another currency: the rate on the payment date (required for them).
+    exchange_rate: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=8)
 
 
 class CancelIn(BaseModel):
@@ -110,6 +116,11 @@ class InvoiceOut(BaseModel):
     # organization has a VAT number.
     zatca_qr: str | None = None
     einvoice: EInvoiceSummary | None = None
+    # Another currency: its rate and the amounts in the organization's currency (the ledger's).
+    exchange_rate: str = "1"
+    base_currency: str = ""
+    base_total: str | None = None
+    base_due: str | None = None
     # Set when the invoice was created from a sales order (its draft is then edited through the order).
     sales_order_id: str | None = None
     sales_order_number: str | None = None
@@ -139,6 +150,9 @@ class PaymentOut(BaseModel):
     reference: str
     journal_entry_id: str
     created_at: datetime
+    exchange_rate: str = "1"
+    base_amount: str | None = None
+    exchange_difference: str | None = None   # gain (+) or loss (-) in the organization's currency
 
 
 def _money(minor: int, currency: str) -> str:
@@ -171,6 +185,11 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
         credit_notes=[CreditNoteRef(id=n.id, number=n.number, issue_date=n.issue_date, total=_money(n.total_minor, c))
                       for n in notes],
         zatca_qr=qr, einvoice=einvoice_summary(doc) if doc else None,
+        exchange_rate=fmt_decimal(inv.exchange_rate), base_currency=org.default_currency,
+        base_total=(_money(inv.base_total_minor, org.default_currency)
+                    if c != org.default_currency and inv.status != "draft" else None),
+        base_due=(_money(inv.base_due_minor, org.default_currency)
+                  if c != org.default_currency and inv.status != "draft" else None),
         journal_entry_id=inv.journal_entry_id, reversal_entry_id=inv.reversal_entry_id, posted_at=inv.posted_at,
         created_at=inv.created_at, sales_order_id=order.id if order else None,
         sales_order_number=order.number if order else None,
@@ -190,10 +209,14 @@ def invoice_out(db: Session, inv: Invoice) -> InvoiceOut:
     )
 
 
-def payment_out(p: Payment, currency: str) -> PaymentOut:
+def payment_out(p: Payment, currency: str, base: str | None = None) -> PaymentOut:
+    foreign = base is not None and base != currency
     return PaymentOut(id=p.id, invoice_id=p.invoice_id, payment_date=p.payment_date,
                       amount=_money(p.amount_minor, currency), method=p.method, reference=p.reference,
-                      journal_entry_id=p.journal_entry_id, created_at=p.created_at)
+                      journal_entry_id=p.journal_entry_id, created_at=p.created_at,
+                      exchange_rate=fmt_decimal(p.exchange_rate),
+                      base_amount=_money(p.base_amount_minor, base) if foreign else None,
+                      exchange_difference=_money(p.fx_minor, base) if foreign else None)
 
 
 def _unprocessable(msg: str) -> HTTPException:
@@ -212,6 +235,17 @@ def _apply_header(db: Session, inv: Invoice, body: InvoiceIn) -> None:
     inv.issue_date = body.issue_date
     inv.due_date = body.due_date or body.issue_date
     inv.notes = body.notes
+    base = svc.base_currency(db)
+    currency = body.currency or base
+    if currency not in CURRENCY_DIGITS:
+        raise _unprocessable(f"unsupported currency: {currency}")
+    if currency != base:
+        if body.exchange_rate is None:
+            raise _unprocessable(f"an invoice in {currency} needs the exchange rate to {base}")
+        if any(l.unit_price is None for l in body.lines):
+            raise _unprocessable(f"give each line's price in {currency} (product prices are in {base})")
+    inv.currency = currency
+    inv.exchange_rate = body.exchange_rate if currency != base else Decimal(1)
 
 
 def _get_invoice(db: Session, invoice_id: str, *, lock: bool = False) -> Invoice:
@@ -377,7 +411,7 @@ def add_payment(
             response.status_code = status.HTTP_200_OK
     else:
         response.status_code = status.HTTP_200_OK
-    return payment_out(payment, inv.currency)
+    return payment_out(payment, inv.currency, svc.base_currency(db))
 
 
 def add_payment_record(db: Session, ctx: OrgContext, invoice_id: str, body: PaymentIn, *, ip: str = "",
@@ -390,6 +424,7 @@ def add_payment_record(db: Session, ctx: OrgContext, invoice_id: str, body: Paym
     payment, created = _domain_errors(lambda: svc.register_payment(
         db, inv, amount_minor=amount_minor, payment_date=body.payment_date, method=body.method,
         reference=body.reference, user_id=ctx.user.id, idempotency_key=idempotency_key,
+        exchange_rate=body.exchange_rate,
     ))
     if created:
         details = {"payment_id": payment.id, "amount": str(body.amount), "method": body.method}
@@ -401,8 +436,9 @@ def add_payment_record(db: Session, ctx: OrgContext, invoice_id: str, body: Paym
 @router.get("/orgs/{org_id}/invoices/{invoice_id}/payments", response_model=list[PaymentOut])
 def list_payments(invoice_id: str, _: OrgContext = Depends(require(P.INVOICES_READ)), db: Session = Depends(get_db)):
     inv = _get_invoice(db, invoice_id)
-    rows = db.scalars(select(Payment).where(Payment.invoice_id == inv.id).order_by(Payment.payment_date))
-    return [payment_out(p, inv.currency) for p in rows]
+    rows = db.scalars(select(Payment).where(Payment.invoice_id == inv.id).order_by(Payment.payment_date, Payment.created_at))
+    base = svc.base_currency(db)
+    return [payment_out(p, inv.currency, base) for p in rows]
 
 
 @router.post("/orgs/{org_id}/invoices/{invoice_id}/cancel", response_model=InvoiceOut)
@@ -457,7 +493,7 @@ def receivables_aging(as_of: date | None = None, ctx: OrgContext = Depends(requi
     per_customer: dict[str, dict] = {}
     totals: dict[str, int] = defaultdict(int)
     for inv, name in rows:
-        due = inv.amount_due_minor
+        due = inv.base_due_minor            # in the organization's currency, whatever the invoice's
         bucket = _bucket((as_of - inv.due_date).days)
         c = per_customer.setdefault(inv.customer_id, {"name": name, "buckets": defaultdict(int), "count": 0})
         c["buckets"][bucket] += due

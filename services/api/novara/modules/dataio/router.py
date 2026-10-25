@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from novara.deps import OrgContext, client_ip, get_db, require
@@ -20,7 +21,7 @@ from novara.modules.dataio.csvio import CsvError, csv_response, read_csv
 from novara.modules.invoicing.models import Invoice, InvoiceLine
 from novara.modules.partners.models import Customer
 from novara.modules.partners.router import CustomerIn
-from novara.money import fmt_decimal, from_minor
+from novara.money import convert, fmt_decimal, from_minor
 
 router = APIRouter(tags=["import-export"])
 
@@ -257,23 +258,29 @@ def sales_report(date_from: date | None = None, date_to: date | None = None,
                           .where(*cond)).all()
     months: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     customers: dict[str, list] = {}
+    # In the organization's currency: invoices in other currencies count at the rate they were booked at.
     for inv, name in invoices:
         bucket = months[inv.issue_date.strftime("%Y-%m")]
-        bucket[0] += inv.subtotal_minor
+        bucket[0] += inv.base_subtotal_minor
         bucket[1] += 1
         c = customers.setdefault(inv.customer_id, [name, 0, 0])
-        c[1] += inv.subtotal_minor
+        c[1] += inv.base_subtotal_minor
         c[2] += 1
-    product_rows = db.execute(
-        select(InvoiceLine.product_id, Product.name, func.sum(InvoiceLine.net_minor),
-               func.count(func.distinct(InvoiceLine.invoice_id)))
+    per_product: dict[str, list] = {}
+    for pid, pname, net_minor, inv_id, inv_currency, rate in db.execute(
+        select(InvoiceLine.product_id, Product.name, InvoiceLine.net_minor, InvoiceLine.invoice_id, Invoice.currency,
+               Invoice.exchange_rate)
         .join(Invoice, Invoice.id == InvoiceLine.invoice_id)
         .join(Product, Product.id == InvoiceLine.product_id)
-        .where(*cond).group_by(InvoiceLine.product_id, Product.name)
-    ).all()
+        .where(*cond)
+    ):
+        p = per_product.setdefault(pid, [pname, 0, set()])
+        p[1] += convert(net_minor, inv_currency, rate if inv_currency != currency else Decimal(1), currency)
+        p[2].add(inv_id)
+    product_rows = [(pid, p[0], p[1], len(p[2])) for pid, p in per_product.items()]
     m = lambda v: str(from_minor(int(v), currency))  # noqa: E731
-    net = sum(inv.subtotal_minor for inv, _ in invoices)
-    tax = sum(inv.tax_minor for inv, _ in invoices)
+    net = sum(inv.base_subtotal_minor for inv, _ in invoices)
+    tax = sum(inv.base_total_minor - inv.base_subtotal_minor for inv, _ in invoices)
     return SalesReportOut(
         date_from=date_from, date_to=date_to, currency=currency, net_sales=m(net), tax=m(tax), gross_sales=m(net + tax),
         invoices=len(invoices),

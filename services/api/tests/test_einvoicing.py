@@ -200,3 +200,18 @@ def test_the_database_keeps_issued_documents_as_signed(api, ei, zatca, app):
             with pytest.raises(DBAPIError, match="e-invoice|permission denied"):
                 db.execute(text(sql), {"n": number})
                 db.commit()
+
+
+def test_an_invoice_in_dollars_states_its_vat_in_riyals(api, ei, zatca, app):
+    onboard(api, ei)
+    inv = api.req("POST", SALES, u(ei, "/invoices"), json={
+        "customer_id": ei["cash"], "issue_date": date.today().isoformat(), "currency": "USD", "exchange_rate": "3.75",
+        "lines": [{"description": "Consulting", "quantity": "10", "unit_price": "100", "tax_id": ei["vat"]}]}).json()
+    posted = api.req("POST", ACCT, u(ei, f"/invoices/{inv['id']}/post")).json()
+    assert posted["einvoice"]["status"] == "reported"
+    root = etree.fromstring(stored(app, ei, posted["number"]).xml.encode())
+    assert (root.findtext(f"{{{CBC}}}DocumentCurrencyCode"), root.findtext(f"{{{CBC}}}TaxCurrencyCode")) == ("USD", "SAR")
+    first, second = root.findall(f"{{{CAC}}}TaxTotal")
+    amount = first.find(f"{{{CBC}}}TaxAmount")
+    assert (amount.text, amount.get("currencyID")) == ("562.50", "SAR")                 # 150 USD x 3.75
+    assert second.find(f"{{{CBC}}}TaxAmount").get("currencyID") == "USD"

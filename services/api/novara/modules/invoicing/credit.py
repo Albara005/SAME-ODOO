@@ -35,8 +35,9 @@ from novara.modules.inventory import service as stock
 from novara.modules.inventory.models import StockMove, Warehouse
 from novara.modules.invoicing.models import CreditNote, CreditNoteLine, CreditNoteTax, Invoice, InvoiceLine, Refund
 from novara.modules.invoicing.service import (PAYMENT_METHODS, InvoiceStateError, InvoiceValidationError,
-                                              line_net_minor, lines_of, settle, tax_groups)
-from novara.money import from_minor, to_minor
+                                              base_currency, booked_rate, line_net_minor, lines_of, settle,
+                                              tax_groups)
+from novara.money import convert, from_minor, to_minor
 
 CREDITABLE = ("posted", "partially_paid", "paid", "credited")
 
@@ -148,21 +149,32 @@ def create_credit_note(db: Session, invoice: Invoice, *, issue_date: date, reaso
     tax_records = {t.id: t for t in db.scalars(select(Tax).where(Tax.id.in_([t.tax_id for t in taxes])))}
     tax_accounts = {a.id: a for a in db.scalars(
         select(Account).where(Account.id.in_({t.account_id for t in tax_records.values()})))}
-    specs = [LineSpec(system_account(db, "sales"), debit_minor=subtotal, label=f"Credit note {number}")]
+    # In the organization's currency at the invoice's rate. The part that settles the invoice clears exactly
+    # what its receivable still holds; any rounding left over goes to exchange differences.
+    base, rate = base_currency(db), booked_rate(db, invoice)
+    to_base = lambda minor: convert(minor, invoice.currency, rate, base)  # noqa: E731
+    applied = min(total, invoice.amount_due_minor)
+    base_applied = invoice.base_due_minor if applied == invoice.amount_due_minor else min(to_base(applied), invoice.base_due_minor)
+    base_receivable = base_applied + to_base(total - applied)
+    specs = [LineSpec(system_account(db, "sales"), debit_minor=to_base(subtotal), label=f"Credit note {number}")]
     for t in taxes:
         record = tax_records[t.tax_id]
-        specs.append(LineSpec(tax_accounts[record.account_id], debit_minor=t.tax_minor,
+        specs.append(LineSpec(tax_accounts[record.account_id], debit_minor=to_base(t.tax_minor),
                               label=f"{record.name} on {number}"))
-    specs.append(LineSpec(system_account(db, "receivable"), credit_minor=total, customer_id=invoice.customer_id,
+    rounding = base_receivable - sum(s.debit_minor for s in specs)
+    if rounding:
+        specs.append(LineSpec(system_account(db, "fx_gain_loss"), debit_minor=max(rounding, 0), credit_minor=max(-rounding, 0),
+                              label=f"Exchange rounding on {number}"))
+    specs.append(LineSpec(system_account(db, "receivable"), credit_minor=base_receivable, customer_id=invoice.customer_id,
                           label=f"Credit note {number} for {invoice.number}"))
-    entry = post_entry(db, entry_date=issue_date, currency=invoice.currency, lines=specs,
+    entry = post_entry(db, entry_date=issue_date, currency=base, lines=specs,
                        memo=f"Credit note {number} for {invoice.number}", source_type="credit_note",
                        source_id=invoice.id, created_by=user_id)
 
-    applied = min(total, invoice.amount_due_minor)
     note = CreditNote(number=number, invoice_id=invoice.id, customer_id=invoice.customer_id, issue_date=issue_date,
                       currency=invoice.currency, reason=reason, subtotal_minor=subtotal, tax_minor=tax_total,
-                      total_minor=total, applied_minor=applied, journal_entry_id=entry.id, created_by=user_id)
+                      total_minor=total, applied_minor=applied, journal_entry_id=entry.id, created_by=user_id,
+                      base_total_minor=base_receivable, base_applied_minor=base_applied)
     db.add(note)
     db.flush()
     for cl in credit_lines:
@@ -171,6 +183,7 @@ def create_credit_note(db: Session, invoice: Invoice, *, issue_date: date, reaso
         t.credit_note_id = note.id
     db.add_all(credit_lines + taxes)
     invoice.amount_credited_minor += applied
+    invoice.base_settled_minor += base_applied
     settle(invoice)
     if returns:
         note.stock_reference = _return_goods(db, invoice, note, returns, user_id=user_id)
@@ -194,7 +207,7 @@ def _return_goods(db: Session, invoice: Invoice, note: CreditNote, returns: list
         warehouses[warehouse.id] = warehouse
     references = []
     for wid, items in plan.items():
-        result = stock.return_in(db, warehouse=warehouses[wid], move_date=note.issue_date, currency=invoice.currency,
+        result = stock.return_in(db, warehouse=warehouses[wid], move_date=note.issue_date, currency=base_currency(db),
                                  lines=items, source_type="credit_note", source_id=note.id, user_id=user_id)
         references.append(result.reference)
     return ", ".join(references)[:40]
@@ -215,19 +228,25 @@ def refund(db: Session, note: CreditNote, *, amount_minor: int, refund_date: dat
         raise InvoiceValidationError(f"refund must be between 0 and the amount owed {from_minor(owed, note.currency)}")
     if refund_date < note.issue_date:
         raise InvoiceValidationError("the refund cannot be dated before the credit note")
+    # At the invoice's rate; the last refund pays out exactly what the note still owes in the books.
+    base = base_currency(db)
+    base_owed = note.base_total_minor - note.base_applied_minor - note.base_refunded_minor
+    base_amount = base_owed if amount_minor == owed else min(
+        convert(amount_minor, note.currency, booked_rate(db, db.get(Invoice, note.invoice_id)), base), base_owed)
     entry = post_entry(
-        db, entry_date=refund_date, currency=note.currency, created_by=user_id,
+        db, entry_date=refund_date, currency=base, created_by=user_id,
         memo=f"Refund for {note.number}", source_type="refund", source_id=note.id,
-        lines=[LineSpec(system_account(db, "receivable"), debit_minor=amount_minor, customer_id=note.customer_id,
+        lines=[LineSpec(system_account(db, "receivable"), debit_minor=base_amount, customer_id=note.customer_id,
                         label=f"Refund {note.number}"),
-               LineSpec(system_account(db, PAYMENT_METHODS[method]), credit_minor=amount_minor,
+               LineSpec(system_account(db, PAYMENT_METHODS[method]), credit_minor=base_amount,
                         label=f"Refund {note.number} {reference}".strip())],
     )
     record = Refund(credit_note_id=note.id, refund_date=refund_date, amount_minor=amount_minor, method=method,
                     reference=reference, journal_entry_id=entry.id, idempotency_key=idempotency_key,
-                    created_by=user_id)
+                    created_by=user_id, base_amount_minor=base_amount)
     db.add(record)
     note.refunded_minor += amount_minor
+    note.base_refunded_minor += base_amount
     db.flush()
     return record, True
 
