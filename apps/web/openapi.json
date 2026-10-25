@@ -2889,6 +2889,21 @@
       "title": "Instructions",
       "type": "string"
      },
+     "knowledge": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "maxItems": 20,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Knowledge"
+     },
      "max_cost_usd": {
       "anyOf": [
        {
@@ -3252,6 +3267,14 @@
      "size_bytes": {
       "title": "Size Bytes",
       "type": "integer"
+     },
+     "text_chars": {
+      "title": "Text Chars",
+      "type": "integer"
+     },
+     "text_status": {
+      "title": "Text Status",
+      "type": "string"
      }
     },
     "required": [
@@ -3261,7 +3284,9 @@
      "size_bytes",
      "sha256",
      "created_by",
-     "created_at"
+     "created_at",
+     "text_status",
+     "text_chars"
     ],
     "title": "FileOut",
     "type": "object"
@@ -4196,6 +4221,29 @@
      }
     },
     "title": "KitUpdate",
+    "type": "object"
+   },
+   "KnowledgeFileOut": {
+    "properties": {
+     "file_id": {
+      "title": "File Id",
+      "type": "string"
+     },
+     "filename": {
+      "title": "Filename",
+      "type": "string"
+     },
+     "text_status": {
+      "title": "Text Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "file_id",
+     "filename",
+     "text_status"
+    ],
+    "title": "KnowledgeFileOut",
     "type": "object"
    },
    "LeaveIn": {
@@ -5971,6 +6019,39 @@
      "primary"
     ],
     "title": "PaletteIn",
+    "type": "object"
+   },
+   "PassageOut": {
+    "properties": {
+     "file_id": {
+      "title": "File Id",
+      "type": "string"
+     },
+     "filename": {
+      "title": "Filename",
+      "type": "string"
+     },
+     "position": {
+      "title": "Position",
+      "type": "integer"
+     },
+     "score": {
+      "title": "Score",
+      "type": "number"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "file_id",
+     "filename",
+     "position",
+     "score",
+     "text"
+    ],
+    "title": "PassageOut",
     "type": "object"
    },
    "PasskeyIn": {
@@ -10605,6 +10686,13 @@
       "title": "Instructions",
       "type": "string"
      },
+     "knowledge": {
+      "items": {
+       "$ref": "#/components/schemas/KnowledgeFileOut"
+      },
+      "title": "Knowledge",
+      "type": "array"
+     },
      "max_cost_usd": {
       "title": "Max Cost Usd",
       "type": "string"
@@ -10641,6 +10729,7 @@
      "route",
      "max_steps",
      "max_cost_usd",
+     "knowledge",
      "created_at"
     ],
     "title": "VersionOut",
@@ -17687,6 +17776,81 @@
      }
     ],
     "summary": "Upload File",
+    "tags": [
+     "files"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/files/search": {
+   "get": {
+    "description": "The passages inside the organization's files that best match the words (ranked; see text.py).",
+    "operationId": "search_files_api_v1_orgs__org_id__files_search_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": true,
+      "schema": {
+       "maxLength": 200,
+       "minLength": 2,
+       "title": "Q",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 8,
+       "maximum": 25,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PassageOut"
+         },
+         "title": "Response Search Files Api V1 Orgs  Org Id  Files Search Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Search Files",
     "tags": [
      "files"
     ]

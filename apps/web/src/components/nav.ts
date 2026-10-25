@@ -6,6 +6,7 @@ import {
   CheckSquare,
   ClipboardCheck,
   FileText,
+  FolderOpen,
   Home,
   IdCard,
   KeyRound,
@@ -49,6 +50,7 @@ export const NAV: NavGroup[] = [
       { to: "hr", label: "nav.hr", icon: IdCard, anyOf: ["hr.read", "leave.request", "hr.manage"], hue: "rose", desc: "app.hr" },
       { to: "accounting", label: "nav.accounting", icon: Landmark, anyOf: ["accounting.read"], hue: "gold", desc: "app.accounting" },
       { to: "reports", label: "nav.reports", icon: BarChart3, anyOf: ["invoices.read", "accounting.read"], hue: "violet", desc: "app.reports" },
+      { to: "documents", label: "nav.documents", icon: FolderOpen, anyOf: ["files.read"], hue: "slate", desc: "app.documents" },
     ],
   },
   {

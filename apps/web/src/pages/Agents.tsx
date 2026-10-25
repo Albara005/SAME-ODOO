@@ -10,6 +10,7 @@ import {
 } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
 import { usd } from "./AiSettings";
+import { TextBadge } from "./Documents";
 
 type Agent = Schemas["AgentOut"];
 type Version = Schemas["novara__agents__router__VersionOut"];
@@ -215,7 +216,7 @@ function RunTab({ agent: a }: { agent: Agent }) {
 
 function BuildTab({ agent: a }: { agent: Agent }) {
   const { t } = useI18n();
-  const { org } = useOrg();
+  const { org, can } = useOrg();
   const qc = useQueryClient();
   const toast = useToast();
   const latest: Version | undefined = a.versions[a.versions.length - 1];
@@ -225,9 +226,20 @@ function BuildTab({ agent: a }: { agent: Agent }) {
     route: latest?.route ?? "assistant",
     max_steps: latest?.max_steps ?? 6,
     max_cost_usd: latest?.max_cost_usd ?? "0.20",
+    knowledge: (latest?.knowledge ?? []).filter((k) => k.text_status !== "deleted").map((k) => k.file_id),
+  });
+  const canAttach = can("files.read");
+  const files = useQuery({
+    queryKey: ["files", org.id],
+    enabled: canAttach,
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/files", { params: { path: { org_id: org.id } } })),
   });
   const save = useMutation({
-    mutationFn: () => unwrap(api.PUT("/api/v1/orgs/{org_id}/agents/{agent_id}/draft", { params: { path: { org_id: org.id, agent_id: a.id } }, body: draft })),
+    mutationFn: () => unwrap(api.PUT("/api/v1/orgs/{org_id}/agents/{agent_id}/draft", {
+      params: { path: { org_id: org.id, agent_id: a.id } },
+      // Without files.read the list can't be changed (or even shown), so leave it as it is.
+      body: canAttach ? draft : { ...draft, knowledge: null },
+    })),
     onSuccess: (v) => {
       toast(t("agents.draftSaved", { v: v.number }));
       void qc.invalidateQueries({ queryKey: ["agent", org.id, a.id] });
@@ -263,6 +275,27 @@ function BuildTab({ agent: a }: { agent: Agent }) {
               />
             );
           })}
+        </div>
+      </Card>
+      <Card title={t("agents.knowledge")}>
+        <div className="stack-sm">
+          <p className="muted small">{t("agents.knowledgeHint")}</p>
+          {!canAttach ? (
+            <p className="small">{t("agents.knowledgeNeedsFiles", { n: draft.knowledge.length })}</p>
+          ) : (
+            <QueryView query={files}>
+              {(list) => list.length === 0 ? <Empty>{t("agents.knowledgeNoFiles")}</Empty> : (
+                <div className="perm-grid">
+                  {list.map((f) => (
+                    <Checkbox key={f.id} checked={draft.knowledge.includes(f.id)}
+                      disabled={!draft.knowledge.includes(f.id) && draft.knowledge.length >= 20}
+                      onChange={(e) => setDraft({ ...draft, knowledge: e.target.checked ? [...draft.knowledge, f.id] : draft.knowledge.filter((x) => x !== f.id) })}
+                      label={<span><span dir="auto">{f.filename}</span> <TextBadge file={f} /></span>} />
+                  ))}
+                </div>
+              )}
+            </QueryView>
+          )}
         </div>
       </Card>
       <Card title={t("agents.limits")}>
@@ -414,6 +447,11 @@ function VersionsTab({ agent: a }: { agent: Agent }) {
               </span>
             </div>
             <p className="muted small">{v.tools.join(", ") || t("agents.noTools")} · {v.route} · {v.max_steps} · ${usd(v.max_cost_usd)}</p>
+            {v.knowledge.length > 0 && (
+              <p className="muted small">
+                {t("agents.knowledge")}: {v.knowledge.map((k) => k.filename || t("agents.knowledgeDeleted")).join("، ")}
+              </p>
+            )}
             {res && (
               <div className="stack-sm" style={{ marginBlockStart: "var(--space-2)" }}>
                 <Badge tone={passed ? "success" : "danger"}>{passed ? t("agents.allPassed") : t("agents.someFailed")}</Badge>

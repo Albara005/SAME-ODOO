@@ -1775,6 +1775,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/files/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Files
+         * @description The passages inside the organization's files that best match the words (ranked; see text.py).
+         */
+        get: operations["search_files_api_v1_orgs__org_id__files_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/files/{file_id}": {
         parameters: {
             query?: never;
@@ -5091,6 +5111,8 @@ export interface components {
              * @default
              */
             instructions: string;
+            /** Knowledge */
+            knowledge?: string[] | null;
             /**
              * Max Cost Usd
              * @default 0.20
@@ -5207,6 +5229,10 @@ export interface components {
             sha256: string;
             /** Size Bytes */
             size_bytes: number;
+            /** Text Chars */
+            text_chars: number;
+            /** Text Status */
+            text_status: string;
         };
         /** FreeTimesOut */
         FreeTimesOut: {
@@ -5551,6 +5577,15 @@ export interface components {
             secondary?: string | null;
             /** Tagline */
             tagline?: string | null;
+        };
+        /** KnowledgeFileOut */
+        KnowledgeFileOut: {
+            /** File Id */
+            file_id: string;
+            /** Filename */
+            filename: string;
+            /** Text Status */
+            text_status: string;
         };
         /** LeaveIn */
         LeaveIn: {
@@ -6240,6 +6275,19 @@ export interface components {
             primary: string;
             /** Secondary */
             secondary?: string | null;
+        };
+        /** PassageOut */
+        PassageOut: {
+            /** File Id */
+            file_id: string;
+            /** Filename */
+            filename: string;
+            /** Position */
+            position: number;
+            /** Score */
+            score: number;
+            /** Text */
+            text: string;
         };
         /** PasskeyIn */
         PasskeyIn: {
@@ -7935,6 +7983,8 @@ export interface components {
             created_at: string;
             /** Instructions */
             instructions: string;
+            /** Knowledge */
+            knowledge: components["schemas"]["KnowledgeFileOut"][];
             /** Max Cost Usd */
             max_cost_usd: string;
             /** Max Steps */
@@ -11958,6 +12008,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_files_api_v1_orgs__org_id__files_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PassageOut"][];
                 };
             };
             /** @description Validation Error */

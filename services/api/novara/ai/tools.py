@@ -171,46 +171,72 @@ def _orders(t: ToolContext, a: OrderQuery):
 
 
 class FileQuery(BaseModel):
-    query: str = Field(min_length=2, max_length=100, description="Words to find in file names or text files")
-    limit: int = Field(default=10, ge=1, le=25)
+    query: str = Field(min_length=2, max_length=200, description="What to look for, in the user's words")
+    limit: int = Field(default=8, ge=1, le=20)
 
 
-TEXT_TYPES = ("text/", "application/json", "application/xml", "application/csv")
-MAX_SEARCH_BYTES = 256 * 1024
-SNIPPET = 160
-
-
-def _snippet(text: str, needle: str) -> str | None:
-    at = text.lower().find(needle)
-    if at < 0:
-        return None
-    start = max(at - SNIPPET // 2, 0)
-    return ("…" if start else "") + text[start:start + SNIPPET].replace("\n", " ") + ("…" if start + SNIPPET < len(text) else "")
+def _passages(found) -> list[dict]:
+    return [{"file_id": p.file_id, "filename": p.filename, "passage_number": p.position + 1, "score": p.score,
+             "text": p.text} for p in found]
 
 
 def _search_files(t: ToolContext, a: FileQuery):
-    """Organization files the user can read (files.read): matching names, and text inside small text files."""
+    """Ranked passages inside the organization's PDF, Word and text files, plus files whose name matches."""
     from sqlalchemy import select
 
+    from novara.modules.files import text as file_text
     from novara.modules.files.models import StoredFile
-    from novara.modules.files.storage import StorageError
 
-    needle = a.query.lower()
-    out = []
+    if t.storage is not None:
+        file_text.index_pending(t.db, t.storage)
+    out = _passages(file_text.search(t.db, a.query, limit=a.limit))
+    terms = file_text.query_terms(a.query)
+    found = {p["file_id"] for p in out}
     for f in t.db.scalars(select(StoredFile).order_by(StoredFile.created_at.desc()).limit(500)):
-        snippet = None
-        if t.storage is not None and f.size_bytes <= MAX_SEARCH_BYTES and f.content_type.startswith(TEXT_TYPES):
-            try:
-                snippet = _snippet(t.storage.get(f.storage_key).decode("utf-8", errors="replace"), needle)
-            except (OSError, KeyError, StorageError):
-                snippet = None
-        if snippet is None and needle not in f.filename.lower():
-            continue
-        out.append({"file_id": f.id, "filename": f.filename, "content_type": f.content_type,
-                    "size_bytes": f.size_bytes, "uploaded_at": f.created_at.isoformat(), "match": snippet or ""})
-        if len(out) >= a.limit:
-            break
-    return out
+        name = file_text.normalise(f.filename)
+        if f.id not in found and terms and all(term in name for term in terms):
+            out.append({"file_id": f.id, "filename": f.filename, "passage_number": None, "score": None,
+                        "text": "", "match": "file name"})
+    return out[:a.limit + 5]
+
+
+class FileRead(BaseModel):
+    file_id: str = Field(max_length=36)
+    start: int = Field(default=0, ge=0, description="Character offset to read from (for long files)")
+
+
+READ_CHARS = 6000
+
+
+def _read_file(t: ToolContext, a: FileRead):
+    from novara.modules.files import text as file_text
+    from novara.modules.files.models import StoredFile
+
+    f = t.db.get(StoredFile, a.file_id)
+    if f is None:
+        raise ToolRefused("no such file")
+    if f.text_status in ("pending", "failed") and t.storage is not None:
+        file_text.index_file(t.db, t.storage, f)
+        t.db.flush()
+    if f.text_status != "ready":
+        return {"file_id": f.id, "filename": f.filename, "text": "", "note": "this file has no readable text"}
+    part, total = file_text.read(t.db, f, a.start, READ_CHARS)
+    return {"file_id": f.id, "filename": f.filename, "start": a.start, "total_chars": total, "text": part,
+            "more": a.start + len(part) < total}
+
+
+class KnowledgeQuery(BaseModel):
+    query: str = Field(min_length=2, max_length=200, description="What to look up in the agent's reference documents")
+
+
+def _search_knowledge(t: ToolContext, a: KnowledgeQuery):
+    """Only the files the agent's owner gave it as knowledge (ToolContext.extra["knowledge_file_ids"])."""
+    from novara.modules.files import text as file_text
+
+    file_ids = list(t.extra.get("knowledge_file_ids") or [])
+    if t.storage is not None and file_ids:
+        file_text.index_pending(t.db, t.storage, file_ids, limit=len(file_ids))
+    return _passages(file_text.search(t.db, a.query, file_ids=file_ids, limit=6))
 
 
 # ---------------------------------------------------------------- write tools (approval required)
@@ -329,8 +355,11 @@ TOOLS: dict[str, Tool] = {t.name: t for t in [
     Tool("stock_levels", "Quantity, value and average cost of stock per product and warehouse.", P.INVENTORY_READ,
          "read", StockQuery, _stock),
     Tool("list_sales_orders", "Quotations and sales orders.", P.SALES_READ, "read", OrderQuery, _orders),
-    Tool("search_files", "Find the organization's uploaded files by name, and by text inside small text/CSV/JSON "
-         "files. Returns where the words appear.", P.FILES_READ, "read", FileQuery, _search_files),
+    Tool("search_files", "Search inside the organization's documents (PDF, Word, text and CSV files) and return the "
+         "best-matching passages with their file, plus files whose name matches. Quote what you use and name the file.",
+         P.FILES_READ, "read", FileQuery, _search_files),
+    Tool("read_file", "Read the text of one document (6,000 characters at a time; use start for more).",
+         P.FILES_READ, "read", FileRead, _read_file),
     Tool("remember", "Save a note for the user's future conversations (a preference or a fact they want kept). "
          "Requires the user's approval in the app; only this user's assistant sees it.", P.AI_USE, "write",
          Note, _remember, lambda a: f"Remember: {a.note}"),
@@ -371,3 +400,9 @@ def execute(tool: Tool, ctx: ToolContext, args: BaseModel) -> object:
     except HTTPException as e:
         detail = e.detail if isinstance(e.detail, str) else json.dumps(e.detail, default=str)
         raise ToolRefused(detail)
+
+
+# Not offered to the assistant: a custom agent gets it when its version has knowledge files.
+KNOWLEDGE_TOOL = Tool("search_knowledge", "Look things up in this agent's reference documents. Use it before "
+                      "answering questions they may cover; quote what you use and name the document.",
+                      P.AGENTS_RUN, "read", KnowledgeQuery, _search_knowledge)

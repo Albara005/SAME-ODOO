@@ -38,6 +38,8 @@ class DraftIn(BaseModel):
     route: str = "assistant"
     max_steps: int = 6
     max_cost_usd: Decimal = Field(default=Decimal("0.20"), gt=0, decimal_places=4)
+    # Files the agent can look things up in; omit to keep the draft's current ones.
+    knowledge: list[str] | None = Field(default=None, max_length=svc.MAX_KNOWLEDGE_FILES)
 
 
 class TestCaseIn(BaseModel):
@@ -52,6 +54,12 @@ class RunIn(BaseModel):
     input: str = Field(min_length=1, max_length=8000)
 
 
+class KnowledgeFileOut(BaseModel):
+    file_id: str
+    filename: str            # empty if the file was deleted since
+    text_status: str         # as on the file, or "deleted"
+
+
 class VersionOut(BaseModel):
     number: int
     status: str
@@ -60,6 +68,7 @@ class VersionOut(BaseModel):
     route: str
     max_steps: int
     max_cost_usd: str
+    knowledge: list[KnowledgeFileOut]
     created_at: datetime
 
 
@@ -94,9 +103,15 @@ class RunOut(BaseModel):
     created_at: datetime
 
 
-def _version_out(v: AgentVersion) -> VersionOut:
+def _version_out(db: Session, v: AgentVersion) -> VersionOut:
+    from novara.modules.files.models import StoredFile
+
+    files = {f.id: f for f in db.scalars(select(StoredFile).where(StoredFile.id.in_(v.knowledge)))} if v.knowledge else {}
+    knowledge = [KnowledgeFileOut(file_id=i, filename=files[i].filename if i in files else "",
+                                  text_status=files[i].text_status if i in files else "deleted") for i in v.knowledge]
     return VersionOut(number=v.number, status=v.status, instructions=v.instructions, tools=v.tools, route=v.route,
-                      max_steps=v.max_steps, max_cost_usd=usd(v.max_cost_micros), created_at=v.created_at)
+                      max_steps=v.max_steps, max_cost_usd=usd(v.max_cost_micros), knowledge=knowledge,
+                      created_at=v.created_at)
 
 
 def _agent_out(db: Session, a: Agent) -> AgentOut:
@@ -105,7 +120,7 @@ def _agent_out(db: Session, a: Agent) -> AgentOut:
     return AgentOut(id=a.id, name=a.name, description=a.description, enabled=a.enabled,
                     published_version=a.published_version, disabled_tools=a.disabled_tools,
                     monthly_budget_usd=usd(a.monthly_budget_micros), month_spend_usd=usd(svc.month_spend(db, a)),
-                    versions=[_version_out(v) for v in svc.versions(db, a)],
+                    versions=[_version_out(db, v) for v in svc.versions(db, a)],
                     available_tools=[{"name": t.name, "kind": t.kind, "permission": t.permission,
                                       "description": t.description} for t in TOOLS.values()])
 
@@ -137,7 +152,7 @@ def _errors(fn):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
     except svc.AgentStateError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e))
-    except svc.AgentDisabled as e:
+    except (svc.AgentDisabled, svc.AgentKnowledgeForbidden) as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     except A.AssistantUnavailable as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
@@ -198,12 +213,16 @@ def edit_draft(agent_id: str, body: DraftIn, request: Request, ctx: OrgContext =
     cost = int(body.max_cost_usd * 1_000_000)
     _errors(lambda: svc.validate_config(tools=body.tools, route=body.route, max_steps=body.max_steps,
                                         max_cost_micros=cost))
+    knowledge = _errors(lambda: svc.validate_knowledge(db, ctx, body.knowledge)) if body.knowledge is not None else None
     draft = svc.editable_draft(db, a, ctx.user.id)
     draft.instructions, draft.tools, draft.route = body.instructions, sorted(set(body.tools)), body.route
     draft.max_steps, draft.max_cost_micros = body.max_steps, cost
-    _audit(db, ctx, request, "agent.draft_updated", a, version=draft.number, tools=draft.tools)
+    if knowledge is not None:
+        draft.knowledge = knowledge
+    _audit(db, ctx, request, "agent.draft_updated", a, version=draft.number, tools=draft.tools,
+           knowledge=len(draft.knowledge))
     db.commit()
-    return _version_out(draft)
+    return _version_out(db, draft)
 
 
 @router.post("/orgs/{org_id}/agents/{agent_id}/tests", response_model=TestCaseOut,
@@ -231,7 +250,8 @@ def test_version(agent_id: str, number: int, request: Request, ctx: OrgContext =
     """Run every test case against this version, as you (your permissions apply). Freezes the version."""
     a = _agent(db, agent_id)
     v = _version(db, a, number)
-    runs = _errors(lambda: svc.run_tests(db, ctx, a, v, provider=request.app.state.ai_provider, ip=client_ip(request)))
+    runs = _errors(lambda: svc.run_tests(db, ctx, a, v, provider=request.app.state.ai_provider, ip=client_ip(request),
+                                         storage=request.app.state.storage))
     _audit(db, ctx, request, "agent.tested", a, version=number, passed=sum(1 for r in runs if r.passed),
            total=len(runs))
     db.commit()
@@ -257,7 +277,8 @@ def run_agent(agent_id: str, body: RunIn, request: Request, ctx: OrgContext = De
     if a.published_version is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "this agent has no published version")
     r = _errors(lambda: svc.run(db, ctx, a, _version(db, a, a.published_version), body.input,
-                                provider=request.app.state.ai_provider, trigger="manual", ip=client_ip(request)))
+                                provider=request.app.state.ai_provider, trigger="manual", ip=client_ip(request),
+                                storage=request.app.state.storage))
     db.commit()
     return _run_out(r)
 

@@ -35,6 +35,7 @@ const BrandKitPage = page(creative, "BrandKitPage");
 const CreativePage = page(creative, "CreativePage");
 const CreditNotePage = page(() => import("./pages/CreditNotes"), "CreditNotePage");
 const CustomersPage = page(() => import("./pages/Customers"), "CustomersPage");
+const DocumentsPage = page(() => import("./pages/Documents"), "DocumentsPage");
 const HostingPage = page(() => import("./pages/Hosting"), "HostingPage");
 const invoices = () => import("./pages/Invoices");
 const InvoiceDetailPage = page(invoices, "InvoiceDetailPage");
@@ -176,6 +177,7 @@ export function App() {
             <Route path="bookings" element={<BookingsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="documents" element={<DocumentsPage />} />
             <Route path="assistant" element={<AssistantPage />} />
             <Route path="assistant/:conversationId" element={<AssistantPage />} />
             <Route path="tasks" element={<TasksPage />} />

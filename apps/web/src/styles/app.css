@@ -763,3 +763,9 @@ td.short { color: var(--color-warning-text); font-weight: 600; }
 /* "or" between the password form and the passkey button. */
 .or-line { display: flex; align-items: center; gap: var(--space-3); color: var(--color-muted); font-size: 0.875rem; }
 .or-line::before, .or-line::after { content: ""; flex: 1; border-block-start: 1px solid var(--color-border); }
+
+/* Documents: passages found inside files. */
+.passages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.passages li { padding: var(--space-3); border-radius: var(--radius); border: 1px solid var(--color-border); border-inline-start: 3px solid var(--gold); background: var(--color-surface); }
+.passages p { margin: var(--space-2) 0 0; line-height: 1.8; }
+.passages .line { display: block; }  /* each line takes its own direction (Arabic and English lines mix) */

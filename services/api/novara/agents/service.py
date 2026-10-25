@@ -2,7 +2,9 @@
 
 What an agent can do in a run is the intersection of
   (its version's tool allowlist) - (tools switched off on the agent)
-and (the tools the *running user* holds the permission for).
+and (the tools the *running user* holds the permission for). A version with knowledge files also
+gets search_knowledge, which reads only those files: whoever attached them (with files.read)
+decided that people who run the agent may read what they say.
 No agent tool can change agents, roles or permissions, so an agent can't widen its own
 access; write tools still need the user's approval; steps and cost are capped per run,
 and spend per month per agent.
@@ -27,6 +29,9 @@ from novara.modules.audit import service as audit
 
 AGENT_ROUTES = ("assistant", "assistant_deep")
 MAX_RUN_COST_MICROS = 2_000_000  # an owner can't set a per-run cap above 2 USD
+MAX_KNOWLEDGE_FILES = 20
+KNOWLEDGE_NOTE = ("\n\nYou have reference documents. Before answering a question they may cover, look it up with "
+                  "search_knowledge, answer from what you find, name the document, and say so if they don't cover it.")
 
 AGENT_SYSTEM = """You are a custom agent inside NOVARA, set up by someone in this organization for a specific job. \
 You act for the signed-in user and can only use the tools you are given, which are limited to what both the agent \
@@ -55,6 +60,10 @@ class AgentDisabled(RuntimeError):
     """The agent is switched off or over its budget (HTTP 403)."""
 
 
+class AgentKnowledgeForbidden(PermissionError):
+    """Attaching files needs files.read (HTTP 403)."""
+
+
 def create_agent(db: Session, *, name: str, description: str, user_id: str) -> Agent:
     agent = Agent(name=name, description=description, created_by=user_id)
     db.add(agent)
@@ -80,7 +89,7 @@ def editable_draft(db: Session, agent: Agent, user_id: str) -> AgentVersion:
         return latest
     draft = AgentVersion(agent_id=agent.id, number=latest.number + 1, status="draft", instructions=latest.instructions,
                          tools=list(latest.tools), route=latest.route, max_steps=latest.max_steps,
-                         max_cost_micros=latest.max_cost_micros, created_by=user_id)
+                         max_cost_micros=latest.max_cost_micros, knowledge=list(latest.knowledge), created_by=user_id)
     db.add(draft)
     db.flush()
     return draft
@@ -105,8 +114,26 @@ def month_spend(db: Session, agent: Agent) -> int:
                          .where(AgentRun.agent_id == agent.id, AgentRun.created_at >= start)))
 
 
+def validate_knowledge(db: Session, org: OrgContext, file_ids: list[str]) -> list[str]:
+    from novara.modules.access import permissions as P
+    from novara.modules.files.models import StoredFile
+
+    ids = list(dict.fromkeys(file_ids))
+    if len(ids) > MAX_KNOWLEDGE_FILES:
+        raise AgentError(f"an agent can have at most {MAX_KNOWLEDGE_FILES} knowledge files")
+    if ids and not org.has(P.FILES_READ):
+        raise AgentKnowledgeForbidden("giving an agent files to read needs the files.read permission")
+    missing = [i for i in ids if db.get(StoredFile, i) is None]
+    if missing:
+        raise AgentError(f"unknown files: {missing}")
+    return ids
+
+
 def effective_tools(agent: Agent, version: AgentVersion) -> dict[str, T.Tool]:
-    return {n: T.TOOLS[n] for n in version.tools if n in T.TOOLS and n not in set(agent.disabled_tools)}
+    tools = {n: T.TOOLS[n] for n in version.tools if n in T.TOOLS and n not in set(agent.disabled_tools)}
+    if version.knowledge and T.KNOWLEDGE_TOOL.name not in set(agent.disabled_tools):
+        tools[T.KNOWLEDGE_TOOL.name] = T.KNOWLEDGE_TOOL
+    return tools
 
 
 @dataclass(frozen=True)
@@ -123,7 +150,7 @@ def evaluate(case: AgentTestCase, reply: str, tool_names: list[str]) -> Evaluati
 
 
 def run(db: Session, org: OrgContext, agent: Agent, version: AgentVersion, text: str, *, provider: ModelProvider,
-        trigger: str, ip: str = "", test_case: AgentTestCase | None = None) -> AgentRun:
+        trigger: str, ip: str = "", test_case: AgentTestCase | None = None, storage=None) -> AgentRun:
     if trigger != "test" and not agent.enabled:
         raise AgentDisabled("this agent is switched off")
     if month_spend(db, agent) >= agent.monthly_budget_micros:
@@ -132,10 +159,13 @@ def run(db: Session, org: OrgContext, agent: Agent, version: AgentVersion, text:
     conv = Conversation(user_id=org.user.id, title=f"agent:{agent.id}:{trigger}")
     db.add(conv)
     db.flush()
+    registry = effective_tools(agent, version)
+    knows = T.KNOWLEDGE_TOOL.name in registry
     result = A.run_turn(db, org, conv, text, provider=provider, route_name=version.route, ip=ip,
-                        registry=effective_tools(agent, version), system=AGENT_SYSTEM + version.instructions,
+                        registry=registry, system=AGENT_SYSTEM + version.instructions + (KNOWLEDGE_NOTE if knows else ""),
                         context_note=f"Agent: {agent.name} (version {version.number}).",
-                        max_steps=version.max_steps, max_cost_micros=version.max_cost_micros)
+                        extra={"knowledge_file_ids": list(version.knowledge)} if knows else None,
+                        max_steps=version.max_steps, max_cost_micros=version.max_cost_micros, storage=storage)
     calls = [{"name": c.name, "status": c.status, "id": c.id} for c in result.tool_calls]
     record = AgentRun(agent_id=agent.id, version_number=version.number, trigger=trigger, user_id=org.user.id,
                       conversation_id=conv.id, test_case_id=test_case.id if test_case else None, input=text,
@@ -154,12 +184,12 @@ def run(db: Session, org: OrgContext, agent: Agent, version: AgentVersion, text:
 
 
 def run_tests(db: Session, org: OrgContext, agent: Agent, version: AgentVersion, *, provider: ModelProvider,
-              ip: str = "") -> list[AgentRun]:
+              ip: str = "", storage=None) -> list[AgentRun]:
     cases = list(db.scalars(select(AgentTestCase).where(AgentTestCase.agent_id == agent.id)
                             .order_by(AgentTestCase.created_at)))
     if not cases:
         raise AgentStateError("add at least one test case first")
-    return [run(db, org, agent, version, c.input, provider=provider, trigger="test", ip=ip, test_case=c)
+    return [run(db, org, agent, version, c.input, provider=provider, trigger="test", ip=ip, test_case=c, storage=storage)
             for c in cases]
 
 

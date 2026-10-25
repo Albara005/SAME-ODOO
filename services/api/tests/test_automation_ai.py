@@ -103,10 +103,10 @@ def test_search_files_finds_names_and_text_inside(api, org):
     out = say(api, org, conversation(api, org), "where is the renewal?").json()
     assert [(c["name"], c["status"]) for c in out["tool_calls"]] == [("search_files", "executed")]
     result = json.loads(org["ai"].requests[-1]["messages"][-1]["content"][0]["content"])["data"]
-    by_name = {f["filename"]: f["match"] for f in result}
+    by_name = {f["filename"]: f for f in result}
     assert set(by_name) == {"contracts.txt", "renewal-checklist.pdf"}
-    assert "Renewal due in March 2027" in by_name["contracts.txt"]
-    assert by_name["renewal-checklist.pdf"] == ""   # matched by name; binary content isn't read
+    assert "Renewal due in March 2027" in by_name["contracts.txt"]["text"]
+    assert by_name["renewal-checklist.pdf"]["match"] == "file name"   # not a readable PDF: found by its name
 
 
 # ---------------------------------------------------------------- streamed replies

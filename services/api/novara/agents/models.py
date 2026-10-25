@@ -41,6 +41,8 @@ class AgentVersion(IdMixin, TimestampMixin, TenantScoped, Base):
     route: Mapped[str] = mapped_column(String(40), default="assistant", nullable=False)
     max_steps: Mapped[int] = mapped_column(Integer, default=6, nullable=False)
     max_cost_micros: Mapped[int] = mapped_column(BigInteger, default=200_000, nullable=False)  # per run
+    # Files the agent can look things up in (search_knowledge), chosen by whoever edits the draft.
+    knowledge: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
 
 
