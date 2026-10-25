@@ -28,11 +28,15 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     # Paid through an online payment link, not yet paid out by the provider (then moved to the bank).
     ("1250", "Online Payments Clearing", "asset", "online_clearing"),
     ("1300", "Accounts Receivable", "asset", "receivable"),
+    ("1350", "Employee Advances", "asset", "employee_advances"),
     ("1400", "Inventory", "asset", "inventory"),
     ("1500", "Input VAT Recoverable", "asset", "vat_input"),
     ("2100", "Accounts Payable", "liability", "payable"),
     ("2150", "Goods Received Not Invoiced", "liability", "grni"),
     ("2200", "Output VAT Payable", "liability", "vat_output"),
+    # Payroll (modules/payroll): net pay until it is paid, and contributions until they are paid over.
+    ("2250", "Salaries Payable", "liability", "salaries_payable"),
+    ("2260", "Contributions Payable", "liability", "contributions_payable"),
     ("3000", "Owner's Equity", "equity", "equity"),
     ("3100", "Retained Earnings", "equity", "retained_earnings"),
     ("4000", "Sales Revenue", "income", "sales"),
@@ -41,6 +45,8 @@ DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     # A vendor billing received goods at another price than the order's: the difference lands here.
     ("5150", "Purchase Price Differences", "expense", "price_variance"),
     ("6000", "General Expenses", "expense", "expense"),
+    ("6100", "Salaries and Wages", "expense", "salaries"),
+    ("6110", "Employer Contributions", "expense", "employer_contributions"),
 ]
 
 
@@ -58,7 +64,7 @@ class PeriodLocked(LedgerError):
 
 # Accounts with a subledger behind them (customer and vendor balances, stock value, goods awaiting a
 # bill). Only documents post to them, so the subledgers always agree with the ledger.
-CONTROL_ACCOUNTS = ("receivable", "payable", "inventory", "grni")
+CONTROL_ACCOUNTS = ("receivable", "payable", "inventory", "grni", "salaries_payable")
 YEAR_END = "year_end_close"
 
 
@@ -93,14 +99,25 @@ def ensure_chart(db: Session) -> dict[str, Account]:
         if key is not None and key in keys:
             continue
         if code in codes:
-            # Account exists from an older chart version; give it its system role if it has none yet.
-            if key is not None and by_code[code].system_key is None and by_code[code].type == type_:
-                by_code[code].system_key = key
+            existing = by_code[code]
+            # The same account from an older chart version: give it its system role if it has none yet.
+            if key is not None and existing.system_key is None and existing.type == type_ and existing.name == name:
+                existing.system_key = key
                 keys.add(key)
-            continue
+                continue
+            if key is None:
+                continue
+            # The organization uses this code for an account of its own: never take that over, file the
+            # system account under the next free code instead.
+            n = int(code)
+            while str(n) in codes:
+                n += 1
+            code = str(n)
         account = Account(code=code, name=name, type=type_, system_key=key)
         db.add(account)
         accounts.append(account)
+        codes.add(code)
+        by_code[code] = account
     db.flush()
     return {a.system_key: a for a in accounts if a.system_key}
 

@@ -34,6 +34,7 @@ from novara.modules.identity.passkeys import router as passkeys_router
 from novara.modules.invoicing.credit_router import router as credit_router
 from novara.modules.invoicing.router import router as invoicing_router
 from novara.modules.partners.router import router as partners_router
+from novara.modules.payroll.router import router as payroll_router
 from novara.modules.projects.router import router as projects_router
 from novara.modules.purchasing.credit_router import router as vendor_credit_router
 from novara.modules.purchasing.router import router as purchasing_router
@@ -54,6 +55,7 @@ from novara.modules.catalog import models as _catalog_models  # noqa: F401
 from novara.modules.inventory import models as _inventory_models  # noqa: F401
 from novara.modules.invoicing import models as _invoicing_models  # noqa: F401
 from novara.modules.partners import models as _partner_models  # noqa: F401
+from novara.modules.payroll import models as _payroll_models  # noqa: F401
 from novara.modules.sales import models as _sales_models  # noqa: F401
 from novara.modules.purchasing import models as _purchasing_models  # noqa: F401
 from novara import idempotency as _idempotency_models  # noqa: F401
@@ -115,7 +117,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     for r in (identity_router, passkeys_router, organizations_router, access_router, audit_router, files_router,
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router, credit_router,
-              inventory_router, sales_router, web_orders_router, purchasing_router, vendor_credit_router, projects_router, hr_router, bookings_router, assistant_router, studio_router, agents_router, automation_router,
+              inventory_router, sales_router, web_orders_router, purchasing_router, vendor_credit_router, projects_router, hr_router, payroll_router, bookings_router, assistant_router, studio_router, agents_router, automation_router,
               creative_router, hosting_router, live_router, data_keys_router, public_data_router, inbound_hooks_router,
               payments_router, public_payments_router):
         app.include_router(r, prefix="/api/v1")

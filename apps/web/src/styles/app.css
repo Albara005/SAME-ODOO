@@ -240,6 +240,7 @@ td.end, th.end { text-align: end; }
 .notice { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3) var(--space-4); border-radius: var(--radius); border: 1px solid; }
 .notice-error { border-color: var(--color-danger); color: var(--color-danger-text); background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface)); }
 .notice-info { border-color: var(--color-info); color: var(--color-info-text); background: color-mix(in srgb, var(--color-info) 7%, var(--color-surface)); }
+.notice-warning { border-color: var(--color-warning); color: var(--color-warning-text); background: color-mix(in srgb, var(--color-warning) 7%, var(--color-surface)); }
 .notice-success { border-color: var(--color-success); color: var(--color-success-text); background: color-mix(in srgb, var(--color-success) 7%, var(--color-surface)); }
 .empty { text-align: center; padding: var(--space-6) var(--space-4); color: var(--color-text-muted); }
 .loading { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-muted); padding: var(--space-4); }

@@ -61,6 +61,7 @@ TIMESHEETS_WRITE = "timesheets.write"
 HR_READ = "hr.read"
 HR_MANAGE = "hr.manage"
 LEAVE_REQUEST = "leave.request"
+PAYROLL_MANAGE = "payroll.manage"
 BOOKINGS_READ = "bookings.read"
 BOOKINGS_MANAGE = "bookings.manage"
 
@@ -111,6 +112,7 @@ CATALOG: dict[str, str] = {
     HR_READ: "View the employee directory and departments",
     HR_MANAGE: "Add and edit employee records, departments, leave types, the weekend and public holidays; decide anyone's leave",
     LEAVE_REQUEST: "Ask for your own leave and see your balance",
+    PAYROLL_MANAGE: "Set everyone's pay and the contributions on it, prepare, post and cancel monthly pay runs (paying them also needs payments.write)",
     BOOKINGS_READ: "View the booking calendar, services and opening hours",
     BOOKINGS_MANAGE: "Book, confirm, decline and cancel bookings; set services, opening hours and booking rules",
 }

@@ -211,7 +211,7 @@ test("accounting: a manual entry, a new account, closing the year and reversing"
   await page.getByRole("tab", { name: "دليل الحسابات" }).click();
   await page.getByRole("button", { name: "حساب جديد" }).click();
   dialog = page.getByRole("dialog");
-  await dialog.getByLabel("الرمز").fill("6100");
+  await dialog.getByLabel("الرمز").fill("6200");
   await dialog.getByLabel("الاسم").fill("إيجار المكتب");
   await dialog.getByRole("button", { name: "إنشاء" }).click();
   await expect(page.getByRole("cell", { name: "إيجار المكتب" })).toBeVisible();

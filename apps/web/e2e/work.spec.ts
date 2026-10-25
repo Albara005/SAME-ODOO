@@ -220,3 +220,55 @@ test("leave: HR sets up a department, the employee asks, the manager approves", 
   await expect(empPage.getByRole("cell", { name: /0\.5 · صباحاً/ })).toBeVisible();
   await empPage.close();
 });
+
+test("payroll: a contribution, an employee's pay, the month's run posted and paid, and the payslip on the HR page", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await signUpAndIn(page, uniqueEmail("payroll"));
+  await createOrg(page, "شركة الرواتب");
+  const call = await apiFor(page);
+  const [me] = await call("GET", "/members");
+  await call("POST", "/hr/employees", { full_name: "هدى صالح", hire_date: "2025-01-01", user_id: me.user_id });
+
+  await nav(page, "الرواتب");
+  await page.getByRole("tab", { name: "الاشتراكات" }).click();
+  await page.getByRole("button", { name: "اشتراك جديد" }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByLabel("الاسم").fill("التأمينات الاجتماعية");
+  await dialog.getByLabel("حصة الموظف").fill("9.75");
+  await dialog.getByLabel("حصة صاحب العمل").fill("11.75");
+  await dialog.getByLabel(/الحد الأعلى الشهري/).fill("45000");
+  await dialog.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByRole("cell", { name: "التأمينات الاجتماعية" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "رواتب الموظفين" }).click();
+  await page.getByRole("button", { name: "تعديل راتب هدى صالح" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel("رقم الآيبان").fill("SA03 8000 0000 6080 1016 7519");
+  await dialog.getByLabel("مبلغ البند 1").fill("10000");
+  await dialog.getByRole("button", { name: "إضافة بند" }).click();
+  await dialog.getByLabel("اسم البند 2").fill("بدل سكن");
+  await dialog.getByLabel("مبلغ البند 2").fill("2500");
+  await dialog.getByRole("row").nth(2).getByLabel("نعم").check();
+  await dialog.getByLabel(/التأمينات الاجتماعية/).check();
+  await dialog.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByRole("cell", { name: /12,500\.00/ })).toBeVisible();
+
+  await page.getByRole("tab", { name: "مسيرات الرواتب" }).click();
+  await page.getByLabel("الشهر").fill("2026-09");
+  await page.getByRole("button", { name: "إعداد مسير الشهر" }).click();
+  const slips = page.getByRole("table", { name: "قسائم الرواتب" });
+  await expect(slips.getByRole("row", { name: /هدى صالح/ })).toContainText("11,281.25");   // 12,500 less 9.75%
+  await page.getByRole("button", { name: "ترحيل إلى الدفاتر" }).click();
+  await expect(page.getByText("رُحِّل المسير")).toBeVisible();
+  await page.getByRole("button", { name: "صرف الرواتب" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "صرف الرواتب" }).click();
+  await expect(page.getByText("سُجّل صرف الرواتب")).toBeVisible();
+  await expect(page.getByRole("table", { name: "مسيرات الرواتب" }).getByText("مدفوعة")).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/payroll-ar.png", fullPage: true });
+
+  await nav(page, "الموارد البشرية");
+  await page.getByRole("tab", { name: "إجازاتي" }).click();
+  await page.getByRole("button", { name: /قسيمة راتب/ }).click();
+  await expect(page.getByText("التأمينات الاجتماعية")).toBeVisible();
+  await expect(page.getByText("11,281.25").first()).toBeVisible();
+});

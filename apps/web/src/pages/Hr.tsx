@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { Tabs } from "../components/business";
+import { MyPayslips } from "../components/MyPayslips";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, Textarea,
   errorText, useToast,
@@ -119,6 +120,7 @@ function MyLeave() {
             </div>
           )}
           <LeaveTable mineOnly />
+          <MyPayslips />
         </div>
       )}
     </QueryView>
