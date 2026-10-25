@@ -1504,6 +1504,7 @@ export const en = {
   "agents.knowledgeNeedsFiles": "{n} knowledge file(s). Changing them needs access to Documents.",
   "agents.knowledgeNoFiles": "No documents yet. Upload some in Documents first.",
   "agents.knowledgeDeleted": "(deleted file)",
+  "inventory.kind.revaluation": "Revaluation",
 } as const;
 
 export type MessageKey = keyof typeof en;

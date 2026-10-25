@@ -1506,4 +1506,5 @@ export const ar: Record<MessageKey, string> = {
   "agents.knowledgeNeedsFiles": "{n} ملف معرفة. تغييرها يحتاج صلاحية المستندات.",
   "agents.knowledgeNoFiles": "لا مستندات بعد. ارفعها من صفحة المستندات أولاً.",
   "agents.knowledgeDeleted": "(ملف محذوف)",
+  "inventory.kind.revaluation": "إعادة تقييم",
 };

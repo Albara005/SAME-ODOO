@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import event, inspect, select
 from sqlalchemy.orm import Session
@@ -29,7 +29,7 @@ from novara.modules.accounting.models import Account, JournalEntry
 from novara.modules.accounting.service import LineSpec, next_number, post_entry, reverse_entry, system_account
 from novara.modules.catalog.models import Product
 from novara.modules.inventory import service as stock
-from novara.modules.inventory.models import Warehouse
+from novara.modules.inventory.models import StockLevel, StockMove, Warehouse
 from novara.modules.invoicing.service import PAYMENT_METHODS, line_net_minor, tax_groups
 from novara.modules.purchasing.models import BillPayment, PurchaseOrder, PurchaseOrderLine, VendorBill, VendorBillLine
 from novara.money import from_minor
@@ -218,6 +218,37 @@ def set_vendor_price(db: Session, bill: VendorBill, line_id: str, unit_cost: Dec
     return line
 
 
+def _revalue(db: Session, bill: VendorBill, line: VendorBillLine, difference_minor: int, user_id: str) -> list[StockMove]:
+    """Put the part of a price difference that belongs to goods still in stock into their value.
+
+    Of a line's quantity, as much as is still on hand (all warehouses) takes its share of the difference,
+    spread over the warehouses by quantity; the share of goods already sold or used stays a price
+    difference. Stock value never goes below zero. Returns the revaluation moves (quantity 0)."""
+    product = db.get(Product, line.product_id) if line.product_id else None
+    if product is None or product.kind != "goods" or not difference_minor:
+        return []
+    levels = list(db.scalars(select(StockLevel).where(StockLevel.product_id == product.id, StockLevel.quantity > 0)
+                             .order_by(StockLevel.warehouse_id).with_for_update()))
+    on_hand = sum((level.quantity for level in levels), Decimal(0))
+    if on_hand <= 0:
+        return []
+    share = int((Decimal(difference_minor) * min(on_hand, line.quantity) / line.quantity)
+                .quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    moves, spread = [], 0
+    for i, level in enumerate(levels):
+        amount = share - spread if i == len(levels) - 1 else int(
+            (Decimal(share) * level.quantity / on_hand).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+        spread += amount
+        amount = max(amount, -level.value_minor)
+        if amount:
+            level.value_minor += amount
+            moves.append(StockMove(reference=bill.number, kind="revaluation", product_id=product.id,
+                                   warehouse_id=level.warehouse_id, move_date=bill.bill_date, quantity=Decimal(0),
+                                   value_minor=amount, source_type="vendor_bill", source_id=bill.id,
+                                   source_line_id=line.id, created_by=user_id))
+    return moves
+
+
 def post_bill(db: Session, bill: VendorBill, *, user_id: str) -> JournalEntry:
     if bill.status != "draft":
         raise PurchaseStateError(f"only draft bills can be posted (status: {bill.status})")
@@ -232,14 +263,22 @@ def post_bill(db: Session, bill: VendorBill, *, user_id: str) -> JournalEntry:
     debits: dict[str, int] = defaultdict(int)
     grni = system_account(db, "grni")
     ordered = ordered_costs(db, lines)
+    revaluations: list[StockMove] = []
     for line in lines:
         if line.account_id is None and line.id in ordered:
-            # Received goods clear GRNI at the order's price (what the receipt credited); a vendor
-            # charging another price leaves a difference, which goes to purchase price differences.
+            # Received goods clear GRNI at the order's price (what the receipt credited). A vendor charging
+            # another price leaves a difference: the share for goods still in stock changes their value
+            # (and average cost); the rest, for goods already gone, is a purchase price difference.
             at_order_price = line_net_minor(line.quantity, ordered[line.id], Decimal(0), bill.currency)
             debits[grni.id] += at_order_price
-            if line.net_minor != at_order_price:
-                debits[system_account(db, "price_variance").id] += line.net_minor - at_order_price
+            difference = line.net_minor - at_order_price
+            moves = _revalue(db, bill, line, difference, user_id)
+            in_stock = sum(m.value_minor for m in moves)
+            revaluations += moves
+            if in_stock:
+                debits[system_account(db, "inventory").id] += in_stock
+            if difference - in_stock:
+                debits[system_account(db, "price_variance").id] += difference - in_stock
         else:
             debits[line.account_id or grni.id] += line.net_minor
     accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_(set(debits))))}
@@ -253,6 +292,9 @@ def post_bill(db: Session, bill: VendorBill, *, user_id: str) -> JournalEntry:
     entry = post_entry(db, entry_date=bill.bill_date, currency=bill.currency, lines=specs,
                        memo=f"Vendor bill {bill.number}", source_type="vendor_bill", source_id=bill.id,
                        created_by=user_id)
+    for m in revaluations:
+        m.journal_entry_id = entry.id
+    db.add_all(revaluations)
     bill.status = "posted"
     bill.journal_entry_id = entry.id
     bill.posted_at = utcnow()
@@ -313,10 +355,52 @@ def cancel_bill(db: Session, bill: VendorBill, *, user_id: str, cancel_date: dat
         raise PurchaseValidationError("cancellation date cannot be before the bill date")
     reversal = reverse_entry(db, db.get(JournalEntry, bill.journal_entry_id), entry_date=cancel_date,
                              memo=f"Cancellation of {bill.number}", created_by=user_id)
+    _undo_revaluations(db, bill, cancel_date, user_id)
     bill.status = "cancelled"
     bill.reversal_entry_id = reversal.id
     bill.cancelled_at = utcnow()
     return reversal
+
+
+def _undo_revaluations(db: Session, bill: VendorBill, cancel_date: date, user_id: str) -> None:
+    """Take a cancelled bill's revaluations back out of the stock that is still there.
+
+    The reversal entry takes the whole revaluation out of the inventory account; stock sold since
+    carried part of it into cost of sales, so only what remains in stock value can come back out.
+    The part that can't is moved from inventory to price differences, keeping the ledger equal to
+    the stock's value."""
+    done = list(db.scalars(select(StockMove).where(StockMove.kind == "revaluation", StockMove.source_type == "vendor_bill",
+                                                   StockMove.source_id == bill.id, StockMove.value_minor != 0)))
+    if not done:
+        return
+    undone, stuck = [], 0
+    for m in done:
+        level = stock.stock_level(db, m.product_id, m.warehouse_id)
+        back = -m.value_minor
+        if back < 0:
+            back = max(back, -level.value_minor)          # can't take out more value than is left
+        elif level.quantity <= 0:
+            back = 0                                       # no stock left to carry the value back
+        if back:
+            level.value_minor += back
+            undone.append(StockMove(reference=f"{bill.number}-X", kind="revaluation", product_id=m.product_id,
+                                    warehouse_id=m.warehouse_id, move_date=cancel_date, quantity=Decimal(0),
+                                    value_minor=back, source_type="vendor_bill_cancel", source_id=bill.id,
+                                    source_line_id=m.source_line_id, created_by=user_id))
+        stuck += -m.value_minor - back
+    entry = None
+    if stuck:
+        inventory, variance = system_account(db, "inventory"), system_account(db, "price_variance")
+        label = f"Revaluation of goods already sold, {bill.number}"
+        lines = ([LineSpec(inventory, debit_minor=-stuck, label=label), LineSpec(variance, credit_minor=-stuck, label=label)]
+                 if stuck < 0 else
+                 [LineSpec(variance, debit_minor=stuck, label=label), LineSpec(inventory, credit_minor=stuck, label=label)])
+        entry = post_entry(db, entry_date=cancel_date, currency=bill.currency, lines=lines, created_by=user_id,
+                           memo=f"Stock revaluation on cancelling {bill.number}", source_type="vendor_bill",
+                           source_id=bill.id)
+    for m in undone:
+        m.journal_entry_id = entry.id if entry is not None else None
+    db.add_all(undone)
 
 
 class BillLocked(RuntimeError):

@@ -52,11 +52,12 @@ class StockMove(IdMixin, TimestampMixin, TenantScoped, Base):
         same_org_fk("product_id", "products"),
         same_org_fk("warehouse_id", "warehouses"),
         same_org_fk("journal_entry_id", "journal_entries"),
-        CheckConstraint("CAST(quantity AS NUMERIC) <> 0", name="ck_stock_move_nonzero"),
+        # A revaluation changes value only (a vendor billing another price for goods still in stock).
+        CheckConstraint("CAST(quantity AS NUMERIC) <> 0 OR kind = 'revaluation'", name="ck_stock_move_nonzero"),
     )
 
     reference: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    kind: Mapped[str] = mapped_column(String(20), nullable=False)  # receipt | delivery | adjustment | return | vendor_return
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)  # receipt | delivery | adjustment | return | vendor_return | revaluation
     product_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     warehouse_id: Mapped[str] = mapped_column(String(36), nullable=False)
     move_date: Mapped[date] = mapped_column(Date, nullable=False)
