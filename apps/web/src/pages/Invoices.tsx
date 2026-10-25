@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, CheckCircle2, CreditCard, FileMinus, Pencil, Plus, Printer, Trash2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
@@ -11,6 +11,7 @@ import {
 import {
   Button, Card, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
 } from "../components/ui";
+import { PaymentLinksCard } from "../components/OnlinePayments";
 import { ZatcaQr } from "../components/ZatcaQr";
 import { useI18n } from "../i18n/I18n";
 import { isPositive, subtractDec } from "../lib/decimal";
@@ -228,6 +229,11 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
     void qc.invalidateQueries({ queryKey: ["home", org.id] });
   };
   const onError = (e: Error) => toast(e instanceof ApiError ? e.message : t("common.error"), "error");
+  const onlinePaid = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ["invoice", org.id, inv.id] });
+    void qc.invalidateQueries({ queryKey: ["invoices", org.id] });
+    void qc.invalidateQueries({ queryKey: ["payments", org.id, inv.id] });
+  }, [qc, org.id, inv.id]);
 
   const post = useMutation({
     mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/invoices/{invoice_id}/post", { params: { path: ids } })),
@@ -441,7 +447,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
                     {list.map((p) => (
                       <tr key={p.id}>
                         <td className="num">{date(p.payment_date)}</td>
-                        <td>{p.method === "bank" ? t("invoices.bank") : t("invoices.cash")}</td>
+                        <td>{p.method === "bank" ? t("invoices.bank") : p.method === "online" ? t("invoices.online") : t("invoices.cash")}</td>
                         <td>{p.reference}</td>
                         <td className="end num">{money(p.amount, inv.currency)}</td>
                       </tr>
@@ -453,6 +459,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
           </QueryView>
         </Card>
       )}
+      {!isDraft && <div className="no-print"><PaymentLinksCard invoice={inv} onPaid={onlinePaid} /></div>}
       {paying && (
         <PaymentDialog invoice={inv} onClose={() => setPaying(false)} onDone={() => {
           setPaying(false);

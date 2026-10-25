@@ -87,6 +87,7 @@ class InvoiceLine(IdMixin, TenantScoped, Base):
 class Payment(IdMixin, TimestampMixin, TenantScoped, Base):
     __tablename__ = "payments"
     __table_args__ = (
+        org_unique_id(),  # online payment links point at the payment they made
         same_org_fk("invoice_id", "invoices"),
         same_org_fk("journal_entry_id", "journal_entries"),
         UniqueConstraint("organization_id", "idempotency_key", name="uq_payment_org_idempotency"),
@@ -96,7 +97,7 @@ class Payment(IdMixin, TimestampMixin, TenantScoped, Base):
     invoice_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)
     amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    method: Mapped[str] = mapped_column(String(20), nullable=False)  # bank | cash
+    method: Mapped[str] = mapped_column(String(20), nullable=False)  # bank | cash | online (a payment link)
     reference: Mapped[str] = mapped_column(String(120), default="", nullable=False)
     journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)

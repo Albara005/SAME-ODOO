@@ -19,6 +19,7 @@ const TONES: Record<string, Tone> = {
   approved: "success", rejected: "neutral", approval_failed: "danger", waiting_approval: "warning",
   completed: "success", failed: "danger", running: "info", queued: "neutral", skipped: "neutral", open: "info", done: "success",
   pending_approval: "warning", provisioning: "info", live: "success", superseded: "neutral", offline: "neutral",
+  expired: "neutral", unapplied: "danger",
 };
 
 export function StatusBadge({ status }: { status: string }) {

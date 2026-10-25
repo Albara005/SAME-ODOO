@@ -8,6 +8,7 @@ import { useOrg } from "../auth/Org";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, useToast,
 } from "../components/ui";
+import { OnlinePaymentsCard } from "../components/OnlinePayments";
 import type { MessageKey } from "../i18n/en";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
 import { useDebounced } from "../lib/useDebounced";
@@ -487,7 +488,7 @@ function monthNames(lang: string): string[] {
 
 export function OrgSettingsPage() {
   const { t, lang } = useI18n();
-  const { org } = useOrg();
+  const { org, can } = useOrg();
   const qc = useQueryClient();
   const toast = useToast();
   const [form, setForm] = useState({
@@ -554,6 +555,7 @@ export function OrgSettingsPage() {
           </div>
         </form>
       </Card>
+      {can("org.manage") && <OnlinePaymentsCard />}
       <RequireMfaCard />
     </div>
   );

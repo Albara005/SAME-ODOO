@@ -25,6 +25,8 @@ from novara.tenancy import current_tenant
 DEFAULT_CHART: list[tuple[str, str, str, str | None]] = [
     ("1100", "Cash", "asset", "cash"),
     ("1200", "Bank", "asset", "bank"),
+    # Paid through an online payment link, not yet paid out by the provider (then moved to the bank).
+    ("1250", "Online Payments Clearing", "asset", "online_clearing"),
     ("1300", "Accounts Receivable", "asset", "receivable"),
     ("1400", "Inventory", "asset", "inventory"),
     ("1500", "Input VAT Recoverable", "asset", "vat_input"),

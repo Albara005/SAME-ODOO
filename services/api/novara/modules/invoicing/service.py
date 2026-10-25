@@ -10,7 +10,8 @@ Posting writes one balanced journal entry:
     Dr Accounts Receivable        total
         Cr Sales Revenue              subtotal
         Cr Output VAT (per tax)       tax
-Payments:  Dr Bank/Cash, Cr Accounts Receivable.
+Payments:  Dr Bank/Cash, Cr Accounts Receivable. A payment through an online payment link
+(novara/payments) goes to Online Payments Clearing instead, until the provider pays it out.
 Cancelling a posted, unpaid invoice posts the exact reversal of its entry.
 Credit notes (``credit.py``) reduce what is due without touching the invoice itself.
 """
@@ -32,6 +33,8 @@ from novara.modules.invoicing.models import Invoice, InvoiceLine, Payment
 from novara.money import from_minor, to_minor
 
 PAYMENT_METHODS = {"bank": "bank", "cash": "cash"}  # method -> system account key
+# Customers can also pay online; only a payment link records those (refunds and vendor payments can't).
+RECEIPT_METHODS = PAYMENT_METHODS | {"online": "online_clearing"}
 
 
 class InvoiceStateError(RuntimeError):
@@ -140,7 +143,7 @@ def register_payment(
             return existing, False
     if invoice.status not in ("posted", "partially_paid"):
         raise InvoiceStateError(f"invoice cannot receive payments (status: {invoice.status})")
-    if method not in PAYMENT_METHODS:
+    if method not in RECEIPT_METHODS:
         raise InvoiceValidationError(f"unknown payment method: {method}")
     residual = invoice.amount_due_minor
     if amount_minor <= 0 or amount_minor > residual:
@@ -154,7 +157,7 @@ def register_payment(
         db, entry_date=payment_date, currency=invoice.currency, created_by=user_id,
         memo=f"Payment for {invoice.number}", source_type="payment", source_id=invoice.id,
         lines=[
-            LineSpec(system_account(db, PAYMENT_METHODS[method]), debit_minor=amount_minor,
+            LineSpec(system_account(db, RECEIPT_METHODS[method]), debit_minor=amount_minor,
                      label=f"Payment {invoice.number} {reference}".strip()),
             LineSpec(system_account(db, "receivable"), credit_minor=amount_minor,
                      customer_id=invoice.customer_id, label=f"Payment {invoice.number}"),

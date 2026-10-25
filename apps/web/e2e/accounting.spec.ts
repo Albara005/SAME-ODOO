@@ -93,7 +93,7 @@ test("credit note, refund, statements, e-invoice QR and closed books", async ({ 
   // A VAT number puts the e-invoice QR code on invoices.
   await nav(page, "المؤسسة");
   await page.getByLabel(/الرقم الضريبي/).fill("300000000000003");
-  await page.getByRole("button", { name: "حفظ" }).click();
+  await page.getByRole("button", { name: "حفظ", exact: true }).click();
   await expect(page.getByText("تم الحفظ")).toBeVisible();
 
   await nav(page, "الفواتير");
@@ -187,7 +187,7 @@ test("accounting: a manual entry, a new account, closing the year and reversing"
   const orgPath = page.url().match(/\/o\/[0-9a-f-]+/)![0];
   await page.goto(`${orgPath}/settings/organization`);
   await page.getByLabel("تبدأ السنة المالية في").selectOption({ label: "أبريل" });
-  await page.getByRole("button", { name: "حفظ" }).click();
+  await page.getByRole("button", { name: "حفظ", exact: true }).click();
   await expect(page.getByText("تم الحفظ")).toBeVisible();
 
   await nav(page, "المحاسبة");
@@ -315,4 +315,44 @@ test("monthly closing: close last month with its drafts in view, then reopen it 
   await expect(page.getByText("أُعيد فتح الشهر")).toBeVisible();
   await expect(row.getByText("مفتوح", { exact: true })).toBeVisible();
   await expect(row.getByText("فاتورة مورد متأخرة عن هذا الشهر")).toBeVisible();
+});
+
+test("online payment: the customer pays through a link and the invoice is paid when the provider confirms", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await signUpAndIn(page, uniqueEmail("paylink"));
+  await createOrg(page, "شركة الدفع");
+  const call = await apiFor(page);
+
+  await nav(page, "المؤسسة");
+  const provider = page.getByLabel("مزوّد الدفع");
+  await provider.selectOption({ label: "Stripe" });
+  await expect(page.getByLabel("عنوان الـ Webhook")).toHaveValue(/\/api\/v1\/public\/payments\/stripe\/nvpay_/);
+  await provider.selectOption({ label: "مزوّد تجريبي (للتطوير فقط)" });
+  await page.getByRole("button", { name: "حفظ إعدادات الدفع" }).click();
+  await expect(page.getByText("تم الحفظ")).toBeVisible();
+
+  const customer = await call("POST", "/customers", { name: "مؤسسة الواحة" });
+  const inv = await call("POST", "/invoices", {
+    customer_id: customer.id, issue_date: "2026-04-01",
+    lines: [{ description: "تصميم شعار", quantity: "1", unit_price: "1200" }],
+  });
+  await call("POST", `/invoices/${inv.id}/post`);
+
+  await nav(page, "الفواتير");
+  await page.getByRole("link", { name: /^INV-2026-/ }).click();
+  await page.getByRole("button", { name: "إنشاء رابط دفع" }).click();
+  const links = page.getByRole("table", { name: "الدفع الإلكتروني" });
+  await expect(links.getByText("مفتوحة")).toBeVisible();
+  await page.screenshot({ path: "test-results/screens/payment-link-ar.png", fullPage: true });
+
+  const [checkout] = await Promise.all([page.waitForEvent("popup"), links.getByRole("link", { name: "فتح" }).click()]);
+  await expect(checkout.getByText("1200.00 SAR")).toBeVisible();
+  await checkout.getByRole("button", { name: /ادفع \(تجريبي\)/ }).click();
+  await expect(checkout.getByRole("heading", { name: "شكراً لك، وصلتنا دفعتك" })).toBeVisible();
+  await checkout.close();
+
+  // The open link is checked every few seconds; the invoice turns paid without reloading.
+  await expect(links.getByText("مدفوعة")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("cell", { name: "إلكترونياً (رابط دفع)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "إنشاء رابط دفع" })).toHaveCount(0);
 });

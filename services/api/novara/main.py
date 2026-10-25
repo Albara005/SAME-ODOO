@@ -45,6 +45,7 @@ from novara.modules.files.router import router as files_router
 from novara.modules.files.storage import ObjectStorage, storage_from_settings
 from novara.modules.identity.router import router as identity_router
 from novara.modules.organizations.router import router as organizations_router
+from novara.payments.router import public_router as public_payments_router, router as payments_router
 
 # Import models so they are registered on Base.metadata.
 from novara.modules.access import models as _access_models  # noqa: F401
@@ -67,6 +68,7 @@ from novara.modules.audit import models as _audit_models  # noqa: F401
 from novara.modules.files import models as _files_models  # noqa: F401
 from novara.modules.identity import models as _identity_models  # noqa: F401
 from novara.modules.organizations import models as _org_models  # noqa: F401
+from novara.payments import models as _payment_models  # noqa: F401
 
 
 def create_app(settings: Settings | None = None, storage: ObjectStorage | None = None,
@@ -92,6 +94,8 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
     app.state.mailer = mailer or mailer_from_settings(settings)
     # Workflow webhooks: signed, public internet only (automation/webhooks.py).
     app.state.webhooks = WebhookSender(settings)
+    # Calls to payment providers (Stripe); None opens a client per call. Tests put a mock transport here.
+    app.state.payment_http = None
 
     @app.exception_handler(PeriodLocked)
     def closed_books(_request: Request, exc: PeriodLocked) -> JSONResponse:
@@ -112,7 +116,8 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router, credit_router,
               inventory_router, sales_router, web_orders_router, purchasing_router, vendor_credit_router, projects_router, hr_router, bookings_router, assistant_router, studio_router, agents_router, automation_router,
-              creative_router, hosting_router, live_router, data_keys_router, public_data_router, inbound_hooks_router):
+              creative_router, hosting_router, live_router, data_keys_router, public_data_router, inbound_hooks_router,
+              payments_router, public_payments_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(sites_router)  # public, unauthenticated: published App Studio sites
 

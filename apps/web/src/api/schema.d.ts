@@ -2521,6 +2521,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/invoices/{invoice_id}/payment-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Links */
+        get: operations["list_links_api_v1_orgs__org_id__invoices__invoice_id__payment_links_get"];
+        put?: never;
+        /**
+         * Create Link
+         * @description A checkout link for the amount (default: all that is due). An open link for the same amount is returned (200).
+         */
+        post: operations["create_link_api_v1_orgs__org_id__invoices__invoice_id__payment_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/invoices/{invoice_id}/payment-links/{link_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Link */
+        post: operations["cancel_link_api_v1_orgs__org_id__invoices__invoice_id__payment_links__link_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/invoices/{invoice_id}/payments": {
         parameters: {
             query?: never;
@@ -2644,6 +2682,44 @@ export interface paths {
         put?: never;
         /** Mark Read */
         post: operations["mark_read_api_v1_orgs__org_id__notifications__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/payments/available": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Available */
+        get: operations["available_api_v1_orgs__org_id__payments_available_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/payments/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Settings */
+        get: operations["read_settings_api_v1_orgs__org_id__payments_settings_get"];
+        /**
+         * Change Settings
+         * @description Choose the provider. Secrets are only ever written: leave them out to keep the ones stored.
+         */
+        put: operations["change_settings_api_v1_orgs__org_id__payments_settings_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4106,6 +4182,86 @@ export interface paths {
         delete?: never;
         /** Orders Preflight */
         options: operations["orders_preflight_api_v1_public_orders_options"];
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/payments/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Done
+         * @description Where the customer lands after the provider's page. It confirms nothing: only the provider's webhook does.
+         */
+        get: operations["done_api_v1_public_payments_done_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/payments/stripe/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stripe Webhook
+         * @description Stripe's webhook calls for this organization (Stripe-Signature checked against its whsec_ secret).
+         */
+        post: operations["stripe_webhook_api_v1_public_payments_stripe__token__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/payments/test/{session}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Test Checkout
+         * @description The test provider's checkout page: what a customer would see at the provider, with a pretend card.
+         */
+        get: operations["test_checkout_api_v1_public_payments_test__session__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/payments/test/{session}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Pay
+         * @description Pretend the provider took the money, then confirm it the way a provider's webhook would.
+         */
+        post: operations["test_pay_api_v1_public_payments_test__session__pay_post"];
+        delete?: never;
+        options?: never;
         head?: never;
         patch?: never;
         trace?: never;
@@ -6603,6 +6759,47 @@ export interface components {
              */
             reference: string;
         };
+        /** PaymentLinkIn */
+        PaymentLinkIn: {
+            /** Amount */
+            amount?: number | string | null;
+        };
+        /** PaymentLinkOut */
+        PaymentLinkOut: {
+            /** Amount */
+            amount: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Id */
+            id: string;
+            /** Invoice Id */
+            invoice_id: string;
+            /** Note */
+            note: string;
+            /** Paid At */
+            paid_at: string | null;
+            /** Payment Id */
+            payment_id: string | null;
+            /** Provider */
+            provider: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "paid" | "unapplied" | "expired" | "cancelled";
+            /** Url */
+            url: string;
+        };
         /** PaymentOut */
         PaymentOut: {
             /** Amount */
@@ -6627,6 +6824,44 @@ export interface components {
             payment_date: string;
             /** Reference */
             reference: string;
+        };
+        /** PaymentProviderOut */
+        PaymentProviderOut: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "none" | "stripe" | "test";
+        };
+        /** PaymentSettingsIn */
+        PaymentSettingsIn: {
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "none" | "stripe" | "test";
+            /** Stripe Secret Key */
+            stripe_secret_key?: string | null;
+            /** Stripe Webhook Secret */
+            stripe_webhook_secret?: string | null;
+        };
+        /** PaymentSettingsOut */
+        PaymentSettingsOut: {
+            /** Has Stripe Key */
+            has_stripe_key: boolean;
+            /** Has Webhook Secret */
+            has_webhook_secret: boolean;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "none" | "stripe" | "test";
+            /** Stripe Key Hint */
+            stripe_key_hint: string;
+            /** Test Provider Available */
+            test_provider_available: boolean;
+            /** Webhook Url */
+            webhook_url: string;
         };
         /** PeriodCloseIn */
         PeriodCloseIn: {
@@ -14051,6 +14286,107 @@ export interface operations {
             };
         };
     };
+    list_links_api_v1_orgs__org_id__invoices__invoice_id__payment_links_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentLinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_link_api_v1_orgs__org_id__invoices__invoice_id__payment_links_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentLinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_link_api_v1_orgs__org_id__invoices__invoice_id__payment_links__link_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoice_id: string;
+                link_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_payments_api_v1_orgs__org_id__invoices__invoice_id__payments_get: {
         parameters: {
             query?: never;
@@ -14370,6 +14706,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    available_api_v1_orgs__org_id__payments_available_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_settings_api_v1_orgs__org_id__payments_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_settings_api_v1_orgs__org_id__payments_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentSettingsOut"];
                 };
             };
             /** @description Validation Error */
@@ -17991,6 +18424,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    done_api_v1_public_payments_done_get: {
+        parameters: {
+            query: {
+                status: "paid" | "cancelled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stripe_webhook_api_v1_public_payments_stripe__token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_checkout_api_v1_public_payments_test__session__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_pay_api_v1_public_payments_test__session__pay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
