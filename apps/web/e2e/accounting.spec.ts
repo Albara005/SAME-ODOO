@@ -459,3 +459,44 @@ test("debit note: more is charged on a posted invoice, numbered DN- and linked b
   await expect(page.getByRole("heading", { name: "الإشعارات المدينة" })).toBeVisible();
   await expect(page.getByRole("link", { name: "DN-2026-00001" })).toBeVisible();
 });
+
+test("currencies: a stored rate is suggested on invoices, and what is owed in dollars is revalued at the month's end", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await signUpAndIn(page, uniqueEmail("reval"));
+  await createOrg(page, "شركة التقييم");
+  const call = await apiFor(page);
+  const customer = await call("POST", "/customers", { name: "Gulf Trading LLC" });
+  const inv = await call("POST", "/invoices", { customer_id: customer.id, issue_date: "2026-04-01", currency: "USD", exchange_rate: "3.75",
+    lines: [{ description: "Consulting", quantity: "10", unit_price: "100" }] });
+  const posted = await call("POST", `/invoices/${inv.id}/post`);                          // 1,000 USD = 3,750.00
+  const orgPath = page.url().match(/\/o\/[0-9a-f-]+/)![0];
+
+  await nav(page, "المحاسبة");
+  await page.getByRole("tab", { name: "العملات" }).click();
+  await page.getByLabel("العملة").selectOption("USD");
+  await page.getByLabel("اليوم", { exact: true }).fill("2026-04-30");
+  await page.getByLabel("السعر", { exact: true }).fill("3.76");
+  await page.getByRole("button", { name: "حفظ السعر" }).click();
+  await expect(page.getByRole("table", { name: "أسعار الصرف" }).getByRole("cell", { name: "3.76" })).toBeVisible();
+
+  await page.getByLabel("في يوم").fill("2026-04-30");
+  const preview = page.getByRole("table", { name: "إعادة تقييم ما يستحق على العملاء بعملات أخرى" });
+  await expect(preview.getByRole("link", { name: posted.number })).toBeVisible();
+  await expect(preview.getByRole("row", { name: new RegExp(posted.number) })).toContainText("3,760.00");
+  await expect(page.locator("p", { hasText: "صافي الفرق غير المحقق" })).toContainText("10.00");
+  await page.getByRole("button", { name: "قيد إعادة التقييم" }).click();
+  await expect(page.getByText("قُيّدت إعادة التقييم").first()).toBeVisible();
+  const history = page.getByRole("table", { name: "عمليات إعادة التقييم" });
+  await expect(history.getByText("USD 3.76")).toBeVisible();
+  await expect(page.getByRole("button", { name: "قيد إعادة التقييم" })).toHaveCount(0);   // once per day
+  await page.screenshot({ path: "test-results/screens/fx-revaluation-ar.png", fullPage: true });
+  await history.getByRole("button", { name: "إلغاء" }).click();
+  await expect(history.getByText("ملغاة")).toBeVisible();
+
+  // The stored rate is suggested on a new invoice in dollars dated after it.
+  await page.goto(`${orgPath}/invoices/new`);
+  await page.getByLabel("تاريخ الإصدار").fill("2026-05-02");
+  await page.getByLabel("العملة").selectOption("USD");
+  await expect(page.getByLabel(/سعر الصرف/)).toHaveValue("3.76");
+  await expect(page.getByText(/مقترح من سعر يوم/)).toBeVisible();
+});

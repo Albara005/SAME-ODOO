@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, CheckCircle2, CreditCard, FileMinus, FilePlus, Pencil, Plus, Printer, Trash2 } from "lucide-react";
-import { useCallback, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
@@ -114,6 +114,18 @@ export function InvoicesPage() {
 
 // ---------------------------------------------------------------- editor
 
+/** The organization's latest rate for a currency on or before a day (Accounting > Currencies), to suggest on a form. */
+function useSuggestedRate(currency: string, day: string, enabled: boolean) {
+  const { org } = useOrg();
+  return useQuery({
+    queryKey: ["exchange-rate", org.id, currency, day],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/exchange-rates/latest", {
+      params: { path: { org_id: org.id }, query: { currency, on: day } } })),
+    enabled: enabled && currency !== org.default_currency && Boolean(day),
+    staleTime: 60_000,
+  }).data ?? null;
+}
+
 function toDraft(inv: Invoice): LineDraft[] {
   return inv.lines.map((l) => ({
     key: l.id,
@@ -159,6 +171,11 @@ function InvoiceEditor({ invoice, debitOf }: { invoice?: Invoice; debitOf?: Invo
   });
   const [reason, setReason] = useState(invoice?.reason ?? "");
   const foreign = header.currency !== org.default_currency;
+  const [rateTouched, setRateTouched] = useState(Boolean(header.exchange_rate));
+  const suggested = useSuggestedRate(header.currency, header.issue_date, foreign && !rateTouched);
+  useEffect(() => {
+    if (suggested && !rateTouched) setHeader((h) => ({ ...h, exchange_rate: suggested.rate }));
+  }, [suggested, rateTouched]);
   const [lines, setLines] = useState<LineDraft[]>(invoice ? toDraft(invoice) : [newLine()]);
   const save = useMutation({
     mutationFn: () => {
@@ -228,9 +245,10 @@ function InvoiceEditor({ invoice, debitOf }: { invoice?: Invoice; debitOf?: Invo
             </Field>
           )}
           {foreign && (
-            <Field label={t("invoices.exchangeRate", { currency: header.currency, base: org.default_currency })} error={err["exchange_rate"]}>
+            <Field label={t("invoices.exchangeRate", { currency: header.currency, base: org.default_currency })} error={err["exchange_rate"]}
+              hint={suggested && !rateTouched ? t("fx.rateSuggested", { day: suggested.day }) : undefined}>
               <Input value={header.exchange_rate} inputMode="decimal" required ltr
-                onChange={(e) => setHeader({ ...header, exchange_rate: e.target.value })} />
+                onChange={(e) => { setRateTouched(true); setHeader({ ...header, exchange_rate: e.target.value }); }} />
             </Field>
           )}
         </div>
@@ -664,6 +682,11 @@ function PaymentDialog({ invoice, onClose, onDone }: { invoice: Invoice; onClose
   const foreign = invoice.currency !== invoice.base_currency;
   const [form, setForm] = useState({ amount: invoice.amount_due, payment_date: today(), method: "bank" as "bank" | "cash", reference: "",
     exchange_rate: foreign ? invoice.exchange_rate : "" });
+  const [rateTouched, setRateTouched] = useState(false);
+  const suggested = useSuggestedRate(invoice.currency, form.payment_date, foreign && !rateTouched);
+  useEffect(() => {
+    if (suggested && !rateTouched) setForm((f) => ({ ...f, exchange_rate: suggested.rate }));
+  }, [suggested, rateTouched]);
   const pay = useMutation({
     mutationFn: () =>
       unwrap(
@@ -697,9 +720,10 @@ function PaymentDialog({ invoice, onClose, onDone }: { invoice: Invoice; onClose
           </Field>
           {foreign && (
             <Field label={t("invoices.paymentRate", { currency: invoice.currency, base: invoice.base_currency })}
-              hint={t("invoices.paymentRateHint", { rate: invoice.exchange_rate })} error={err["exchange_rate"]}>
+              hint={suggested && !rateTouched ? `${t("fx.rateSuggested", { day: suggested.day })} · ${t("invoices.paymentRateHint", { rate: invoice.exchange_rate })}`
+                : t("invoices.paymentRateHint", { rate: invoice.exchange_rate })} error={err["exchange_rate"]}>
               <Input value={form.exchange_rate} inputMode="decimal" required ltr
-                onChange={(e) => setForm({ ...form, exchange_rate: e.target.value })} />
+                onChange={(e) => { setRateTouched(true); setForm({ ...form, exchange_rate: e.target.value }); }} />
             </Field>
           )}
         </div>

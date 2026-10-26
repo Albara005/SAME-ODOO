@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, ArchiveRestore, BookPlus, CalendarCheck, Plus, Trash2, Undo2 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { Tabs, useIdempotencyKey } from "../components/business";
@@ -14,7 +15,7 @@ import { digitsFor, isPositive, isZero, parseDec, sumDec } from "../lib/decimal"
 import { addDays, fiscalYear, formatMoney, locale, today } from "../lib/format";
 import { BooksLock, ExportButton, qs, useAccountName } from "./Reports";
 
-type Tab = "journal" | "accounts" | "months" | "year";
+type Tab = "journal" | "accounts" | "months" | "year" | "fx";
 type Account = Schemas["AccountOut"];
 type Entry = Schemas["JournalEntryOut"];
 
@@ -42,12 +43,14 @@ export function AccountingPage() {
           { key: "accounts", label: t("accounting.chart") },
           { key: "months", label: t("periods.tab") },
           { key: "year", label: t("yearEnd.tab") },
+          { key: "fx", label: t("fx.tab") },
         ]}
       />
       {tab === "journal" && <Journal />}
       {tab === "accounts" && <ChartOfAccounts />}
       {tab === "months" && <MonthlyClose />}
       {tab === "year" && <YearEnd />}
+      {tab === "fx" && <Currencies />}
     </div>
   );
 }
@@ -55,7 +58,8 @@ export function AccountingPage() {
 // ---------------------------------------------------------------- journal
 
 const SOURCES = ["manual", "invoice", "payment", "credit_note", "refund", "vendor_bill", "bill_payment", "vendor_credit",
-  "vendor_refund", "stock", "year_end_close"];
+  "vendor_refund", "stock", "year_end_close", "pay_run", "end_of_service", "fx_revaluation"];
+const FOREIGN = ["USD", "EUR", "GBP", "AED", "SAR", "QAR", "KWD", "BHD", "OMR", "EGP", "JOD", "TRY", "JPY"];
 
 function Journal() {
   const { t } = useI18n();
@@ -659,5 +663,214 @@ function ReopenDialog({ period, month, onClose, onDone }: {
         </div>
       </form>
     </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------- currencies
+
+function Currencies() {
+  return (
+    <div className="stack">
+      <Revaluation />
+      <Rates />
+    </div>
+  );
+}
+
+function Rates() {
+  const { t, date } = useI18n();
+  const { org, can } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const path = { params: { path: { org_id: org.id } } };
+  const base = org.default_currency;
+  const rates = useQuery({
+    queryKey: ["exchange-rates", org.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/exchange-rates", path)),
+  });
+  const [form, setForm] = useState({ currency: base === "USD" ? "EUR" : "USD", day: today(), rate: "" });
+  const done = () => void qc.invalidateQueries({ queryKey: ["exchange-rates", org.id] });
+  const add = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/exchange-rates", { ...path, body: form })),
+    onSuccess: () => { done(); setForm({ ...form, rate: "" }); toast(t("common.saved")); },
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE("/api/v1/orgs/{org_id}/exchange-rates/{rate_id}", { params: { path: { org_id: org.id, rate_id: id } } })),
+    onSuccess: done,
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const manage = can("accounting.journal");
+  return (
+    <Card title={t("fx.rates")}>
+      <div className="stack-sm">
+        <p className="muted small">{t("fx.ratesHint", { base })}</p>
+        {manage && (
+          <form className="row" style={{ alignItems: "flex-end" }} onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
+            <Field label={t("fx.currency")}>
+              <Select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
+                {FOREIGN.filter((c) => c !== base).map((c) => <option key={c} value={c}>{c}</option>)}
+              </Select>
+            </Field>
+            <Field label={t("fx.day")}>
+              <Input type="date" value={form.day} required ltr onChange={(e) => setForm({ ...form, day: e.target.value })} />
+            </Field>
+            <Field label={t("fx.rate")}>
+              <Input value={form.rate} inputMode="decimal" required ltr placeholder="3.75" onChange={(e) => setForm({ ...form, rate: e.target.value })} />
+            </Field>
+            <Button type="submit" variant="primary" icon={<Plus size={16} />} loading={add.isPending}>{t("fx.addRate")}</Button>
+          </form>
+        )}
+        {add.isError && <ErrorNotice error={add.error} />}
+        <QueryView query={rates}>
+          {(list) => list.length === 0 ? <Empty>{t("fx.noRates")}</Empty> : (
+            <div className="table-wrap">
+              <table aria-label={t("fx.rates")}>
+                <thead>
+                  <tr><th>{t("fx.currency")}</th><th>{t("fx.day")}</th><th className="end">{t("fx.rate")}</th><th /></tr>
+                </thead>
+                <tbody>
+                  {list.map((r) => (
+                    <tr key={r.id}>
+                      <td className="mono">{r.currency}</td>
+                      <td className="num">{date(r.day)}</td>
+                      <td className="end num">{r.rate}</td>
+                      <td className="end">
+                        {manage && <IconButton label={t("common.delete")} onClick={() => remove.mutate(r.id)}><Trash2 size={16} /></IconButton>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </QueryView>
+      </div>
+    </Card>
+  );
+}
+
+function Revaluation() {
+  const { t, money, date } = useI18n();
+  const { org, can, path: to } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const path = { params: { path: { org_id: org.id } } };
+  const [day, setDay] = useState(today());
+  const [given, setGiven] = useState<Record<string, string>>({});
+  const preview = useQuery({
+    queryKey: ["fx-preview", org.id, day],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/fx-revaluations/preview", { params: { path: { org_id: org.id }, query: { as_of: day } } })),
+    enabled: Boolean(day),
+    placeholderData: keepPreviousData,
+  });
+  const history = useQuery({
+    queryKey: ["fx-revaluations", org.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/fx-revaluations", path)),
+  });
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["fx-revaluations", org.id] });
+    void qc.invalidateQueries({ queryKey: ["fx-preview", org.id] });
+    void qc.invalidateQueries({ queryKey: ["exchange-rates", org.id] });
+    void qc.invalidateQueries({ queryKey: ["journal", org.id] });
+    void qc.invalidateQueries({ queryKey: ["report", org.id] });
+  };
+  const post = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/fx-revaluations", {
+      ...path, body: { as_of: day, rates: Object.fromEntries(Object.entries(given).filter(([, v]) => v.trim())) },
+    })),
+    onSuccess: () => { refresh(); setGiven({}); toast(t("fx.posted")); },
+  });
+  const cancel = useMutation({
+    mutationFn: (id: string) => unwrap(api.POST("/api/v1/orgs/{org_id}/fx-revaluations/{doc_id}/cancel", { params: { path: { org_id: org.id, doc_id: id } } })),
+    onSuccess: refresh,
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const p = preview.data;
+  const base = p?.base_currency ?? org.default_currency;
+  const manage = can("accounting.journal");
+  const doneThatDay = (history.data ?? []).some((h) => h.as_of === day && h.status === "posted");
+  return (
+    <Card title={t("fx.revaluation")}>
+      <div className="stack-sm">
+        <p className="muted small">{t("fx.revaluationHint")}</p>
+        <div className="row" style={{ alignItems: "flex-end" }}>
+          <Field label={t("fx.asOf")}>
+            <Input type="date" value={day} max={today()} ltr onChange={(e) => { setDay(e.target.value); setGiven({}); }} />
+          </Field>
+          {(p?.missing ?? []).map((c) => (
+            <Field key={c} label={t("fx.missing", { currency: c })}>
+              <Input value={given[c] ?? ""} inputMode="decimal" ltr onChange={(e) => setGiven({ ...given, [c]: e.target.value })} />
+            </Field>
+          ))}
+        </div>
+        {post.isError && <ErrorNotice error={post.error} />}
+        <QueryView query={preview}>
+          {(r) => r.lines.length === 0 ? <Empty>{t("fx.nothingOwed")}</Empty> : (
+            <>
+              <div className="table-wrap">
+                <table aria-label={t("fx.revaluation")}>
+                  <thead>
+                    <tr>
+                      <th>{t("fx.invoice")}</th>
+                      <th className="end">{t("fx.due")}</th>
+                      <th className="end">{t("fx.booked")}</th>
+                      <th className="end">{t("fx.revalued")}</th>
+                      <th className="end">{t("fx.difference")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.lines.map((l) => (
+                      <tr key={l.invoice_id}>
+                        <td><Link className="mono" to={to(`invoices/${l.invoice_id}`)}>{l.number}</Link></td>
+                        <td className="end num">{money(l.due, l.currency)}</td>
+                        <td className="end num">{money(l.booked, base)}</td>
+                        <td className="end num">{l.revalued ? money(l.revalued, base) : "—"}</td>
+                        <td className="end num">{l.difference ? money(l.difference, base) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {r.difference !== null && r.difference !== undefined && (
+                <p><strong>{t("fx.net")}:</strong> <span className="num">{money(r.difference, base)}</span></p>
+              )}
+              {manage && doneThatDay && <p className="small muted">{t("fx.doneThatDay")}</p>}
+              {manage && !doneThatDay && (
+                <div>
+                  <Button variant="primary" loading={post.isPending}
+                    disabled={r.missing.some((c) => !(given[c] ?? "").trim())}
+                    onClick={() => window.confirm(t("fx.postConfirm")) && post.mutate()}>{t("fx.post")}</Button>
+                </div>
+              )}
+            </>
+          )}
+        </QueryView>
+        {(history.data ?? []).length > 0 && (
+          <div className="table-wrap">
+            <table aria-label={t("fx.history")}>
+              <thead>
+                <tr><th>{t("fx.asOf")}</th><th>{t("fx.rates")}</th><th className="end">{t("fx.difference")}</th><th>{t("common.status")}</th><th /></tr>
+              </thead>
+              <tbody>
+                {(history.data ?? []).map((h) => (
+                  <tr key={h.id}>
+                    <td className="num">{date(h.as_of)}</td>
+                    <td className="mono small">{Object.entries(h.rates).map(([c, v]) => `${c} ${v}`).join(" · ")}</td>
+                    <td className="end num">{money(h.difference, h.base_currency)}</td>
+                    <td>{h.status === "posted" ? <Badge tone="success">{t("fx.posted")}</Badge> : <Badge>{t("status.cancelled")}</Badge>}</td>
+                    <td className="end">
+                      {manage && h.status === "posted" && (
+                        <Button size="sm" variant="danger" loading={cancel.isPending}
+                          onClick={() => window.confirm(t("fx.cancelConfirm")) && cancel.mutate(h.id)}>{t("fx.cancel")}</Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
