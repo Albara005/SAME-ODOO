@@ -34,7 +34,8 @@ import type { MessageKey } from "../i18n/en";
 export type NavItem = { to: string; label: MessageKey; icon: LucideIcon; anyOf?: string[]; hue?: string; desc?: MessageKey };
 export type NavGroup = { title?: MessageKey; items: NavItem[] };
 
-/** Menu from the plan (section 13.1). Items show only to users holding one of `anyOf`. */
+/** Menu from the plan (section 13.1). Items show only to users holding one of `anyOf`. Apps (the items with a
+ *  description) are keyed by their path, the keys the organization's `apps` list holds. */
 export const NAV: NavGroup[] = [
   { items: [{ to: "", label: "nav.home", icon: Home }] },
   {
@@ -86,8 +87,16 @@ export const NAV: NavGroup[] = [
   },
 ];
 
-export function visibleNav(can: (p: string) => boolean): NavGroup[] {
-  return NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.anyOf || i.anyOf.some(can)) })).filter(
+/** The apps there are, in menu order: what the first-run setup and the organization's settings choose from. */
+export const APP_ITEMS: NavItem[] = NAV.flatMap((g) => g.items).filter((i) => i.desc);
+
+/** Whether the organization's menu shows the item: every app when it hasn't chosen (`apps` null), the rest always. */
+export function inMenu(item: NavItem, apps: readonly string[] | null | undefined): boolean {
+  return !apps || !item.desc || apps.includes(item.to);
+}
+
+export function visibleNav(can: (p: string) => boolean, apps?: readonly string[] | null): NavGroup[] {
+  return NAV.map((g) => ({ ...g, items: g.items.filter((i) => (!i.anyOf || i.anyOf.some(can)) && inMenu(i, apps)) })).filter(
     (g) => g.items.length > 0,
   );
 }

@@ -85,7 +85,7 @@ function CreateOrgDialog({ open, onClose }: { open: boolean; onClose: () => void
     onSuccess: (org) => {
       void qc.invalidateQueries({ queryKey: ["orgs"] });
       rememberOrg(org.id);
-      navigate(`/o/${org.id}`);
+      navigate(`/o/${org.id}/setup`);
     },
   });
   const fieldErr = create.error instanceof ApiError ? create.error.fields : {};

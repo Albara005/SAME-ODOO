@@ -49,6 +49,7 @@ from novara.modules.files.router import router as files_router
 from novara.modules.files.storage import ObjectStorage, storage_from_settings
 from novara.modules.identity.router import router as identity_router
 from novara.modules.organizations.router import router as organizations_router
+from novara.modules.organizations.setup import router as setup_router
 from novara.payments.router import public_router as public_payments_router, router as payments_router
 from novara.einvoice.router import router as einvoice_router
 from novara import push
@@ -131,7 +132,7 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
             conn.execute(text("SELECT 1"))
         return {"status": "ok"}
 
-    for r in (identity_router, passkeys_router, organizations_router, access_router, audit_router, files_router,
+    for r in (identity_router, passkeys_router, organizations_router, setup_router, access_router, audit_router, files_router,
               # dataio before the resource routers: /customers/export.csv must not match /customers/{id}.
               dataio_router, partners_router, catalog_router, accounting_router, invoicing_router, credit_router,
               inventory_router, sales_router, web_orders_router, purchasing_router, vendor_credit_router, projects_router, hr_router, payroll_router, bookings_router, assistant_router, studio_router, agents_router, automation_router,

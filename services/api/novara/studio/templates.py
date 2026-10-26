@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import html
 from dataclasses import dataclass
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
 
 STATIC_INDEX = """<!doctype html>
 <html lang="ar" dir="rtl">
@@ -109,6 +112,37 @@ TEMPLATES: dict[str, Template] = {
         ),
     ),
 }
+
+
+# An online store on the organization's catalog: products, a cart, and orders that wait in Sales. config.js holds
+# the platform's address and a public data key (scopes catalog and orders); the setup wizard fills it in.
+STORE_CONFIG = """/* Where the store reads the catalog and sends orders. The key is public by design: it can only read
+   the published catalog and send order requests (Studio > the project > Data). */
+window.NOVARA_STORE = {{ api: "{api}", key: "{key}" }};
+"""
+
+
+def store_config(api: str, key: str) -> str:
+    return STORE_CONFIG.format(api=api.replace('"', ""), key=key.replace('"', ""))
+
+
+TEMPLATES["store"] = Template(
+    key="store",
+    name="Online store",
+    description="A shop on your product catalog: products with their prices, a cart, and orders that arrive in "
+                "Sales. Static files; the data comes through a public data key.",
+    allowed_extensions=TEMPLATES["static-site"].allowed_extensions,
+    starter={"index.html": (_HERE / "store" / "index.html").read_text(encoding="utf-8"),
+             "styles.css": (_HERE / "store" / "styles.css").read_text(encoding="utf-8"),
+             "app.js": (_HERE / "store" / "app.js").read_text(encoding="utf-8"),
+             "proof.js": (_HERE / "proof.js").read_text(encoding="utf-8"),
+             "config.js": store_config("", "")},
+    guidance=TEMPLATES["static-site"].guidance + (
+        "\nThis is an online store: app.js loads the catalog (GET {api}/api/v1/public/catalog) and sends orders "
+        "(POST {api}/api/v1/public/orders with a proof from proof.js) using window.NOVARA_STORE from config.js. "
+        "Keep config.js, proof.js and those calls; change the look and the texts freely."
+    ),
+)
 
 
 def starter_files(template: Template, *, name: str, description: str) -> dict[str, str]:

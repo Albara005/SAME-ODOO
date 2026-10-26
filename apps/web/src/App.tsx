@@ -59,6 +59,7 @@ const HrPage = page(() => import("./pages/Hr"), "HrPage");
 const PayrollPage = page(() => import("./pages/Payroll"), "PayrollPage");
 const BookingsPage = page(() => import("./pages/Bookings"), "BookingsPage");
 const ReportsPage = page(() => import("./pages/Reports"), "ReportsPage");
+const SetupPage = page(() => import("./pages/Setup"), "SetupPage");
 const sales = () => import("./pages/Sales");
 const SalesOrderDetailPage = page(sales, "SalesOrderDetailPage");
 const SalesOrderEditorPage = page(sales, "SalesOrderEditorPage");
@@ -106,7 +107,8 @@ function RootRedirect() {
   return <Navigate to={target ? `/o/${target.id}` : "/orgs"} replace />;
 }
 
-function OrgRoute() {
+/** An organization's pages, in the app's shell; the first-run setup (`setup`) has the whole screen. */
+function OrgRoute({ setup = false }: { setup?: boolean }) {
   const { orgId = "" } = useParams();
   const { user } = useAuth();
   const org = useOrgQuery(orgId);
@@ -116,7 +118,13 @@ function OrgRoute() {
   rememberOrg(org.data.id);
   return (
     <OrgProvider org={org.data}>
-      <Layout />
+      {setup ? (
+        <Suspense fallback={<Loading />}>
+          <SetupPage />
+        </Suspense>
+      ) : (
+        <Layout />
+      )}
     </OrgProvider>
   );
 }
@@ -151,6 +159,7 @@ export function App() {
               </Suspense>
             }
           />
+          <Route path="/o/:orgId/setup" element={<OrgRoute setup />} />
           <Route path="/o/:orgId" element={<OrgRoute />}>
             <Route index element={<HomePage />} />
             <Route path="customers" element={<CustomersPage />} />

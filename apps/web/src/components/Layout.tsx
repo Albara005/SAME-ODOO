@@ -264,7 +264,7 @@ export function Layout() {
             </span>
           </NavLink>
           <nav className="stack-sm nav-scroll">
-            {visibleNav(can).map((group, i) => (
+            {visibleNav(can, org.apps).map((group, i) => (
               <div className="nav-group" key={group.title ?? i}>
                 {group.title && <div className="nav-title">{t(group.title)}</div>}
                 {group.items.map((item) => (
