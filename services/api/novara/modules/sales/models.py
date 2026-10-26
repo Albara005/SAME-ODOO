@@ -70,7 +70,9 @@ class SalesOrderLine(IdMixin, TenantScoped, Base):
 
 class WebOrder(IdMixin, TimestampMixin, TenantScoped, Base):
     """An order request a visitor sent from a published App Studio site (see sales/web_orders.py).
-    Nothing is reserved or posted: a person turns it into a quotation, or dismisses it."""
+    Nothing is reserved or posted: a person turns it into a quotation, or dismisses it. With the site's checkout
+    the visitor pays at once: the request waits for the money ("awaiting_payment"), then becomes the customer's
+    posted, paid invoice ("paid")."""
 
     __tablename__ = "web_orders"
     __table_args__ = (
@@ -80,12 +82,14 @@ class WebOrder(IdMixin, TimestampMixin, TenantScoped, Base):
         same_org_fk("key_id", "app_data_keys", ondelete="CASCADE"),
         same_org_fk("sales_order_id", "sales_orders"),
         same_org_fk("customer_id", "customers"),
+        same_org_fk("invoice_id", "invoices"),
     )
 
     number: Mapped[str] = mapped_column(String(40), nullable=False)
     project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     key_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-    status: Mapped[str] = mapped_column(String(20), default="new", nullable=False, index=True)  # new | converted | dismissed
+    # new | awaiting_payment | paid | converted | dismissed
+    status: Mapped[str] = mapped_column(String(20), default="new", nullable=False, index=True)
     customer_name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str] = mapped_column(String(320), default="", nullable=False)
     phone: Mapped[str] = mapped_column(String(40), default="", nullable=False)
@@ -99,5 +103,6 @@ class WebOrder(IdMixin, TimestampMixin, TenantScoped, Base):
     ip_address: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
     sales_order_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     customer_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    invoice_id: Mapped[str | None] = mapped_column(String(36), nullable=True)   # paid on the site: its invoice
     handled_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
     handled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

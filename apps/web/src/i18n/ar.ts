@@ -1979,4 +1979,7 @@ export const ar: Record<MessageKey, string> = {
   "pay.hyperpayWebhookHint": "اختياري: أضف Webhook بهذا العنوان في لوحة هايبر باي، لتظهر الدفعة حتى لو أغلق العميل الصفحة قبل العودة.",
   "pay.hyperpayKey": "مفتاح فك تشفير الـ Webhook",
   "pay.hyperpayKeyHint": "المفتاح المكوّن من 64 حرفاً الذي تعرضه هايبر باي للـ Webhook.",
+  "dataKeys.scope.checkout": "الدفع",
+  "dataKeys.scope.checkoutLong": "الدفع في الموقع: يدفع الزائر عند الطلب، ويصبح الطلب المدفوع فاتورة مرحّلة ومدفوعة (يحتاج صلاحية ترحيل الفواتير وتسجيل الدفعات، ومزوّد دفع إلكتروني)",
+  "webOrders.awaitingPayment": "بانتظار الدفع",
 };

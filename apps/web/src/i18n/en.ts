@@ -1977,6 +1977,9 @@ export const en = {
   "pay.hyperpayWebhookHint": "Optional: add a webhook with this address in HyperPay's dashboard, so payments show even if the customer closes the page before coming back.",
   "pay.hyperpayKey": "Webhook decryption key",
   "pay.hyperpayKeyHint": "The 64-character key HyperPay shows for the webhook.",
+  "dataKeys.scope.checkout": "Checkout",
+  "dataKeys.scope.checkoutLong": "Take payment on the site: the visitor pays when ordering, and a paid order becomes a posted, paid invoice (needs posting invoices and taking payments, and an online payment provider)",
+  "webOrders.awaitingPayment": "Awaiting payment",
 } as const;
 
 export type MessageKey = keyof typeof en;

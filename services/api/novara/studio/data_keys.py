@@ -8,6 +8,8 @@ what confirmed orders hold). With the "orders" scope the site can also send orde
 
     POST /api/v1/public/orders                    (see novara/modules/sales/web_orders.py)
 
+With the "checkout" scope an order can be paid at once ("pay": true; the answer's payment_url is the payment page).
+
 With the "bookings" scope it can list bookable services and their free times, and ask for one:
 
     GET  /api/v1/public/booking-services
@@ -49,6 +51,8 @@ from novara.modules.inventory.models import StockLevel
 from novara.modules.organizations.models import Organization
 from novara.modules.sales import web_orders
 from novara.money import fmt_decimal, from_minor, to_minor
+from novara.payments import service as payments
+from novara.payments.providers import ProviderError
 from novara.studio import proof
 from novara.studio.models import AppDataKey, AppProject
 from novara.tenancy import bind_tenant, system_scope
@@ -64,6 +68,8 @@ SCOPES: dict[str, tuple[str, ...]] = {
     "orders": (P.PRODUCTS_READ, P.SALES_WRITE),
     # Booking requests hold a time until someone confirms them: a booking decision.
     "bookings": (P.BOOKINGS_MANAGE,),
+    # The visitor pays at once, and a paid order becomes a posted, paid invoice: posting and payment decisions.
+    "checkout": (P.PRODUCTS_READ, P.SALES_WRITE, P.CUSTOMERS_WRITE, P.INVOICES_POST, P.PAYMENTS_WRITE),
 }
 PUBLIC_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -126,6 +132,8 @@ def create_key(project_id: str, body: DataKeyIn, request: Request, ctx: OrgConte
         missing = [p for p in SCOPES[scope] if not ctx.has(p)]
         if missing:
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"publishing '{scope}' needs {', '.join(missing)}")
+    if "checkout" in scopes:
+        scopes = sorted({*scopes, "orders"})   # paying is for an order
     if {"availability", "orders"} & set(scopes) and "catalog" not in scopes:
         scopes = sorted({*scopes, "catalog"})  # a site needs the catalog to show stock or to order
     raw = "nvpk_" + secrets.token_urlsafe(24)
@@ -230,11 +238,17 @@ def orders_preflight() -> Response:
 def public_order(request: Request, payload: dict = Body(...), key: str | None = Query(default=None, max_length=100),
                  x_novara_key: str | None = Header(default=None, max_length=100), db: Session = Depends(get_db)):
     """An order request from a published site (a key with the "orders" scope). It waits in Sales for a person.
-    Body: name, email and/or phone, note, lines [{product_id, quantity}]; prices come from the catalog."""
+    Body: name, email and/or phone, note, lines [{product_id, quantity}]; prices come from the catalog.
+    With the "checkout" scope, "pay": true makes it wait for the visitor's payment instead: the answer carries
+    payment_url, where the site sends the visitor."""
     raw = x_novara_key or key
     data_key = _key_for(db, raw) if raw else None
     if data_key is None or "orders" not in data_key.scopes:
         return JSONResponse({"detail": "invalid or revoked key"}, status_code=status.HTTP_401_UNAUTHORIZED, headers=NO_STORE)
+    pay = payload.pop("pay", False) is True
+    if pay and "checkout" not in data_key.scopes:
+        return JSONResponse({"detail": "this key can't take payments: give it the checkout scope"},
+                            status_code=status.HTTP_403_FORBIDDEN, headers=NO_STORE)
     solved = payload.pop("proof", None)
     try:
         body = web_orders.PublicOrderIn.model_validate(payload)
@@ -247,16 +261,26 @@ def public_order(request: Request, payload: dict = Body(...), key: str | None = 
     if refused is not None:
         return refused
     try:
-        order = web_orders.receive(db, data_key, body, ip=client_ip(request))
+        order = web_orders.receive(db, data_key, body, ip=client_ip(request), awaiting_payment=pay)
     except web_orders.RateLimited as e:
         return JSONResponse({"detail": str(e)}, status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                             headers={**NO_STORE, "Retry-After": "600"})
     except web_orders.WebOrderInvalid as e:
         return JSONResponse({"detail": str(e)}, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, headers=NO_STORE)
+    answer = {"received": True, "reference": order.number, "currency": order.currency,
+              "total": str(from_minor(order.total_minor, order.currency))}
+    if pay:
+        try:
+            link = payments.create_order_link(db, request.app.state.settings, order, request.app.state.payment_http)
+        except (payments.PaymentsUnavailable, payments.PaymentsInvalid, ProviderError) as e:
+            db.rollback()                           # no payment page: no order either
+            code = (status.HTTP_409_CONFLICT if isinstance(e, payments.PaymentsUnavailable) else
+                    status.HTTP_422_UNPROCESSABLE_ENTITY if isinstance(e, payments.PaymentsInvalid) else
+                    status.HTTP_502_BAD_GATEWAY)
+            return JSONResponse({"detail": str(e)}, status_code=code, headers=NO_STORE)
+        answer["payment_url"] = link.url
     db.commit()
-    return JSONResponse({"received": True, "reference": order.number, "currency": order.currency,
-                         "total": str(from_minor(order.total_minor, order.currency))},
-                        status_code=status.HTTP_201_CREATED, headers=NO_STORE)
+    return JSONResponse(answer, status_code=status.HTTP_201_CREATED, headers=NO_STORE)
 
 
 # ---------------------------------------------------------------- proof of work

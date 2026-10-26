@@ -9,6 +9,10 @@ registered on the invoice like any other, with method "online":
 The clearing account holds what the provider owes the organization; when the provider pays out,
 an accountant moves it to the bank with a journal entry (and books the provider's fees then).
 
+A published site with the "checkout" scope takes payment for the order it sends (sales/web_orders.py): the link
+is for the order itself, and when the money is confirmed the order becomes the customer's invoice, posted and
+paid in the same transaction (and e-invoiced, when that is on). Until then nothing is posted.
+
 Confirmations can arrive twice or late: a link is paid at most once (by its id as the payment's
 idempotency key). If the invoice can't take the money any more (paid another way meanwhile,
 cancelled, or the amount differs), the link becomes "unapplied", nothing is posted, and the person
@@ -26,18 +30,23 @@ from sqlalchemy.orm import Session
 from novara import crypto
 from novara.automation.models import Notification
 from novara.db import new_id, utcnow
-from novara.modules.accounting.service import LedgerError
+from novara.einvoice.service import EInvoiceError, EInvoiceState
+from novara.modules.access.service import holders
+from novara.modules.accounting.service import LedgerError, PeriodLocked
 from novara.modules.audit import service as audit
 from novara.modules.invoicing.models import Invoice
 from novara.modules.invoicing.service import InvoiceStateError, InvoiceValidationError, lock_invoice, register_payment
 from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
+from novara.modules.sales import web_orders
+from novara.modules.sales.models import WebOrder
 from novara.money import from_minor
 from novara.payments.models import PaymentLink, PaymentSettings
 from novara.payments.providers import CheckoutRequest, HyperPay, Moyasar, ProviderError, Stripe, TestProvider
 from novara.tenancy import current_tenant
 
 LINK_HOURS = 23  # Stripe allows at most 24
+ORDER_LINK_HOURS = 2  # a visitor paying for what they just ordered
 
 
 class PaymentsUnavailable(RuntimeError):
@@ -143,6 +152,52 @@ def create_link(db: Session, settings, inv: Invoice, *, amount_minor: int | None
     return link, True
 
 
+def create_order_link(db: Session, settings, order: WebOrder, http=None) -> PaymentLink:
+    """The payment page for an order a site just sent: its whole total, in the organization's currency."""
+    row = settings_row(db, settings)
+    if row.provider == "none":
+        raise PaymentsUnavailable("online payments aren't set up for this shop")
+    gateway = provider(db, settings, row, http)
+    org = db.get(Organization, order.organization_id)
+    link_id = new_id()
+    base = f"{settings.app_base_url}/api/v1/public/payments/done"
+    try:
+        checkout = gateway.create_checkout(CheckoutRequest(
+            link_id=link_id, title=f"{org.name} · {order.number}"[:250], amount_minor=order.total_minor,
+            currency=order.currency, customer_email=order.email, success_url=f"{base}?status=paid",
+            cancel_url=f"{base}?status=cancelled", expires_at=utcnow() + timedelta(hours=ORDER_LINK_HOURS),
+            metadata={"web_order_id": order.id, "web_order_number": order.number, "organization_id": order.organization_id}))
+    except ProviderError as e:
+        if e.invalid:
+            raise PaymentsInvalid(str(e)) from None
+        raise
+    link = PaymentLink(id=link_id, web_order_id=order.id, provider=gateway.name, session_id=checkout.session_id,
+                       url=checkout.url, amount_minor=order.total_minor, currency=order.currency, status="open",
+                       expires_at=checkout.expires_at)
+    db.add(link)
+    db.flush()
+    return link
+
+
+def cancel_order_links(db: Session, settings, order: WebOrder, http=None) -> None:
+    """The order was taken over or dismissed: its open links close here (and at the provider, if it answers). Money
+    that still arrives is not recorded, and sales is told."""
+    for link in db.scalars(select(PaymentLink).where(PaymentLink.web_order_id == order.id, PaymentLink.status == "open")
+                           .with_for_update()):
+        try:
+            provider(db, settings, settings_row(db, settings), http, name=link.provider).expire(link.session_id)
+        except (ProviderError, PaymentsUnavailable):
+            pass
+        link.status = "cancelled"
+
+
+def subject_number(db: Session, link: PaymentLink) -> str:
+    """What the customer is paying for: the invoice's number, or the site order's."""
+    if link.web_order_id:
+        return db.get(WebOrder, link.web_order_id).number
+    return db.get(Invoice, link.invoice_id).number or ""
+
+
 def cancel_link(db: Session, settings, link: PaymentLink, http=None) -> None:
     if effective_status(link) != "open":
         raise PaymentsUnavailable(f"only open links can be cancelled (this one is {effective_status(link)})")
@@ -165,11 +220,14 @@ def _tell(db: Session, link: PaymentLink, title: str, body: str) -> None:
 
 
 def complete(db: Session, link_id: str, *, amount_minor: int, currency: str, reference: str,
-             paid_at: datetime) -> str:
+             paid_at: datetime, settings=None) -> str:
     """Apply a confirmed payment to the link's invoice: "paid", "unapplied", or "duplicate" if already handled."""
     link = db.scalar(select(PaymentLink).where(PaymentLink.id == link_id).with_for_update())
     if link.status in ("paid", "unapplied"):
         return "duplicate"
+    if link.web_order_id:
+        return _complete_order(db, link, amount_minor=amount_minor, currency=currency, reference=reference,
+                               paid_at=paid_at, settings=settings)
     inv = lock_invoice(db, link.invoice_id)
     org = db.get(Organization, inv.organization_id)
     link.paid_at = paid_at
@@ -213,6 +271,55 @@ def complete(db: Session, link_id: str, *, amount_minor: int, currency: str, ref
                     "ردّ المبلغ من لوحة المزوّد أو سجّله يدوياً.",
                f"The provider took {money}, but it wasn't recorded: {problem}. "
                "Refund it from the provider's dashboard or record it by hand."))
+    return "unapplied"
+
+
+def _tell_sales(db: Session, key: str, title: str, body: str) -> None:
+    for uid in holders(db, "sales.write"):
+        db.add(Notification(user_id=uid, title=title[:300], body=body, idempotency_key=f"{key}:{uid}"[:120]))
+
+
+def _complete_order(db: Session, link: PaymentLink, *, amount_minor: int, currency: str, reference: str,
+                    paid_at: datetime, settings) -> str:
+    """The money for a site's order: the order becomes the customer's invoice, posted and paid; or, if that can't be
+    done (the order was taken over meanwhile, a different amount...), the link is "unapplied" and sales is told."""
+    order = db.scalar(select(WebOrder).where(WebOrder.id == link.web_order_id).with_for_update())
+    org = db.get(Organization, link.organization_id)
+    link.paid_at, link.provider_reference = paid_at, reference[:255]
+    money = f"{from_minor(amount_minor, currency)} {currency}"
+    problem, inv, payment = None, None, None
+    if (amount_minor, currency) != (link.amount_minor, link.currency):
+        problem = f"the provider took {money}, but the order is {from_minor(link.amount_minor, link.currency)} {link.currency}"
+    elif link.status == "cancelled" or order.status != "awaiting_payment":
+        problem = f"the order request was {order.status.replace('_', ' ')} meanwhile"
+    else:
+        try:
+            with db.begin_nested():
+                inv = web_orders.invoice_paid_order(db, order, paid_at=paid_at, settings=settings)
+                payment, _ = register_payment(
+                    db, inv, amount_minor=amount_minor, payment_date=inv.issue_date, method="online",
+                    reference=f"{link.provider} {reference}"[:120], user_id=None, idempotency_key=f"link:{link.id}")
+        except (InvoiceStateError, InvoiceValidationError, LedgerError, PeriodLocked, EInvoiceError, EInvoiceState) as e:
+            problem, inv = str(e), None
+    details = {"number": order.number, "amount": str(from_minor(amount_minor, currency)), "currency": currency,
+               "provider": link.provider, "link_id": link.id, "reference": reference[:255]}
+    if problem is None:
+        link.status, link.payment_id = "paid", payment.id
+        audit.record(db, actor_user_id=None, action="web_order.paid_online", target_type="web_order", target_id=order.id,
+                     details=details | {"invoice": inv.number, "payment_id": payment.id})
+        _tell_sales(db, f"weborder:{order.id}:paid",
+                    _say(org, f"دُفع طلب الموقع ⁦{order.number}⁩: الفاتورة ⁦{inv.number}⁩", f"Site order {order.number} was paid: invoice {inv.number}"),
+                    _say(org, f"⁦{money}⁩ من {order.customer_name}. جهّز الطلب وسلّمه.",
+                         f"{money} from {order.customer_name}. Prepare the order and deliver it."))
+        return "paid"
+    link.status, link.note = "unapplied", problem[:300]
+    audit.record(db, actor_user_id=None, action="web_order.online_payment_unapplied", target_type="web_order",
+                 target_id=order.id, details=details | {"problem": problem[:300]})
+    _tell_sales(db, f"weborder:{order.id}:unapplied:{link.id}",
+                _say(org, f"دفعة لطلب الموقع ⁦{order.number}⁩ لم تُسجَّل", f"A payment for site order {order.number} wasn't recorded"),
+                _say(org, f"استلم مزوّد الدفع ⁦{money}⁩ لكن لم تُسجَّل: ⁦{problem}⁩. ردّ المبلغ من لوحة المزوّد أو سجّله يدوياً.",
+                     f"The provider took {money}, but it wasn't recorded: {problem}. Refund it from the provider's dashboard "
+                     "or record it by hand."))
     return "unapplied"
 
 

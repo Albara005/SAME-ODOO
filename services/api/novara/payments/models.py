@@ -46,7 +46,8 @@ class PaymentSettings(IdMixin, TimestampMixin, TenantScoped, Base):
 
 
 class PaymentLink(IdMixin, TimestampMixin, TenantScoped, Base):
-    """A checkout page for (part of) what is due on one invoice. Paid once, then it's done.
+    """A checkout page for (part of) what is due on one invoice, or for an order a published site took (the order
+    becomes a paid invoice when the money comes, see sales/web_orders.py). Paid once, then it's done.
 
     "unapplied": the provider took the money but the invoice couldn't take it (paid another way meanwhile,
     cancelled, or a different amount); the person who made the link is told, nothing is posted."""
@@ -54,13 +55,16 @@ class PaymentLink(IdMixin, TimestampMixin, TenantScoped, Base):
     __tablename__ = "payment_links"
     __table_args__ = (
         same_org_fk("invoice_id", "invoices"),
+        same_org_fk("web_order_id", "web_orders"),
         same_org_fk("payment_id", "payments"),
         UniqueConstraint("provider", "session_id", name="uq_payment_link_session"),
         CheckConstraint("amount_minor > 0", name="ck_payment_link_amount_positive"),
         CheckConstraint("status IN ('open', 'paid', 'unapplied', 'expired', 'cancelled')", name="ck_payment_link_status"),
+        CheckConstraint("(invoice_id IS NULL) <> (web_order_id IS NULL)", name="ck_payment_link_subject"),
     )
 
-    invoice_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    invoice_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    web_order_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     provider: Mapped[str] = mapped_column(String(10), nullable=False)
     session_id: Mapped[str] = mapped_column(String(255), nullable=False)
     url: Mapped[str] = mapped_column(Text, nullable=False)

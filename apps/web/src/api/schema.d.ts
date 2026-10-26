@@ -4591,7 +4591,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Web Orders */
+        /**
+         * List Web Orders
+         * @description By status; "open" is what still waits for someone: new requests and those waiting for their payment.
+         */
         get: operations["list_web_orders_api_v1_orgs__org_id__web_orders_get"];
         put?: never;
         post?: never;
@@ -4982,6 +4985,8 @@ export interface paths {
          * Public Order
          * @description An order request from a published site (a key with the "orders" scope). It waits in Sales for a person.
          *     Body: name, email and/or phone, note, lines [{product_id, quantity}]; prices come from the catalog.
+         *     With the "checkout" scope, "pay": true makes it wait for the visitor's payment instead: the answer carries
+         *     payment_url, where the site sends the visitor.
          */
         post: operations["public_order_api_v1_public_orders_post"];
         delete?: never;
@@ -8463,7 +8468,7 @@ export interface components {
             /** Id */
             id: string;
             /** Invoice Id */
-            invoice_id: string;
+            invoice_id: string | null;
             /** Note */
             note: string;
             /** Paid At */
@@ -8479,6 +8484,8 @@ export interface components {
             status: "open" | "paid" | "unapplied" | "expired" | "cancelled";
             /** Url */
             url: string;
+            /** Web Order Id */
+            web_order_id?: string | null;
         };
         /** PaymentOut */
         PaymentOut: {
@@ -10432,6 +10439,10 @@ export interface components {
             email: string;
             /** Id */
             id: string;
+            /** Invoice Id */
+            invoice_id: string | null;
+            /** Invoice Number */
+            invoice_number: string | null;
             /** Lines */
             lines: components["schemas"]["WebOrderLineOut"][];
             /** Note */

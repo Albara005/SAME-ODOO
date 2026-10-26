@@ -41,6 +41,7 @@ from novara.modules.invoicing.models import Invoice
 from novara.modules.invoicing.service import lock_invoice
 from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
+from novara.modules.sales.models import WebOrder
 from novara.money import from_minor, to_minor
 from novara.payments import service as svc
 from novara.payments.models import PaymentLink, PaymentSettings
@@ -111,7 +112,8 @@ class PaymentLinkIn(BaseModel):
 
 class PaymentLinkOut(BaseModel):
     id: str
-    invoice_id: str
+    invoice_id: str | None
+    web_order_id: str | None = None         # a published site's order (paid on the site)
     provider: str
     url: str
     amount: str
@@ -140,7 +142,7 @@ def _settings_out(db: Session, settings, row: PaymentSettings) -> PaymentSetting
 
 
 def link_out(link: PaymentLink) -> PaymentLinkOut:
-    return PaymentLinkOut(id=link.id, invoice_id=link.invoice_id, provider=link.provider, url=link.url,
+    return PaymentLinkOut(id=link.id, invoice_id=link.invoice_id, web_order_id=link.web_order_id, provider=link.provider, url=link.url,
                    amount=str(from_minor(link.amount_minor, link.currency)), currency=link.currency,
                    status=svc.effective_status(link), expires_at=link.expires_at, paid_at=link.paid_at,
                    payment_id=link.payment_id, note=link.note, created_at=link.created_at)
@@ -328,7 +330,7 @@ def _stripe_call(db: Session, settings, token: str, body: bytes, signature: str)
         return JSONResponse({"received": True, "result": "expired"})
     assert isinstance(meaning, Paid)
     result = svc.complete(db, link.id, amount_minor=meaning.amount_minor, currency=meaning.currency,
-                          reference=meaning.reference, paid_at=meaning.paid_at)
+                          reference=meaning.reference, paid_at=meaning.paid_at, settings=settings)
     db.commit()
     return JSONResponse({"received": True, "result": result})
 
@@ -382,7 +384,7 @@ def _moyasar_call(db: Session, settings, http, token: str, body: bytes) -> JSONR
         db.commit()
         return JSONResponse({"received": True, "result": "expired"})
     result = svc.complete(db, link.id, amount_minor=meaning.amount_minor, currency=meaning.currency,
-                          reference=meaning.reference, paid_at=meaning.paid_at)
+                          reference=meaning.reference, paid_at=meaning.paid_at, settings=settings)
     db.commit()
     return JSONResponse({"received": True, "result": result})
 
@@ -429,7 +431,6 @@ def _test_link(db: Session, settings, session: str) -> PaymentLink:
 def test_checkout(session: str, request: Request, db: Session = Depends(get_db)):
     """The test provider's checkout page: what a customer would see at the provider, with a pretend card."""
     link = _test_link(db, request.app.state.settings, session)
-    inv = db.get(Invoice, link.invoice_id)
     org = db.get(Organization, link.organization_id)
     money = f"{from_minor(link.amount_minor, link.currency)} {link.currency}"
     state = svc.effective_status(link)
@@ -437,7 +438,7 @@ def test_checkout(session: str, request: Request, db: Session = Depends(get_db))
         return _page("الدفع", f"<h1>هذا الرابط لم يعد متاحاً</h1><p class='muted'>This link is {state}.</p>", 410)
     return _page("الدفع", (
         f"<p class='muted'>مزوّد دفع تجريبي · Test payment provider</p><h1>{html.escape(org.name)}</h1>"
-        f"<p>الفاتورة ⁦{html.escape(inv.number or '')}⁩</p><p class='amount'>{html.escape(money)}</p>"
+        f"<p>⁦{html.escape(svc.subject_number(db, link))}⁩</p><p class='amount'>{html.escape(money)}</p>"
         f"<form method='post' action='{html.escape(session)}/pay'>"
         "<button class='pay' type='submit'>ادفع (تجريبي) · Pay (test)</button></form>"
         "<p class='muted'>لا تُسحب أي أموال حقيقية. No real money is taken.</p>"))
@@ -450,7 +451,7 @@ def test_pay(session: str, request: Request, db: Session = Depends(get_db)):
     if svc.effective_status(link) != "open":
         raise HTTPException(status.HTTP_410_GONE, "this link is no longer open")
     svc.complete(db, link.id, amount_minor=link.amount_minor, currency=link.currency, reference=session[-12:],
-                 paid_at=utcnow())
+                 paid_at=utcnow(), settings=request.app.state.settings)
     db.commit()
     return RedirectResponse(f"{request.app.state.settings.app_base_url}/api/v1/public/payments/done?status=paid",
                             status_code=status.HTTP_303_SEE_OTHER)
@@ -502,9 +503,12 @@ def _widget_headers(host: str) -> dict[str, str]:
             "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"}
 
 
-def _customer_fields(db: Session, inv: Invoice) -> dict[str, str]:
-    """What HyperPay asks of the buyer for 3-D Secure, as far as the customer's record has it."""
-    c = db.get(Customer, inv.customer_id)
+def _customer_fields(db: Session, link: PaymentLink) -> dict[str, str]:
+    """What HyperPay asks of the buyer for 3-D Secure, as far as the customer's record (or the site order) has it."""
+    if link.web_order_id:
+        w = db.get(WebOrder, link.web_order_id)
+        return {"customer.email": w.email, "customer.givenName": w.customer_name[:48], "billing.country": "SA"}
+    c = db.get(Customer, db.get(Invoice, link.invoice_id).customer_id)
     if c is None:
         return {}
     return {"customer.email": c.email or "", "customer.givenName": (c.name or "")[:48], "billing.street1": c.address_line or "",
@@ -517,14 +521,13 @@ def hyperpay_checkout(session: str, request: Request, brand: Literal["mada", "ca
     """The customer's page: choose mada or another card, then HyperPay's widget for a checkout prepared now."""
     link = _hyperpay_link(db, session)
     org = db.get(Organization, link.organization_id)
-    inv = db.get(Invoice, link.invoice_id)
     money = f"{from_minor(link.amount_minor, link.currency)} {link.currency}"
     state = svc.effective_status(link)
     if state != "open":
         return _page("الدفع", f"<h1>هذا الرابط لم يعد متاحاً</h1><p class='muted'>This link is {html.escape(state)}.</p>", 410)
     settings = request.app.state.settings
     gateway = _hyperpay(db, settings, request.app.state.payment_http)
-    head = (f"<h1>{html.escape(org.name)}</h1><p>الفاتورة ⁦{html.escape(inv.number or '')}⁩</p>"
+    head = (f"<h1>{html.escape(org.name)}</h1><p>⁦{html.escape(svc.subject_number(db, link))}⁩</p>"
             f"<p class='amount'>{html.escape(money)}</p>")
     brands = gateway.brands()
     if brand is not None and brand not in brands:
@@ -536,7 +539,7 @@ def hyperpay_checkout(session: str, request: Request, brand: Literal["mada", "ca
     brand = brand or brands[0]
     try:
         checkout = gateway.prepare(brand=brand, link_id=link.id, amount_minor=link.amount_minor, currency=link.currency,
-                                   customer=_customer_fields(db, inv))
+                                   customer=_customer_fields(db, link))
     except ProviderError as e:
         return _page("الدفع", head + f"<p>تعذّر بدء الدفع، حاول بعد قليل.</p><p class='muted'>{html.escape(str(e))}</p>", 502)
     result = f"{settings.app_base_url}/api/v1/public/payments/hyperpay/{session}/result?brand={brand}"
@@ -556,13 +559,13 @@ def _not_completed(session: str, outcome: HyperPayResult | None = None, code: in
                                     "<p class='muted'>The payment wasn't completed and nothing was charged.</p>" + detail, code)
 
 
-def _record(db: Session, link: PaymentLink, outcome: HyperPayResult) -> str:
+def _record(db: Session, settings, link: PaymentLink, outcome: HyperPayResult) -> str:
     """What HyperPay said about a payment for this link: recorded when taken, noted when held for review."""
     if outcome.state == "paid":
         if outcome.amount_minor is None:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "HyperPay's answer had no amount")
         result = svc.complete(db, link.id, amount_minor=outcome.amount_minor, currency=outcome.currency,
-                              reference=outcome.payment_id, paid_at=utcnow())
+                              reference=outcome.payment_id, paid_at=utcnow(), settings=settings)
         db.commit()
         return result
     if outcome.state == "review" and link.status == "open":
@@ -584,7 +587,7 @@ def _hyperpay_back(db: Session, settings, http, session: str, brand: str, checko
         return _not_completed(session, outcome)
     if outcome.merchant_reference != link.id:                # a checkout made for another link
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "that payment wasn't made for this link")
-    if _record(db, link, outcome) == "review":
+    if _record(db, settings, link, outcome) == "review":
         return _page("الدفع قيد المراجعة", "<h1>دفعتك قيد المراجعة</h1><p>ستظهر على الفاتورة حين يقبلها مزوّد الدفع.</p>"
                                            "<p class='muted'>Your payment is being reviewed by the provider.</p>")
     return RedirectResponse(f"{settings.app_base_url}/api/v1/public/payments/done?status=paid",
@@ -627,7 +630,7 @@ def _hyperpay_call(db: Session, settings, http, token: str, body: bytes, iv: str
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))         # HyperPay calls again later
     if outcome.merchant_reference != link.id:
         return JSONResponse({"received": True, "result": "not ours"})
-    return JSONResponse({"received": True, "result": _record(db, link, outcome)})
+    return JSONResponse({"received": True, "result": _record(db, settings, link, outcome)})
 
 
 @public_router.post("/public/payments/hyperpay/{token}")

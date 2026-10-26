@@ -115,7 +115,7 @@ function WebOrders() {
   const toast = useToast();
   const requests = useQuery({
     queryKey: ["web-orders", org.id],
-    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/web-orders", { params: { path: { org_id: org.id }, query: { status: "new" } } })),
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/web-orders", { params: { path: { org_id: org.id }, query: { status: "open" } } })),
   });
   const onError = (e: Error) => toast(errorText(e, t("common.error")), "error");
   const convert = useMutation({
@@ -148,6 +148,7 @@ function WebOrders() {
                 <span dir="auto">{w.customer_name}</span>
                 <span className="muted small" dir="ltr">{[w.email, w.phone].filter(Boolean).join(" · ")}</span>
                 <Badge>{w.project_name}</Badge>
+                {w.status === "awaiting_payment" && <Badge tone="warning">{t("webOrders.awaitingPayment")}</Badge>}
               </span>
               <span className="muted small num">{date(w.created_at)}</span>
             </div>

@@ -2785,7 +2785,7 @@
       "items": {
        "type": "string"
       },
-      "maxItems": 4,
+      "maxItems": 5,
       "minItems": 1,
       "title": "Scopes",
       "type": "array"
@@ -8431,8 +8431,15 @@
       "type": "string"
      },
      "invoice_id": {
-      "title": "Invoice Id",
-      "type": "string"
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Invoice Id"
      },
      "note": {
       "title": "Note",
@@ -8479,6 +8486,17 @@
      "url": {
       "title": "Url",
       "type": "string"
+     },
+     "web_order_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Web Order Id"
      }
     },
     "required": [
@@ -13761,6 +13779,28 @@
       "title": "Id",
       "type": "string"
      },
+     "invoice_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Invoice Id"
+     },
+     "invoice_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Invoice Number"
+     },
      "lines": {
       "items": {
        "$ref": "#/components/schemas/WebOrderLineOut"
@@ -13832,6 +13872,8 @@
      "tax",
      "total",
      "sales_order_id",
+     "invoice_id",
+     "invoice_number",
      "created_at"
     ],
     "title": "WebOrderOut",
@@ -34234,6 +34276,7 @@
   },
   "/api/v1/orgs/{org_id}/web-orders": {
    "get": {
+    "description": "By status; \"open\" is what still waits for someone: new requests and those waiting for their payment.",
     "operationId": "list_web_orders_api_v1_orgs__org_id__web_orders_get",
     "parameters": [
      {
@@ -34252,7 +34295,7 @@
       "schema": {
        "anyOf": [
         {
-         "pattern": "^(new|converted|dismissed)$",
+         "pattern": "^(open|new|awaiting_payment|paid|converted|dismissed)$",
          "type": "string"
         },
         {
@@ -35618,7 +35661,7 @@
     ]
    },
    "post": {
-    "description": "An order request from a published site (a key with the \"orders\" scope). It waits in Sales for a person.\nBody: name, email and/or phone, note, lines [{product_id, quantity}]; prices come from the catalog.",
+    "description": "An order request from a published site (a key with the \"orders\" scope). It waits in Sales for a person.\nBody: name, email and/or phone, note, lines [{product_id, quantity}]; prices come from the catalog.\nWith the \"checkout\" scope, \"pay\": true makes it wait for the visitor's payment instead: the answer carries\npayment_url, where the site sends the visitor.",
     "operationId": "public_order_api_v1_public_orders_post",
     "parameters": [
      {

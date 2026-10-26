@@ -779,14 +779,17 @@ function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; on
   const [availability, setAvailability] = useState(false);
   const [orders, setOrders] = useState(false);
   const [bookings, setBookings] = useState(false);
+  const [checkout, setCheckout] = useState(false);
   const [requireProof, setRequireProof] = useState(true);
+  const canCheckout = can("sales.write") && can("customers.write") && can("invoices.post") && can("payments.write");
   const create = useMutation({
     mutationFn: () =>
       unwrap(api.POST("/api/v1/orgs/{org_id}/studio/projects/{project_id}/data-keys", {
         params: { path: { org_id: org.id, project_id: p.id } },
         body: {
           name: name.trim(),
-          scopes: ["catalog", ...(availability ? ["availability"] : []), ...(orders ? ["orders"] : []), ...(bookings ? ["bookings"] : [])],
+          scopes: ["catalog", ...(availability ? ["availability"] : []), ...(orders || checkout ? ["orders"] : []),
+                   ...(checkout ? ["checkout"] : []), ...(bookings ? ["bookings"] : [])],
           require_proof: requireProof,
         },
       })),
@@ -804,12 +807,14 @@ function NewKeyDialog({ project: p, onClose, onCreated }: { project: Project; on
           <Checkbox label={t("dataKeys.scope.catalogLong")} checked disabled readOnly />
           <Checkbox label={t("dataKeys.scope.availabilityLong")} checked={availability} disabled={!can("inventory.read")}
             onChange={(e) => setAvailability(e.target.checked)} />
-          <Checkbox label={t("dataKeys.scope.ordersLong")} checked={orders} disabled={!can("sales.write")}
+          <Checkbox label={t("dataKeys.scope.ordersLong")} checked={orders || checkout} disabled={!can("sales.write") || checkout}
             onChange={(e) => setOrders(e.target.checked)} />
+          <Checkbox label={t("dataKeys.scope.checkoutLong")} checked={checkout} disabled={!canCheckout}
+            onChange={(e) => setCheckout(e.target.checked)} />
           <Checkbox label={t("dataKeys.scope.bookingsLong")} checked={bookings} disabled={!can("bookings.manage")}
             onChange={(e) => setBookings(e.target.checked)} />
         </fieldset>
-        {(orders || bookings) && (
+        {(orders || checkout || bookings) && (
           <div className="stack-sm">
             <Checkbox label={t("dataKeys.requireProof")} checked={requireProof} onChange={(e) => setRequireProof(e.target.checked)} />
             <p className="muted small">{t("dataKeys.requireProofHint")}</p>
@@ -844,6 +849,16 @@ function NewKeyCard({ dataKey, secret, onClose }: { dataKey: DataKey; secret: st
       ``,
       `// Requests carry a bot check the visitor's browser solves in about a second.`,
       `// Add once to the page: <script src="${origin}/api/v1/public/proof.js"></script>`,
+    ] : []),
+    ...(dataKey.scopes.includes("checkout") ? [
+      ``,
+      `// An order paid on the spot: send the visitor to the payment page. Once paid it becomes a paid invoice.`,
+      `const order = await (await fetch("${window.location.origin}/api/v1/public/orders", {`,
+      `  method: "POST",`,
+      `  headers: { "X-Novara-Key": "${secret}", "Content-Type": "application/json" },`,
+      `  body: JSON.stringify({ name, email, phone, note, lines: [{ product_id, quantity: 2 }], pay: true${withProof} }),`,
+      `})).json();`,
+      `window.location.href = order.payment_url;`,
     ] : []),
     ...(dataKey.scopes.includes("orders") ? [
       ``,

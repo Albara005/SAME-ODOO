@@ -278,6 +278,57 @@ test("App Studio: an order request from the site becomes a quotation in Sales", 
   await expect(page.getByRole("cell", { name: "قهوة عربية" })).toBeVisible();
 });
 
+test("site checkout: the visitor pays on the spot and the order becomes a paid invoice", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("checkout"));
+  await createOrg(page, "محمصة الدفع");
+  const orgId = page.url().match(/\/o\/([0-9a-f-]+)/)![1]!;
+  const token = await page.evaluate(() => localStorage.getItem("novara.token"));
+  const call = async (method: "POST" | "PUT", path: string, data: object) => {
+    const res = await page.request.fetch(`/api/v1/orgs/${orgId}${path}`, { method, headers: { Authorization: `Bearer ${token}` }, data });
+    expect(res.ok(), await res.text()).toBeTruthy();
+    return res.json();
+  };
+  const tax = await call("POST", "/taxes", { name: "ضريبة القيمة المضافة", rate: "15" });
+  const coffee = await call("POST", "/products", { name: "قهوة عربية", sku: "CF-1", kind: "goods", sale_price: "40", default_tax_id: tax.id });
+  const app = await call("POST", "/studio/projects", { name: "Roastery", slug: "roastery" });
+  await call("PUT", "/payments/settings", { provider: "test" });
+
+  await page.goto(`/o/${orgId}/studio/${app.id}`);
+  await page.getByRole("tab", { name: "البيانات" }).click();
+  await page.getByRole("button", { name: "مفتاح بيانات جديد" }).click();
+  await page.getByRole("dialog").getByLabel(/الدفع في الموقع/).check();
+  await expect(page.getByRole("dialog").getByLabel(/استقبال طلبات من الموقع/)).toBeChecked();
+  await page.getByRole("dialog").getByRole("button", { name: "إنشاء المفتاح" }).click();
+  await expect(page.getByLabel("مثال الشيفرة")).toContainText("pay: true");
+  await expect(page.getByLabel("مثال الشيفرة")).toContainText("payment_url");
+  const key = (await page.getByLabel("المفتاح", { exact: true }).textContent())!.trim();
+
+  // The site sends the order with pay: true and the visitor to the payment page.
+  const order = { name: "مقهى الندى", email: "orders@nada.example.com", pay: true, lines: [{ product_id: coffee.id, quantity: 3 }] };
+  const sent = await page.request.post("/api/v1/public/orders", {
+    headers: { "X-Novara-Key": key }, data: { ...order, proof: await solveInBrowser(page, key) } });
+  expect(sent.status()).toBe(201);
+  const { reference, total, payment_url } = await sent.json();
+  expect(total).toBe("138.00");                                     // 3 x 40 + 15%
+
+  await page.getByRole("complementary").getByRole("navigation").getByRole("link", { name: /^أوامر البيع/ }).click();
+  await expect(page.getByText(reference)).toBeVisible();
+  await expect(page.getByText("بانتظار الدفع")).toBeVisible();
+
+  await page.goto(payment_url);
+  await expect(page.getByText(reference)).toBeVisible();
+  await page.getByRole("button", { name: /ادفع \(تجريبي\)/ }).click();
+  await expect(page.getByRole("heading", { name: "شكراً لك، وصلتنا دفعتك" })).toBeVisible();
+
+  // Paid: the request is done, and the customer's invoice is posted and paid.
+  await page.goto(`/o/${orgId}/invoices`);
+  const row = page.getByRole("row", { name: /مقهى الندى/ });
+  await expect(row).toContainText("138.00");
+  await expect(row).toContainText("مدفوعة");
+  await page.goto(`/o/${orgId}/sales`);
+  await expect(page.getByText(reference)).toHaveCount(0);
+});
+
 /** Solve the bot check the way a published site does, with /api/v1/public/proof.js in the browser. */
 async function solveInBrowser(page: Page, key: string): Promise<{ challenge: string; nonce: string }> {
   await page.addScriptTag({ url: "/api/v1/public/proof.js" });
