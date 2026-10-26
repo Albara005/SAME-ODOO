@@ -16,7 +16,7 @@ from novara.modules.access import permissions as P
 from novara.modules.audit import service as audit
 from novara.modules.hr import attendance
 from novara.modules.hr import service as svc
-from novara.modules.hr.models import Department, Employee, Holiday, HrPolicy, LeaveRequest, LeaveType
+from novara.modules.hr.models import Department, Employee, Holiday, HrPolicy, LeaveRequest, LeaveType, WorkSchedule
 from novara.modules.organizations.models import Membership, Organization
 
 router = APIRouter(tags=["hr"])
@@ -45,6 +45,8 @@ class EmployeeIn(BaseModel):
     work_email: str = Field(default="", max_length=320)
     phone: str = Field(default="", max_length=40)
     hire_date: date | None = None
+    schedule_id: str | None = None      # their work schedule; none follows the HR policy
+    reduced_hours: bool = True          # reduced-hours periods (Ramadan) shorten their day
 
 
 class EmployeeUpdate(BaseModel):
@@ -56,6 +58,8 @@ class EmployeeUpdate(BaseModel):
     phone: str | None = Field(default=None, max_length=40)
     hire_date: date | None = None
     end_date: date | None = None  # setting it marks the person as having left
+    schedule_id: str | None = None
+    reduced_hours: bool | None = None
 
 
 class EmployeeOut(BaseModel):
@@ -71,6 +75,8 @@ class EmployeeOut(BaseModel):
     end_date: date | None
     status: str
     away_today: bool
+    schedule_id: str | None
+    reduced_hours: bool
 
 
 class LeaveTypeIn(BaseModel):
@@ -215,6 +221,11 @@ def _department(db: Session, dept_id: str | None) -> Department | None:
     return d
 
 
+def _work_schedule(db: Session, schedule_id: str | None) -> None:
+    if schedule_id is not None and db.get(WorkSchedule, schedule_id) is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "work schedule not found")
+
+
 def _employee(db: Session, employee_id: str) -> Employee:
     e = db.get(Employee, employee_id)
     if e is None:
@@ -239,7 +250,7 @@ def _employee_out(db: Session, e: Employee, away: set[str], depts: dict[str, str
     return EmployeeOut(id=e.id, full_name=e.full_name, job_title=e.job_title, department_id=e.department_id,
                        department_name=dept_name, user_id=e.user_id, work_email=e.work_email, phone=e.phone,
                        hire_date=e.hire_date, end_date=e.end_date, status=svc.status_of(e, date.today()),
-                       away_today=e.id in away)
+                       away_today=e.id in away, schedule_id=e.schedule_id, reduced_hours=e.reduced_hours)
 
 
 def _num(d: Decimal | None) -> float | None:
@@ -362,11 +373,13 @@ def remove_holiday(holiday_id: str, request: Request, ctx: OrgContext = Depends(
 
 
 @router.get("/orgs/{org_id}/hr/leave-days", response_model=DaysOut)
-def leave_days(start: date, end: date, _: OrgContext = Depends(require_any(P.HR_MANAGE, P.LEAVE_REQUEST)),
-               db: Session = Depends(get_db)):
-    """How many working days a leave from start to end takes."""
+def leave_days(start: date, end: date, employee_id: str | None = None,
+               ctx: OrgContext = Depends(require_any(P.HR_MANAGE, P.LEAVE_REQUEST)), db: Session = Depends(get_db)):
+    """How many working days a leave from start to end takes: for the employee (HR) or yourself, on their schedule."""
+    who = db.get(Employee, employee_id) if employee_id and ctx.has(P.HR_MANAGE) else \
+        db.scalar(select(Employee).where(Employee.user_id == ctx.user.id))
     try:
-        return DaysOut(days=svc.working_days(db, start, end))
+        return DaysOut(days=svc.working_days(db, start, end, who))
     except svc.LeaveError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
 
@@ -452,6 +465,7 @@ def _check_link(db: Session, user_id: str | None, employee_id: str | None = None
 def create_employee(body: EmployeeIn, request: Request, ctx: OrgContext = Depends(require(P.HR_MANAGE)),
                     db: Session = Depends(get_db)):
     _department(db, body.department_id)
+    _work_schedule(db, body.schedule_id)
     _check_link(db, body.user_id)
     e = Employee(**body.model_dump())
     db.add(e)
@@ -477,11 +491,13 @@ def update_employee(employee_id: str, body: EmployeeUpdate, request: Request,
                     ctx: OrgContext = Depends(require(P.HR_MANAGE)), db: Session = Depends(get_db)):
     e = _employee(db, employee_id)
     changes = body.model_dump(exclude_unset=True)
-    for required in ("full_name", "job_title", "work_email", "phone"):
+    for required in ("full_name", "job_title", "work_email", "phone", "reduced_hours"):
         if required in changes and changes[required] is None:
             del changes[required]   # these can be emptied, not removed
     if "department_id" in changes:
         _department(db, changes["department_id"])
+    if "schedule_id" in changes:
+        _work_schedule(db, changes["schedule_id"])
     if "user_id" in changes:
         _check_link(db, changes["user_id"], e.id)
     for k, v in changes.items():

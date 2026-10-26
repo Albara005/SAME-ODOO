@@ -9,8 +9,10 @@ requests both hold their days, and one person never has two live requests on the
 (two halves of one day excepted).
 
 Attendance is what people check in and out for (or HR enters for them), counted on the day it starts in the
-organization's time zone. Time beyond the normal working day, and all of it on a weekend day or public holiday, is
-overtime; what HR or the department's manager approves for a month is paid with that month's pay run.
+organization's time zone. Time beyond the normal working day, and all of it on a day off or public holiday, is
+overtime; what HR or the department's manager approves for a month is paid with that month's pay run. The normal
+working day is the person's work schedule for that weekday (or the HR policy's), shortened during reduced-hours
+periods such as Ramadan for the people they apply to.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (JSON, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint,
-                        false, text)
+                        false, text, true)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -64,11 +66,40 @@ class Department(IdMixin, TimestampMixin, TenantScoped, Base):
     manager_user_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
 
 
+class WorkSchedule(IdMixin, TimestampMixin, TenantScoped, Base):
+    """A working week: the minutes of a normal working day for each weekday (Monday first), 0 for a day off. People on
+    a schedule have their overtime counted against it and their leave in its working days; everyone else follows the
+    HR policy (its weekend off, its working day on the other days)."""
+
+    __tablename__ = "work_schedules"
+    __table_args__ = (org_unique_id(), UniqueConstraint("organization_id", "name", name="uq_work_schedule_name"))
+
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    minutes: Mapped[list] = mapped_column(JSON, nullable=False)    # seven numbers, Monday to Sunday
+
+
+class ReducedHours(IdMixin, TimestampMixin, TenantScoped, Base):
+    """Days with a shorter working day, such as Ramadan: from start to end, a working day is at most daily_minutes
+    for the people it applies to (Employee.reduced_hours). Periods don't overlap."""
+
+    __tablename__ = "reduced_hours"
+    __table_args__ = (
+        CheckConstraint("end_date >= start_date", name="ck_reduced_hours_dates"),
+        CheckConstraint("daily_minutes BETWEEN 60 AND 960", name="ck_reduced_hours_minutes"),
+    )
+
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    daily_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class Employee(IdMixin, TimestampMixin, TenantScoped, Base):
     __tablename__ = "employees"
     __table_args__ = (
         org_unique_id(),
         same_org_fk("department_id", "departments"),
+        same_org_fk("schedule_id", "work_schedules"),
         UniqueConstraint("organization_id", "user_id", name="uq_employee_user"),
         CheckConstraint("end_date IS NULL OR hire_date IS NULL OR end_date >= hire_date", name="ck_employee_dates"),
     )
@@ -82,6 +113,10 @@ class Employee(IdMixin, TimestampMixin, TenantScoped, Base):
     phone: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     hire_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # the last working day, once known
+    # Their working week; none follows the HR policy.
+    schedule_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # Reduced-hours periods (Ramadan) shorten their working day.
+    reduced_hours: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true(), nullable=False)
 
 
 class LeaveType(IdMixin, TimestampMixin, TenantScoped, Base):

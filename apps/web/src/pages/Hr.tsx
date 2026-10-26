@@ -13,7 +13,7 @@ import {
 import { useI18n } from "../i18n/I18n";
 import type { MessageKey } from "../i18n/en";
 import { today } from "../lib/format";
-import { AttendanceTab, MyAttendance, WorkingDay } from "./Attendance";
+import { AttendanceTab, MyAttendance, ReducedHoursCard, Schedules, WorkingDay, useSchedules } from "./Attendance";
 
 type Tab = "mine" | "requests" | "people" | "attendance" | "away" | "settings";
 type Leave = Schemas["LeaveOut"];
@@ -295,9 +295,9 @@ function RequestDialog({ onClose }: { onClose: () => void }) {
   const ready = Boolean(form.start_date && form.end_date && form.end_date >= form.start_date);
   const oneDay = ready && form.start_date === form.end_date;
   const days = useQuery({
-    queryKey: ["hr", "leave-days", org.id, form.start_date, form.end_date],
+    queryKey: ["hr", "leave-days", org.id, form.start_date, form.end_date, form.employee_id],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/hr/leave-days", {
-      params: { path: { org_id: org.id }, query: { start: form.start_date, end: form.end_date } },
+      params: { path: { org_id: org.id }, query: { start: form.start_date, end: form.end_date, employee_id: form.employee_id || null } },
     })),
     enabled: ready,
   });
@@ -444,16 +444,19 @@ function EmployeeDialog({ employee, onClose }: { employee: Employee | null; onCl
   const qc = useQueryClient();
   const depts = useDepartments();
   const members = useMembers();
+  const schedules = useSchedules();
   const [form, setForm] = useState({
     full_name: employee?.full_name ?? "", job_title: employee?.job_title ?? "", department_id: employee?.department_id ?? "",
     user_id: employee?.user_id ?? "", work_email: employee?.work_email ?? "", phone: employee?.phone ?? "",
-    hire_date: employee?.hire_date ?? "", end_date: employee?.end_date ?? "",
+    hire_date: employee?.hire_date ?? "", end_date: employee?.end_date ?? "", schedule_id: employee?.schedule_id ?? "",
   });
+  const [reduced, setReduced] = useState(employee?.reduced_hours ?? true);
   const save = useMutation({
     mutationFn: () => {
       const body = {
         full_name: form.full_name, job_title: form.job_title, department_id: form.department_id || null, user_id: form.user_id || null,
         work_email: form.work_email, phone: form.phone, hire_date: form.hire_date || null,
+        schedule_id: form.schedule_id || null, reduced_hours: reduced,
       };
       return employee
         ? unwrap(api.PATCH("/api/v1/orgs/{org_id}/hr/employees/{employee_id}", {
@@ -504,7 +507,14 @@ function EmployeeDialog({ employee, onClose }: { employee: Employee | null; onCl
               <Input type="date" value={form.end_date} min={form.hire_date || undefined} onChange={set("end_date")} ltr />
             </Field>
           )}
+          <Field label={t("att.schedule")} hint={t("att.scheduleFieldHint")} optional>
+            <Select value={form.schedule_id} onChange={set("schedule_id")}>
+              <option value="">{t("att.policyDay")}</option>
+              {(schedules.data ?? []).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </Select>
+          </Field>
         </div>
+        <Checkbox label={t("att.reducedApplies")} checked={reduced} onChange={(e) => setReduced(e.target.checked)} />
         <div className="form-actions">
           <Button onClick={onClose}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" loading={save.isPending}>{employee ? t("common.save") : t("common.create")}</Button>
@@ -559,6 +569,8 @@ function Settings() {
       <div className="stack">
         <Weekend />
         <WorkingDay />
+        <Schedules />
+        <ReducedHoursCard />
         <Holidays />
       </div>
     </div>

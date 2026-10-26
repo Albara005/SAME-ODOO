@@ -3834,6 +3834,22 @@
       "title": "Phone",
       "type": "string"
      },
+     "reduced_hours": {
+      "default": true,
+      "title": "Reduced Hours",
+      "type": "boolean"
+     },
+     "schedule_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Schedule Id"
+     },
      "user_id": {
       "anyOf": [
        {
@@ -3926,6 +3942,21 @@
       "title": "Phone",
       "type": "string"
      },
+     "reduced_hours": {
+      "title": "Reduced Hours",
+      "type": "boolean"
+     },
+     "schedule_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Schedule Id"
+     },
      "status": {
       "title": "Status",
       "type": "string"
@@ -3958,7 +3989,9 @@
      "hire_date",
      "end_date",
      "status",
-     "away_today"
+     "away_today",
+     "schedule_id",
+     "reduced_hours"
     ],
     "title": "EmployeeOut",
     "type": "object"
@@ -4140,6 +4173,28 @@
        }
       ],
       "title": "Phone"
+     },
+     "reduced_hours": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reduced Hours"
+     },
+     "schedule_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Schedule Id"
      },
      "user_id": {
       "anyOf": [
@@ -6992,9 +7047,35 @@
       "title": "Paid",
       "type": "boolean"
      },
+     "reduced_hours": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reduced Hours"
+     },
+     "schedule_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Schedule Name"
+     },
      "timezone": {
       "title": "Timezone",
       "type": "string"
+     },
+     "today_minutes": {
+      "title": "Today Minutes",
+      "type": "integer"
      },
      "worked_minutes": {
       "title": "Worked Minutes",
@@ -7005,6 +7086,9 @@
      "employee_id",
      "timezone",
      "daily_minutes",
+     "schedule_name",
+     "today_minutes",
+     "reduced_hours",
      "month",
      "open",
      "entries",
@@ -10651,6 +10735,75 @@
     "title": "RecoveryCodesOut",
     "type": "object"
    },
+   "ReducedHoursIn": {
+    "properties": {
+     "daily_minutes": {
+      "maximum": 960.0,
+      "minimum": 60.0,
+      "title": "Daily Minutes",
+      "type": "integer"
+     },
+     "end_date": {
+      "format": "date",
+      "title": "End Date",
+      "type": "string"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "start_date": {
+      "format": "date",
+      "title": "Start Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "start_date",
+     "end_date",
+     "daily_minutes"
+    ],
+    "title": "ReducedHoursIn",
+    "type": "object"
+   },
+   "ReducedHoursOut": {
+    "properties": {
+     "daily_minutes": {
+      "title": "Daily Minutes",
+      "type": "integer"
+     },
+     "end_date": {
+      "format": "date",
+      "title": "End Date",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "start_date": {
+      "format": "date",
+      "title": "Start Date",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "start_date",
+     "end_date",
+     "daily_minutes"
+    ],
+    "title": "ReducedHoursOut",
+    "type": "object"
+   },
    "RefundIn": {
     "properties": {
      "amount": {
@@ -11442,6 +11595,67 @@
      "top_products"
     ],
     "title": "SalesReportOut",
+    "type": "object"
+   },
+   "ScheduleIn": {
+    "properties": {
+     "minutes": {
+      "items": {
+       "type": "integer"
+      },
+      "maxItems": 7,
+      "minItems": 7,
+      "title": "Minutes",
+      "type": "array"
+     },
+     "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "minutes"
+    ],
+    "title": "ScheduleIn",
+    "type": "object"
+   },
+   "ScheduleOut": {
+    "properties": {
+     "employees": {
+      "title": "Employees",
+      "type": "integer"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "minutes": {
+      "items": {
+       "type": "integer"
+      },
+      "title": "Minutes",
+      "type": "array"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "weekly_minutes": {
+      "title": "Weekly Minutes",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "id",
+     "name",
+     "minutes",
+     "weekly_minutes",
+     "employees"
+    ],
+    "title": "ScheduleOut",
     "type": "object"
    },
    "SchedulePreviewIn": {
@@ -24597,7 +24811,7 @@
   },
   "/api/v1/orgs/{org_id}/hr/leave-days": {
    "get": {
-    "description": "How many working days a leave from start to end takes.",
+    "description": "How many working days a leave from start to end takes: for the employee (HR) or yourself, on their schedule.",
     "operationId": "leave_days_api_v1_orgs__org_id__hr_leave_days_get",
     "parameters": [
      {
@@ -24627,6 +24841,22 @@
        "format": "date",
        "title": "End",
        "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "employee_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Id"
       }
      }
     ],
@@ -25505,6 +25735,399 @@
      }
     ],
     "summary": "Set Policy",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/reduced-hours": {
+   "get": {
+    "operationId": "list_reduced_hours_api_v1_orgs__org_id__hr_reduced_hours_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "year",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Year"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ReducedHoursOut"
+         },
+         "title": "Response List Reduced Hours Api V1 Orgs  Org Id  Hr Reduced Hours Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Reduced Hours",
+    "tags": [
+     "hr"
+    ]
+   },
+   "post": {
+    "description": "Days with a shorter working day, such as Ramadan (its dates as announced): a working day is at most\ndaily_minutes for the people it applies to. Months already paid stand.",
+    "operationId": "add_reduced_hours_api_v1_orgs__org_id__hr_reduced_hours_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReducedHoursIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReducedHoursOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Add Reduced Hours",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/reduced-hours/{period_id}": {
+   "delete": {
+    "operationId": "remove_reduced_hours_api_v1_orgs__org_id__hr_reduced_hours__period_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "period_id",
+      "required": true,
+      "schema": {
+       "title": "Period Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Remove Reduced Hours",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/schedules": {
+   "get": {
+    "operationId": "list_schedules_api_v1_orgs__org_id__hr_schedules_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ScheduleOut"
+         },
+         "title": "Response List Schedules Api V1 Orgs  Org Id  Hr Schedules Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Schedules",
+    "tags": [
+     "hr"
+    ]
+   },
+   "post": {
+    "description": "A working week, such as a shift: minutes for each weekday from Monday, 0 for a day off.",
+    "operationId": "add_schedule_api_v1_orgs__org_id__hr_schedules_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ScheduleIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ScheduleOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Add Schedule",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/schedules/{schedule_id}": {
+   "delete": {
+    "operationId": "remove_schedule_api_v1_orgs__org_id__hr_schedules__schedule_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "schedule_id",
+      "required": true,
+      "schema": {
+       "title": "Schedule Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Remove Schedule",
+    "tags": [
+     "hr"
+    ]
+   },
+   "put": {
+    "description": "Months already paid stand; the others are counted on the new week.",
+    "operationId": "change_schedule_api_v1_orgs__org_id__hr_schedules__schedule_id__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "schedule_id",
+      "required": true,
+      "schema": {
+       "title": "Schedule Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ScheduleIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ScheduleOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Change Schedule",
     "tags": [
      "hr"
     ]

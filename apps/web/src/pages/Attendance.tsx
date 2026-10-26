@@ -74,6 +74,11 @@ export function MyAttendance() {
     >
       <div className="stack-sm">
         <p role="status">{m.open ? t("att.inSince", { time: clock(m.open.check_in, m.timezone) }) : t("att.notIn")}</p>
+        <p className="muted small">
+          {m.today_minutes === 0 ? t("att.todayOff") : t("att.today", { hours: hm(m.today_minutes) })}
+          {m.reduced_hours && <> · <Badge tone="info">{m.reduced_hours}</Badge></>}
+          {m.schedule_name && <> · {t("att.onSchedule", { name: m.schedule_name })}</>}
+        </p>
         <div className="stat-row">
           <Card tight>
             <span className="muted small">{t("att.worked")}</span>
@@ -416,5 +421,186 @@ function WorkingDayForm({ timezone, dailyMinutes, onSaved }: {
       <datalist id="hr-zones">{ZONES.map((z) => <option key={z} value={z} />)}</datalist>
       <div><Button type="submit" loading={save.isPending}>{t("common.save")}</Button></div>
     </form>
+  );
+}
+
+// ---------------------------------------------------------------- work schedules and reduced hours (HR settings)
+
+type Schedule = Schemas["ScheduleOut"];
+
+export function useSchedules() {
+  const { org } = useOrg();
+  return useQuery({
+    queryKey: ["hr", "schedules", org.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/hr/schedules", { params: { path: { org_id: org.id } } })),
+  });
+}
+
+function dayNames(lang: string): string[] {
+  const fmt = new Intl.DateTimeFormat(lang === "ar" ? "ar-SA-u-ca-gregory-nu-latn" : "en-GB", { weekday: "short" });
+  return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(Date.UTC(2024, 0, 1 + i, 12))));
+}
+
+// Saturday first: the order a week reads in the region (Monday is 0).
+const WEEK = [5, 6, 0, 1, 2, 3, 4];
+
+/** Working weeks such as shifts: each weekday's hours, 0 for a day off. People without one follow the working day. */
+export function Schedules() {
+  const { t, lang } = useI18n();
+  const { org } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const schedules = useSchedules();
+  const [editing, setEditing] = useState<Schedule | "new" | null>(null);
+  const remove = useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE("/api/v1/orgs/{org_id}/hr/schedules/{schedule_id}", {
+      params: { path: { org_id: org.id, schedule_id: id } },
+    })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["hr"] }),
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const names = dayNames(lang);
+  return (
+    <Card title={t("att.schedules")} actions={<Button size="sm" icon={<Plus size={14} />} onClick={() => setEditing("new")}>{t("att.newSchedule")}</Button>}>
+      <div className="stack-sm">
+        <p className="muted small">{t("att.schedulesHint")}</p>
+        <QueryView query={schedules}>
+          {(list) => list.length === 0 ? <p className="muted small">{t("att.noSchedules")}</p> : (
+            <ul className="plain-list">
+              {list.map((x) => (
+                <li key={x.id} className="row-between">
+                  <span className="stack-xs">
+                    <strong dir="auto">{x.name}</strong>
+                    <span className="muted small">
+                      {WEEK.filter((d) => x.minutes[d]).map((d) => `${names[d]} ${hm(x.minutes[d] ?? 0)}`).join(" · ")}
+                    </span>
+                    <span className="muted small">{t("att.scheduleSummary", { hours: hm(x.weekly_minutes), n: x.employees })}</span>
+                  </span>
+                  <span className="row" style={{ gap: 4 }}>
+                    <IconButton label={`${t("common.edit")} ${x.name}`} onClick={() => setEditing(x)}><Pencil size={14} /></IconButton>
+                    <IconButton label={`${t("common.delete")} ${x.name}`} onClick={() => remove.mutate(x.id)}><Trash2 size={14} /></IconButton>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </QueryView>
+      </div>
+      {editing && <ScheduleDialog schedule={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
+    </Card>
+  );
+}
+
+function ScheduleDialog({ schedule, onClose }: { schedule: Schedule | null; onClose: () => void }) {
+  const { t, lang } = useI18n();
+  const { org } = useOrg();
+  const qc = useQueryClient();
+  const [name, setName] = useState(schedule?.name ?? "");
+  const [hours, setHours] = useState<string[]>(
+    (schedule?.minutes ?? [480, 480, 480, 480, 0, 0, 480]).map((m) => String(m / 60)));
+  const save = useMutation({
+    mutationFn: () => {
+      const body = { name: name.trim(), minutes: hours.map((h) => Math.round(Number(h || 0) * 60)) };
+      return schedule
+        ? unwrap(api.PUT("/api/v1/orgs/{org_id}/hr/schedules/{schedule_id}", { params: { path: { org_id: org.id, schedule_id: schedule.id } }, body }))
+        : unwrap(api.POST("/api/v1/orgs/{org_id}/hr/schedules", { params: { path: { org_id: org.id } }, body }));
+    },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["hr"] }); onClose(); },
+  });
+  const names = dayNames(lang);
+  return (
+    <Dialog open onClose={onClose} title={schedule ? schedule.name : t("att.newSchedule")}>
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        {save.isError && <ErrorNotice error={save.error} />}
+        <Field label={t("common.name")}>
+          <Input value={name} required maxLength={80} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <fieldset className="stack-sm" style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className="muted small">{t("att.scheduleDays")}</legend>
+          <div className="grid-4">
+            {WEEK.map((d) => (
+              <Field key={d} label={names[d] ?? ""}>
+                <Input type="number" min={0} max={16} step={0.25} required value={hours[d] ?? "0"} ltr
+                  onChange={(e) => setHours(hours.map((h, i) => (i === d ? e.target.value : h)))} />
+              </Field>
+            ))}
+          </div>
+        </fieldset>
+        <div className="form-actions">
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" variant="primary" loading={save.isPending}>{schedule ? t("common.save") : t("common.create")}</Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+/** Periods with a shorter working day, such as Ramadan: its dates as announced and the day's hours. */
+export function ReducedHoursCard() {
+  const { t, date } = useI18n();
+  const { org } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const periods = useQuery({
+    queryKey: ["hr", "reduced-hours", org.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/hr/reduced-hours", { params: { path: { org_id: org.id } } })),
+  });
+  const [form, setForm] = useState({ name: "", start_date: "", end_date: "", hours: "6" });
+  const add = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/hr/reduced-hours", {
+      params: { path: { org_id: org.id } },
+      body: { name: form.name.trim(), start_date: form.start_date, end_date: form.end_date, daily_minutes: Math.round(Number(form.hours) * 60) },
+    })),
+    onSuccess: () => { setForm({ name: "", start_date: "", end_date: "", hours: "6" }); void qc.invalidateQueries({ queryKey: ["hr"] }); },
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => unwrap(api.DELETE("/api/v1/orgs/{org_id}/hr/reduced-hours/{period_id}", {
+      params: { path: { org_id: org.id, period_id: id } },
+    })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["hr"] }),
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  return (
+    <Card title={t("att.reduced")}>
+      <div className="stack">
+        <p className="muted small">{t("att.reducedHint")}</p>
+        <QueryView query={periods}>
+          {(list) => list.length === 0 ? <p className="muted small">{t("att.noReduced")}</p> : (
+            <ul className="plain-list">
+              {list.map((r) => (
+                <li key={r.id} className="row-between">
+                  <span>
+                    <span dir="auto">{r.name}</span> · <span className="num small">{date(r.start_date)} – {date(r.end_date)}</span>
+                    {" · "}<span className="num small">{t("att.hours", { h: hm(r.daily_minutes) })}</span>
+                  </span>
+                  <IconButton label={`${t("common.delete")} ${r.name}`} onClick={() => remove.mutate(r.id)}><Trash2 size={14} /></IconButton>
+                </li>
+              ))}
+            </ul>
+          )}
+        </QueryView>
+        <form className="stack-sm" onSubmit={(e) => { e.preventDefault(); add.mutate(); }}>
+          {add.isError && <ErrorNotice error={add.error} />}
+          <div className="grid-2">
+            <Field label={t("att.reducedName")}>
+              <Input value={form.name} required maxLength={120} placeholder={t("att.reducedPlaceholder")}
+                onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </Field>
+            <Field label={t("att.dailyHours")}>
+              <Input type="number" min={1} max={16} step={0.25} required value={form.hours} ltr
+                onChange={(e) => setForm({ ...form, hours: e.target.value })} />
+            </Field>
+            <Field label={t("att.from")}>
+              <Input type="date" required value={form.start_date} ltr onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+            </Field>
+            <Field label={t("att.to")}>
+              <Input type="date" required value={form.end_date} min={form.start_date || undefined} ltr
+                onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+            </Field>
+          </div>
+          <div><Button type="submit" icon={<Plus size={16} />} loading={add.isPending}>{t("att.addReduced")}</Button></div>
+        </form>
+      </div>
+    </Card>
   );
 }

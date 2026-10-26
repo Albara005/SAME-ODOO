@@ -52,6 +52,7 @@ a:hover { text-decoration: underline; }
 /* ---------------------------------------------------------------- utilities */
 .stack { display: flex; flex-direction: column; gap: var(--space-4); }
 .stack-sm { display: flex; flex-direction: column; gap: var(--space-2); }
+.stack-xs { display: flex; flex-direction: column; gap: var(--space-1); }
 .row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .grow { flex: 1; }
@@ -271,6 +272,7 @@ code, .mono { font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; fon
 
 /* ---------------------------------------------------------------- reports */
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+.grid-4 { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: var(--space-3); }
 .filters { align-items: flex-end; }
 .refetching { opacity: 0.6; transition: opacity 0.15s; }
 tfoot th { background: var(--color-surface-raised); color: var(--color-text); border-block-end: 0; }

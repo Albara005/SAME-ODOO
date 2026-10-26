@@ -10,7 +10,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from novara.modules.access.service import holders
-from novara.modules.hr.models import DEFAULT_WEEKEND, Department, Employee, Holiday, HrPolicy, LeaveRequest, LeaveType
+from novara.modules.hr.models import (DEFAULT_WEEKEND, Department, Employee, Holiday, HrPolicy, LeaveRequest, LeaveType,
+                                      WorkSchedule)
 
 LIVE = ("pending", "approved")  # requests that hold their days
 MAX_SPAN_DAYS = 366
@@ -34,13 +35,21 @@ def weekend(db: Session) -> list[int]:
     return list(policy.weekend) if policy else list(DEFAULT_WEEKEND)
 
 
-def working_days(db: Session, start: date, end: date) -> int:
-    """Days from start to end inclusive, without the weekend and public holidays."""
+def days_off(db: Session, employee: Employee | None) -> set[int]:
+    """The weekdays someone doesn't work: their work schedule's days off, or the organization's weekend."""
+    s = db.get(WorkSchedule, employee.schedule_id) if employee is not None and employee.schedule_id else None
+    if s is not None:
+        return {i for i, m in enumerate(s.minutes) if not m}
+    return set(weekend(db))
+
+
+def working_days(db: Session, start: date, end: date, employee: Employee | None = None) -> int:
+    """Days from start to end inclusive, without the person's days off (or the weekend) and public holidays."""
     if end < start:
         raise LeaveError("the leave ends before it starts")
     if (end - start).days >= MAX_SPAN_DAYS:
         raise LeaveError("a request covers at most a year")
-    off = set(weekend(db))
+    off = days_off(db, employee)
     holidays = set(db.scalars(select(Holiday.day).where(Holiday.day >= start, Holiday.day <= end)))
     n, day = 0, start
     while day <= end:
@@ -166,9 +175,9 @@ def check_request(db: Session, employee: Employee, leave_type: LeaveType, start:
         raise LeaveError("the leave starts before the hire date")
     if half_day is not None and (half_day not in ("am", "pm") or start != end):
         raise LeaveError("a half day is the morning or the afternoon of a single day")
-    whole = working_days(db, start, end)
+    whole = working_days(db, start, end, employee)
     if whole == 0:
-        raise LeaveError("those days are all weekend or public holidays")
+        raise LeaveError("those days are all days off or public holidays")
     days = HALF if half_day else Decimal(whole)
     for other in db.scalars(select(LeaveRequest).where(
             LeaveRequest.employee_id == employee.id, LeaveRequest.status.in_(LIVE),

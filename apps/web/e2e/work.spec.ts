@@ -398,6 +398,44 @@ test("attendance: checking in and out, HR's hours on a day off, overtime approve
   await page.screenshot({ path: "test-results/screens/attendance-ar.png", fullPage: true });
 });
 
+test("work schedules: a shift with Thursday and Friday off, Ramadan hours, and the employee on it", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("schedules"));
+  await createOrg(page, "شركة الورديات");
+  const call = await apiFor(page);
+  const huda = await call("POST", "/hr/employees", { full_name: "هدى صالح", hire_date: "2025-01-01" });
+
+  await nav(page, "الموارد البشرية");
+  await page.getByRole("tab", { name: "الإعدادات" }).click();
+  await page.getByRole("button", { name: "جدول جديد" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("الاسم").fill("الوردية ب");
+  for (const day of ["السبت", "الأحد", "الاثنين", "الثلاثاء", "الأربعاء"]) await dialog.getByLabel(day, { exact: true }).fill("9");
+  for (const day of ["الخميس", "الجمعة"]) await dialog.getByLabel(day, { exact: true }).fill("0");
+  await dialog.getByRole("button", { name: "إنشاء" }).click();
+  const schedules = page.locator(".card", { has: page.getByRole("heading", { name: "جداول الدوام" }) });
+  await expect(schedules.getByText("الوردية ب")).toBeVisible();
+  await expect(schedules.getByText(/45:00.*ساعة أسبوعياً/)).toBeVisible();
+
+  const reduced = page.locator(".card", { has: page.getByRole("heading", { name: /ساعات العمل المخفّضة/ }) });
+  await reduced.getByLabel("الاسم").fill("رمضان 1448");
+  await reduced.getByLabel("ساعات يوم العمل المعتاد").fill("6");
+  await reduced.getByLabel("من").fill("2027-02-08");
+  await reduced.getByLabel("إلى").fill("2027-03-09");
+  await reduced.getByRole("button", { name: "إضافة الفترة" }).click();
+  await expect(reduced.getByText("رمضان 1448")).toBeVisible();
+
+  // Huda moves onto the shift; her leave follows it (Saturday is a working day for her).
+  await page.getByRole("tab", { name: "الموظفون" }).click();
+  await page.getByRole("button", { name: "تعديل هدى صالح" }).click();
+  await page.getByRole("dialog").getByLabel("جدول الدوام").selectOption({ label: "الوردية ب" });
+  await page.getByRole("dialog").getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const [on] = await call("GET", "/hr/schedules");
+  expect(on.employees).toBe(1);
+  const days = await call("GET", `/hr/leave-days?start=2027-01-02&end=2027-01-03&employee_id=${huda.id}`);
+  expect(days.days).toBe(2);
+});
+
 test("WPS: the employer's and each employee's ids, then the posted month's salary file (SIF)", async ({ page }) => {
   await signUpAndIn(page, uniqueEmail("wps"));
   await createOrg(page, "شركة دبي");

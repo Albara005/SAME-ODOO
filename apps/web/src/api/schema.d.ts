@@ -2516,7 +2516,7 @@ export interface paths {
         };
         /**
          * Leave Days
-         * @description How many working days a leave from start to end takes.
+         * @description How many working days a leave from start to end takes: for the employee (HR) or yourself, on their schedule.
          */
         get: operations["leave_days_api_v1_orgs__org_id__hr_leave_days_get"];
         put?: never;
@@ -2722,6 +2722,87 @@ export interface paths {
         put: operations["set_policy_api_v1_orgs__org_id__hr_policy_put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/hr/reduced-hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reduced Hours */
+        get: operations["list_reduced_hours_api_v1_orgs__org_id__hr_reduced_hours_get"];
+        put?: never;
+        /**
+         * Add Reduced Hours
+         * @description Days with a shorter working day, such as Ramadan (its dates as announced): a working day is at most
+         *     daily_minutes for the people it applies to. Months already paid stand.
+         */
+        post: operations["add_reduced_hours_api_v1_orgs__org_id__hr_reduced_hours_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/hr/reduced-hours/{period_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Reduced Hours */
+        delete: operations["remove_reduced_hours_api_v1_orgs__org_id__hr_reduced_hours__period_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/hr/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Schedules */
+        get: operations["list_schedules_api_v1_orgs__org_id__hr_schedules_get"];
+        put?: never;
+        /**
+         * Add Schedule
+         * @description A working week, such as a shift: minutes for each weekday from Monday, 0 for a day off.
+         */
+        post: operations["add_schedule_api_v1_orgs__org_id__hr_schedules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/hr/schedules/{schedule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change Schedule
+         * @description Months already paid stand; the others are counted on the new week.
+         */
+        put: operations["change_schedule_api_v1_orgs__org_id__hr_schedules__schedule_id__put"];
+        post?: never;
+        /** Remove Schedule */
+        delete: operations["remove_schedule_api_v1_orgs__org_id__hr_schedules__schedule_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6773,6 +6854,13 @@ export interface components {
              * @default
              */
             phone: string;
+            /**
+             * Reduced Hours
+             * @default true
+             */
+            reduced_hours: boolean;
+            /** Schedule Id */
+            schedule_id?: string | null;
             /** User Id */
             user_id?: string | null;
             /**
@@ -6801,6 +6889,10 @@ export interface components {
             job_title: string;
             /** Phone */
             phone: string;
+            /** Reduced Hours */
+            reduced_hours: boolean;
+            /** Schedule Id */
+            schedule_id: string | null;
             /** Status */
             status: string;
             /** User Id */
@@ -6867,6 +6959,10 @@ export interface components {
             job_title?: string | null;
             /** Phone */
             phone?: string | null;
+            /** Reduced Hours */
+            reduced_hours?: boolean | null;
+            /** Schedule Id */
+            schedule_id?: string | null;
             /** User Id */
             user_id?: string | null;
             /** Work Email */
@@ -7927,8 +8023,14 @@ export interface components {
             overtime_minutes: number;
             /** Paid */
             paid: boolean;
+            /** Reduced Hours */
+            reduced_hours: string | null;
+            /** Schedule Name */
+            schedule_name: string | null;
             /** Timezone */
             timezone: string;
+            /** Today Minutes */
+            today_minutes: number;
             /** Worked Minutes */
             worked_minutes: number;
         };
@@ -9225,6 +9327,42 @@ export interface components {
             /** Recovery Codes */
             recovery_codes: string[];
         };
+        /** ReducedHoursIn */
+        ReducedHoursIn: {
+            /** Daily Minutes */
+            daily_minutes: number;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Name */
+            name: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+        };
+        /** ReducedHoursOut */
+        ReducedHoursOut: {
+            /** Daily Minutes */
+            daily_minutes: number;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+        };
         /** RefundIn */
         RefundIn: {
             /** Amount */
@@ -9523,6 +9661,26 @@ export interface components {
             top_customers: components["schemas"]["SalesBucket"][];
             /** Top Products */
             top_products: components["schemas"]["SalesBucket"][];
+        };
+        /** ScheduleIn */
+        ScheduleIn: {
+            /** Minutes */
+            minutes: number[];
+            /** Name */
+            name: string;
+        };
+        /** ScheduleOut */
+        ScheduleOut: {
+            /** Employees */
+            employees: number;
+            /** Id */
+            id: string;
+            /** Minutes */
+            minutes: number[];
+            /** Name */
+            name: string;
+            /** Weekly Minutes */
+            weekly_minutes: number;
         };
         /** SchedulePreviewIn */
         SchedulePreviewIn: {
@@ -16435,6 +16593,7 @@ export interface operations {
             query: {
                 start: string;
                 end: string;
+                employee_id?: string | null;
             };
             header?: never;
             path: {
@@ -16926,6 +17085,236 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PolicyOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reduced_hours_api_v1_orgs__org_id__hr_reduced_hours_get: {
+        parameters: {
+            query?: {
+                year?: number | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReducedHoursOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_reduced_hours_api_v1_orgs__org_id__hr_reduced_hours_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReducedHoursIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReducedHoursOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_reduced_hours_api_v1_orgs__org_id__hr_reduced_hours__period_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                period_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_schedules_api_v1_orgs__org_id__hr_schedules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_schedule_api_v1_orgs__org_id__hr_schedules_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_schedule_api_v1_orgs__org_id__hr_schedules__schedule_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_schedule_api_v1_orgs__org_id__hr_schedules__schedule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

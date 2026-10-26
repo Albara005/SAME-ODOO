@@ -7,8 +7,13 @@ long; one person's entries never overlap.
 For a month, per day with entries that are checked out:
 
     worked    = the entries' minutes
-    overtime  = what is worked beyond the policy's working day (daily_minutes), or all of it on a weekend day or
-                public holiday
+    overtime  = what is worked beyond the person's normal working day that day, or all of it on a day off or public
+                holiday
+
+The normal working day is the person's work schedule for that weekday (minutes per weekday, 0 for a day off), or,
+without one, the HR policy's working day (daily_minutes) with its weekend off. During a reduced-hours period (Ramadan)
+a working day is at most the period's minutes, for the people it applies to (Employee.reduced_hours); days off stay
+off. A schedule has no start date: moving someone to another one recounts their months not yet paid.
 
 HR or the person's department manager (never the person) approves overtime for a month, up to what attendance shows,
 and the month's pay run pays what is approved (payroll/service.py). Once that run is posted, the approval and that
@@ -21,6 +26,8 @@ person's entries for the month stand; cancelling the run frees them.
     PATCH/DELETE /orgs/{org}/hr/attendance/{id}             (hr.manage)
     GET    /orgs/{org}/hr/overtime?month=YYYY-MM            everyone's month: worked, overtime, approved
     PUT/DELETE /orgs/{org}/hr/overtime/{employee_id}/{month}   approve overtime for payment, or withdraw it
+    GET/POST /orgs/{org}/hr/schedules, PUT/DELETE .../{id}  work schedules (hr.manage to change)
+    GET/POST /orgs/{org}/hr/reduced-hours, DELETE .../{id}  reduced-hours periods such as Ramadan
 """
 
 from __future__ import annotations
@@ -29,10 +36,11 @@ import calendar
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -42,13 +50,15 @@ from novara.deps import OrgContext, client_ip, get_db, require, require_any
 from novara.modules.access import permissions as P
 from novara.modules.audit import service as audit
 from novara.modules.hr.models import (DEFAULT_DAILY_MINUTES, DEFAULT_TIMEZONE, DEFAULT_WEEKEND, AttendanceEntry,
-                                      Department, Employee, Holiday, HrPolicy, OvertimeApproval)
+                                      Department, Employee, Holiday, HrPolicy, OvertimeApproval, ReducedHours,
+                                      WorkSchedule)
 from novara.modules.hr.service import can_decide, lock_employee
 from novara.modules.payroll.models import PayrollSettings, PayRun
 
 router = APIRouter(tags=["hr"])
 
 MAX_ENTRY = timedelta(hours=24)
+NOBODY = SimpleNamespace(schedule_id=None, reduced_hours=False)   # the policy's working day, for a member who isn't an employee
 MONTH = r"^\d{4}-(0[1-9]|1[0-2])$"
 
 
@@ -109,13 +119,57 @@ class Month:
     overtime: int = 0
 
 
+@dataclass
+class WorkingDays:
+    """The normal working day of each person on each day of a stretch of days."""
+    policy: HrPolicy
+    holidays: set[date]
+    schedules: dict[str, WorkSchedule]
+    reduced: list[ReducedHours]
+
+    def schedule_minutes(self, e: Employee, d: date) -> int:
+        s = self.schedules.get(e.schedule_id or "")
+        if s is not None:
+            return int(s.minutes[d.weekday()])
+        return 0 if d.weekday() in self.policy.weekend else self.policy.daily_minutes
+
+    def period(self, e: Employee, d: date) -> ReducedHours | None:
+        if not e.reduced_hours:
+            return None
+        return next((r for r in self.reduced if r.start_date <= d <= r.end_date), None)
+
+    def minutes(self, e: Employee, d: date) -> int:
+        if d in self.holidays:
+            return 0
+        normal = self.schedule_minutes(e, d)
+        r = self.period(e, d)
+        return min(normal, r.daily_minutes) if normal and r else normal
+
+
+def working_days(db: Session, start: date, end: date) -> WorkingDays:
+    return WorkingDays(
+        policy=policy(db),
+        holidays=set(db.scalars(select(Holiday.day).where(Holiday.day >= start, Holiday.day <= end))),
+        schedules={s.id: s for s in db.scalars(select(WorkSchedule))},
+        reduced=list(db.scalars(select(ReducedHours).where(ReducedHours.start_date <= end,
+                                                           ReducedHours.end_date >= start))))
+
+
+def normal_day(db: Session, e: Employee) -> int:
+    """The length of the person's usual working day, outside reduced hours: what an hour's wage is worked out on."""
+    s = db.get(WorkSchedule, e.schedule_id) if e.schedule_id else None
+    if s is None:
+        return policy(db).daily_minutes
+    days = [int(m) for m in s.minutes if int(m) > 0]
+    return round(sum(days) / len(days))
+
+
 def months(db: Session, start: date, end: date, employee_ids: list[str]) -> dict[str, Month]:
     """Worked and overtime minutes for each person over the days start to end (checked-out entries only)."""
     if not employee_ids:
         return {}
-    p = policy(db)
-    off = set(p.weekend)
-    holidays = set(db.scalars(select(Holiday.day).where(Holiday.day >= start, Holiday.day <= end)))
+    wd = working_days(db, start, end)
+    people = {e.id: e for e in db.scalars(select(Employee).where(Employee.id.in_(employee_ids)))}
     per_day: dict[str, dict[date, int]] = {}
     for e in db.scalars(select(AttendanceEntry).where(AttendanceEntry.employee_id.in_(employee_ids),
                                                       AttendanceEntry.day >= start, AttendanceEntry.day <= end,
@@ -126,7 +180,7 @@ def months(db: Session, start: date, end: date, employee_ids: list[str]) -> dict
     for emp in employee_ids:
         days = per_day.get(emp, {})
         out[emp] = Month(days_present=len(days), worked=sum(days.values()), overtime=sum(
-            m if (d.weekday() in off or d in holidays) else max(m - p.daily_minutes, 0) for d, m in days.items()))
+            max(m - wd.minutes(people[emp], d), 0) for d, m in days.items()))
     return out
 
 
@@ -269,6 +323,9 @@ class MyAttendanceOut(BaseModel):
     employee_id: str | None
     timezone: str
     daily_minutes: int
+    schedule_name: str | None   # their work schedule, if they have one
+    today_minutes: int          # today's normal working day for them (0: a day off)
+    reduced_hours: str | None   # the reduced-hours period today is in, if it shortens their day
     month: str
     open: EntryOut | None
     entries: list[EntryOut]
@@ -281,6 +338,43 @@ class MyAttendanceOut(BaseModel):
 class ApprovalIn(BaseModel):
     minutes: int = Field(gt=0, le=31 * 24 * 60)
     note: str = Field(default="", max_length=500)
+
+
+class ScheduleIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    minutes: list[int] = Field(min_length=7, max_length=7)    # Monday to Sunday; 0 is a day off
+
+    @field_validator("minutes")
+    @classmethod
+    def _days(cls, v: list[int]) -> list[int]:
+        if any(m != 0 and not 60 <= m <= 960 for m in v):
+            raise ValueError("a working day is 1 to 16 hours (0 for a day off)")
+        if not any(v):
+            raise ValueError("a schedule has at least one working day")
+        return v
+
+
+class ScheduleOut(BaseModel):
+    id: str
+    name: str
+    minutes: list[int]
+    weekly_minutes: int
+    employees: int
+
+
+class ReducedHoursIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    start_date: date
+    end_date: date
+    daily_minutes: int = Field(ge=60, le=960)
+
+
+class ReducedHoursOut(BaseModel):
+    id: str
+    name: str
+    start_date: date
+    end_date: date
+    daily_minutes: int
 
 
 # ---------------------------------------------------------------- helpers
@@ -341,10 +435,17 @@ def my_attendance(month: str | None = Query(default=None, pattern=MONTH),
     month = month or local_day(p, now()).strftime("%Y-%m")
     start, end = month_bounds(month)
     me = _me(db, ctx)
+    today = local_day(p, now())
     if me is None:
-        return MyAttendanceOut(employee_id=None, timezone=p.timezone, daily_minutes=p.daily_minutes, month=month,
+        return MyAttendanceOut(employee_id=None, timezone=p.timezone, daily_minutes=p.daily_minutes,
+                               schedule_name=None, today_minutes=working_days(db, today, today).minutes(
+                                   NOBODY, today), reduced_hours=None, month=month,
                                open=None, entries=[], worked_minutes=0, overtime_minutes=0, approved_minutes=None,
                                paid=False)
+    wd = working_days(db, today, today)
+    period = wd.period(me, today)
+    today_minutes = wd.minutes(me, today)
+    shortened = period is not None and 0 < today_minutes < wd.schedule_minutes(me, today)
     entries = list(db.scalars(select(AttendanceEntry).where(AttendanceEntry.employee_id == me.id,
                                                             AttendanceEntry.day >= start, AttendanceEntry.day <= end)
                               .order_by(AttendanceEntry.check_in.desc())))
@@ -352,8 +453,11 @@ def my_attendance(month: str | None = Query(default=None, pattern=MONTH),
     m = months(db, start, end, [me.id])[me.id]
     a = approval(db, me.id, start)
     locks: dict = {}
+    schedule = wd.schedules.get(me.schedule_id or "")
     return MyAttendanceOut(
-        employee_id=me.id, timezone=p.timezone, daily_minutes=p.daily_minutes, month=month,
+        employee_id=me.id, timezone=p.timezone, daily_minutes=p.daily_minutes,
+        schedule_name=schedule.name if schedule else None, today_minutes=today_minutes,
+        reduced_hours=period.name if shortened else None, month=month,
         open=_entry_out(db, current, me.full_name, locks) if current else None,
         entries=[_entry_out(db, e, me.full_name, locks) for e in entries], worked_minutes=m.worked,
         overtime_minutes=m.overtime, approved_minutes=a.minutes if a else None,
@@ -565,4 +669,141 @@ def withdraw_overtime(employee_id: str, month: str, request: Request,
     audit.record(db, actor_user_id=ctx.user.id, action="overtime.withdrawn", target_type="employee", target_id=e.id,
                  details={"employee": e.full_name, "month": month, "hours": hm(a.minutes)}, ip_address=client_ip(request))
     db.delete(a)
+    db.commit()
+
+
+# ---------------------------------------------------------------- work schedules
+
+
+def _schedule_out(s: WorkSchedule, employees: int) -> ScheduleOut:
+    return ScheduleOut(id=s.id, name=s.name, minutes=[int(m) for m in s.minutes],
+                       weekly_minutes=sum(int(m) for m in s.minutes), employees=employees)
+
+
+def _on_schedule(db: Session, schedule_id: str) -> int:
+    return len(list(db.scalars(select(Employee.id).where(Employee.schedule_id == schedule_id))))
+
+
+@router.get("/orgs/{org_id}/hr/schedules", response_model=list[ScheduleOut])
+def list_schedules(_: OrgContext = Depends(require_any(P.HR_MANAGE, P.HR_READ)), db: Session = Depends(get_db)):
+    counts: dict[str, int] = {}
+    for sid in db.scalars(select(Employee.schedule_id).where(Employee.schedule_id.is_not(None))):
+        counts[sid] = counts.get(sid, 0) + 1
+    return [_schedule_out(s, counts.get(s.id, 0)) for s in db.scalars(select(WorkSchedule).order_by(WorkSchedule.name))]
+
+
+def _named(db: Session, name: str, skip: str | None = None) -> None:
+    if db.scalar(select(WorkSchedule.id).where(WorkSchedule.name == name, *([WorkSchedule.id != skip] if skip else []))):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"there is already a schedule called '{name}'")
+
+
+def _schedule_details(s: WorkSchedule) -> dict:
+    return {"name": s.name, "days": [hm(int(m)) if m else "off" for m in s.minutes]}
+
+
+@router.post("/orgs/{org_id}/hr/schedules", response_model=ScheduleOut, status_code=status.HTTP_201_CREATED)
+def add_schedule(body: ScheduleIn, request: Request, ctx: OrgContext = Depends(require(P.HR_MANAGE)),
+                 db: Session = Depends(get_db)):
+    """A working week, such as a shift: minutes for each weekday from Monday, 0 for a day off."""
+    _named(db, body.name)
+    s = WorkSchedule(name=body.name, minutes=body.minutes)
+    db.add(s)
+    db.flush()
+    audit.record(db, actor_user_id=ctx.user.id, action="hr.schedule_added", target_type="work_schedule",
+                 target_id=s.id, details=_schedule_details(s), ip_address=client_ip(request))
+    db.commit()
+    return _schedule_out(s, 0)
+
+
+def _schedule(db: Session, schedule_id: str) -> WorkSchedule:
+    s = db.get(WorkSchedule, schedule_id)
+    if s is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "work schedule not found")
+    return s
+
+
+@router.put("/orgs/{org_id}/hr/schedules/{schedule_id}", response_model=ScheduleOut)
+def change_schedule(schedule_id: str, body: ScheduleIn, request: Request, ctx: OrgContext = Depends(require(P.HR_MANAGE)),
+                    db: Session = Depends(get_db)):
+    """Months already paid stand; the others are counted on the new week."""
+    s = _schedule(db, schedule_id)
+    _named(db, body.name, skip=s.id)
+    before = _schedule_details(s)
+    s.name, s.minutes = body.name, body.minutes
+    audit.record(db, actor_user_id=ctx.user.id, action="hr.schedule_changed", target_type="work_schedule",
+                 target_id=s.id, details={"before": before, "after": _schedule_details(s)},
+                 ip_address=client_ip(request))
+    db.commit()
+    return _schedule_out(s, _on_schedule(db, s.id))
+
+
+@router.delete("/orgs/{org_id}/hr/schedules/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT,
+               response_model=None)
+def remove_schedule(schedule_id: str, request: Request, ctx: OrgContext = Depends(require(P.HR_MANAGE)),
+                    db: Session = Depends(get_db)):
+    s = _schedule(db, schedule_id)
+    if n := _on_schedule(db, s.id):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"{n} employee(s) work on this schedule: move them first")
+    audit.record(db, actor_user_id=ctx.user.id, action="hr.schedule_removed", target_type="work_schedule",
+                 target_id=s.id, details=_schedule_details(s), ip_address=client_ip(request))
+    db.delete(s)
+    db.commit()
+
+
+# ---------------------------------------------------------------- reduced hours (Ramadan)
+
+MAX_REDUCED_DAYS = 92
+
+
+def _reduced_out(r: ReducedHours) -> ReducedHoursOut:
+    return ReducedHoursOut(id=r.id, name=r.name, start_date=r.start_date, end_date=r.end_date,
+                           daily_minutes=r.daily_minutes)
+
+
+@router.get("/orgs/{org_id}/hr/reduced-hours", response_model=list[ReducedHoursOut])
+def list_reduced_hours(year: int | None = None,
+                       _: OrgContext = Depends(require_any(P.HR_MANAGE, P.HR_READ, P.ATTENDANCE_SELF)),
+                       db: Session = Depends(get_db)):
+    stmt = select(ReducedHours).order_by(ReducedHours.start_date)
+    if year:
+        stmt = stmt.where(ReducedHours.start_date <= date(year, 12, 31), ReducedHours.end_date >= date(year, 1, 1))
+    return [_reduced_out(r) for r in db.scalars(stmt)]
+
+
+@router.post("/orgs/{org_id}/hr/reduced-hours", response_model=ReducedHoursOut, status_code=status.HTTP_201_CREATED)
+def add_reduced_hours(body: ReducedHoursIn, request: Request, ctx: OrgContext = Depends(require(P.HR_MANAGE)),
+                      db: Session = Depends(get_db)):
+    """Days with a shorter working day, such as Ramadan (its dates as announced): a working day is at most
+    daily_minutes for the people it applies to. Months already paid stand."""
+    if body.end_date < body.start_date:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "the period ends before it starts")
+    if (body.end_date - body.start_date).days >= MAX_REDUCED_DAYS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"a period is at most {MAX_REDUCED_DAYS} days")
+    other = db.scalar(select(ReducedHours).where(ReducedHours.start_date <= body.end_date,
+                                                 ReducedHours.end_date >= body.start_date))
+    if other is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"it overlaps '{other.name}' ({other.start_date.isoformat()} to "
+                                                      f"{other.end_date.isoformat()})")
+    r = ReducedHours(**body.model_dump())
+    db.add(r)
+    db.flush()
+    audit.record(db, actor_user_id=ctx.user.id, action="hr.reduced_hours_added", target_type="reduced_hours",
+                 target_id=r.id, details={"name": r.name, "from": r.start_date.isoformat(),
+                                          "to": r.end_date.isoformat(), "hours": hm(r.daily_minutes)},
+                 ip_address=client_ip(request))
+    db.commit()
+    return _reduced_out(r)
+
+
+@router.delete("/orgs/{org_id}/hr/reduced-hours/{period_id}", status_code=status.HTTP_204_NO_CONTENT,
+               response_model=None)
+def remove_reduced_hours(period_id: str, request: Request, ctx: OrgContext = Depends(require(P.HR_MANAGE)),
+                         db: Session = Depends(get_db)):
+    r = db.get(ReducedHours, period_id)
+    if r is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "reduced-hours period not found")
+    audit.record(db, actor_user_id=ctx.user.id, action="hr.reduced_hours_removed", target_type="reduced_hours",
+                 target_id=r.id, details={"name": r.name, "from": r.start_date.isoformat(),
+                                          "to": r.end_date.isoformat()}, ip_address=client_ip(request))
+    db.delete(r)
     db.commit()

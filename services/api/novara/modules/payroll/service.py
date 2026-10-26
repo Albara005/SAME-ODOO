@@ -10,7 +10,8 @@ For each employee employed during the month (between their start date and last d
                    saudi       (wage + half the basic wage) / 30 / the working day's hours (Labor Law, article 107:
                                the hourly wage plus 50% of the hourly basic wage)
                    multiplier  basic wage x the multiplier / 30 / the working day's hours
-                 where the wage is every earning in full and the basic wage the earnings marked basic
+                 where the wage is every earning in full, the basic wage the earnings marked basic, and the working
+                 day the person's usual one (their work schedule's average working day, or the HR policy's)
     deductions   in full
     contributions: each covering contribution's rates x the contributory earnings (up to its monthly cap),
                    from the employee (taken from pay) and from the employer (a cost on top)
@@ -38,7 +39,7 @@ The provision holds, for each employee, the full award they would get if their s
 from __future__ import annotations
 
 import calendar
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from fractions import Fraction
@@ -49,6 +50,7 @@ from sqlalchemy.orm import Session
 from novara.db import utcnow
 from novara.modules.accounting.models import JournalEntry
 from novara.modules.accounting.service import LineSpec, post_entry, reverse_entry, system_account
+from novara.modules.hr.attendance import normal_day
 from novara.modules.hr.models import DEFAULT_DAILY_MINUTES, Employee, HrPolicy, LeaveRequest, LeaveType, OvertimeApproval
 from novara.modules.invoicing.service import PAYMENT_METHODS
 from novara.modules.payroll import eosb
@@ -237,7 +239,7 @@ def calculate(db: Session, run: PayRun) -> None:
             continue
         pay = db.scalar(select(EmployeePay).where(EmployeePay.employee_id == e.id))
         w = work_out(db, e, items, covering(db, pay), run.period_start, run.period_end,
-                     overtime=(ot_rule, approved.get(e.id, 0)))
+                     overtime=(replace(ot_rule, daily_minutes=normal_day(db, e)), approved.get(e.id, 0)))
         if w.net < 0:
             raise PayrollError(f"{e.full_name}'s deductions and contributions are more than their pay this month")
         last = min(run.period_end, e.end_date) if e.end_date else run.period_end
