@@ -63,10 +63,10 @@ def rate_on(db: Session, currency: str, day: date) -> ExchangeRate | None:
 def set_rate(db: Session, currency: str, day: date, rate: Decimal, user_id: str) -> ExchangeRate:
     row = db.scalar(select(ExchangeRate).where(ExchangeRate.currency == currency, ExchangeRate.day == day))
     if row is None:
-        row = ExchangeRate(currency=currency, day=day, rate=rate, created_by=user_id)
+        row = ExchangeRate(currency=currency, day=day, rate=rate, source="manual", created_by=user_id)
         db.add(row)
     else:
-        row.rate, row.created_by = rate, user_id
+        row.rate, row.source, row.created_by = rate, "manual", user_id   # a rate set by hand replaces the feed's
     db.flush()
     return row
 
@@ -191,6 +191,7 @@ class RateOut(BaseModel):
     currency: str
     day: date
     rate: str
+    source: Literal["manual", "ecb"] = "manual"
 
 
 class RevaluationIn(BaseModel):
@@ -258,14 +259,14 @@ def list_rates(currency: str | None = Query(default=None, pattern="^[A-Z]{3}$"),
     q = select(ExchangeRate).order_by(ExchangeRate.day.desc(), ExchangeRate.currency).limit(200)
     if currency:
         q = q.where(ExchangeRate.currency == currency)
-    return [RateOut(id=r.id, currency=r.currency, day=r.day, rate=fmt_decimal(r.rate)) for r in db.scalars(q)]
+    return [RateOut(id=r.id, currency=r.currency, day=r.day, rate=fmt_decimal(r.rate), source=r.source) for r in db.scalars(q)]
 
 
 @router.get("/orgs/{org_id}/exchange-rates/latest", response_model=RateOut | None)
 def latest_rate(currency: str = Query(pattern="^[A-Z]{3}$"), on: date | None = None,
                 _: OrgContext = Depends(require(P.INVOICES_READ)), db: Session = Depends(get_db)):
     r = rate_on(db, currency, on or date.today())
-    return RateOut(id=r.id, currency=r.currency, day=r.day, rate=fmt_decimal(r.rate)) if r else None
+    return RateOut(id=r.id, currency=r.currency, day=r.day, rate=fmt_decimal(r.rate), source=r.source) if r else None
 
 
 @router.post("/orgs/{org_id}/exchange-rates", response_model=RateOut, status_code=status.HTTP_201_CREATED)
@@ -281,7 +282,7 @@ def add_rate(body: RateIn, request: Request, ctx: OrgContext = Depends(require(P
     except IntegrityError:                          # the same day at the same moment
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "that day's rate was just set; try again")
-    return RateOut(id=r.id, currency=r.currency, day=r.day, rate=fmt_decimal(r.rate))
+    return RateOut(id=r.id, currency=r.currency, day=r.day, rate=fmt_decimal(r.rate), source=r.source)
 
 
 @router.delete("/orgs/{org_id}/exchange-rates/{rate_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)

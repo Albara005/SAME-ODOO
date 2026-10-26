@@ -500,3 +500,30 @@ test("currencies: a stored rate is suggested on invoices, and what is owed in do
   await expect(page.getByLabel(/سعر الصرف/)).toHaveValue("3.76");
   await expect(page.getByText(/مقترح من سعر يوم/)).toBeVisible();
 });
+
+test("exchange rates: fetched from the European Central Bank for the chosen currencies; a rate set by hand stays", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("ecb"));
+  await createOrg(page, "شركة الأسعار");
+  const call = await apiFor(page);
+  await call("POST", "/exchange-rates", { currency: "EUR", day: "2026-04-30", rate: "4.10" });
+
+  await nav(page, "المحاسبة");
+  await page.getByRole("tab", { name: "العملات" }).click();
+  const card = page.locator(".card", { has: page.getByRole("heading", { name: "الأسعار من البنك المركزي الأوروبي" }) });
+  await card.getByLabel("اجلب الأسعار كل يوم عمل").check();
+  for (const c of ["USD", "EUR", "GBP"]) await card.getByLabel(c, { exact: true }).check();
+  await card.getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByText("تم الحفظ")).toBeVisible();
+  await card.getByRole("button", { name: "اجلب الآن" }).click();
+  await expect(page.getByText(/لـ 2 عملات/)).toBeVisible();                    // the euro rate was set by hand
+
+  // Riyals per euro = 1.08 x 3.75 (the peg) = 4.05; a pound is 4.05 / 0.86.
+  const rates = page.getByRole("table", { name: "أسعار الصرف" });
+  await expect(rates.getByRole("row", { name: /GBP/ })).toContainText("4.709302");
+  await expect(rates.getByRole("row", { name: /GBP/ })).toContainText("البنك الأوروبي");
+  await expect(rates.getByRole("row", { name: /USD/ })).toContainText("3.75");
+  await expect(rates.getByRole("row", { name: /EUR/ })).toContainText("4.1");
+  await expect(rates.getByRole("row", { name: /EUR/ })).not.toContainText("البنك الأوروبي");
+  await expect(card).toContainText("آخر أسعار محفوظة");
+  await page.screenshot({ path: "test-results/screens/fx-feed-ar.png", fullPage: true });
+});

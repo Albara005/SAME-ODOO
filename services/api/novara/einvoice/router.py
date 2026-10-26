@@ -1,7 +1,7 @@
 """E-invoicing (ZATCA phase 2) settings, onboarding and the documents sent.
 
     GET/PUT /orgs/{org}/einvoicing                    seller details and the device's state (org.manage)
-    POST    /orgs/{org}/einvoicing/onboard            {otp}: certificates from ZATCA (org.manage)
+    POST    /orgs/{org}/einvoicing/onboard            {otp}: certificates from ZATCA, or a renewed one (org.manage)
     POST    /orgs/{org}/einvoicing/off                stop issuing e-invoices (org.manage)
     GET     /orgs/{org}/einvoicing/status             on or off, for the invoice screens (invoices.read)
     GET     /orgs/{org}/einvoicing/documents          the latest documents and what ZATCA said
@@ -49,6 +49,8 @@ class EInvoiceSettingsOut(EInvoiceSettingsIn):
     problems: list[str]
     onboarded_at: datetime | None
     certificate_expires_at: datetime | None
+    certificate_state: Literal["ok", "expiring", "expired"] | None
+    certificate_days_left: int | None
     documents: int
     pending: int
     rejected: int
@@ -61,6 +63,9 @@ class OnboardIn(BaseModel):
 class EInvoiceStatusOut(BaseModel):
     active: bool
     environment: Environment | None
+    # The certificate expires within 30 days (expiring) or has (expired: invoices can't be posted until it's renewed).
+    certificate_state: Literal["ok", "expiring", "expired"] | None = None
+    certificate_expires_at: datetime | None = None
 
 
 def _errors(fn):
@@ -80,7 +85,8 @@ def _settings_out(db: Session, ctx: OrgContext) -> EInvoiceSettingsOut:
         environment=s.environment, crn=s.crn, street=s.street, building_number=s.building_number, district=s.district,
         city=s.city, postal_code=s.postal_code, branch_name=s.branch_name, industry=s.industry, status=s.status,
         vat_number=org.vat_number, problems=svc.seller_problems(org, s), onboarded_at=s.onboarded_at,
-        certificate_expires_at=s.certificate_expires_at, documents=sum(counts.values()),
+        certificate_expires_at=s.certificate_expires_at, certificate_state=svc.certificate_state(s),
+        certificate_days_left=svc.certificate_days_left(s), documents=sum(counts.values()),
         pending=counts.get("pending", 0), rejected=counts.get("rejected", 0))
 
 
@@ -109,12 +115,15 @@ def change_settings(body: EInvoiceSettingsIn, request: Request, ctx: OrgContext 
 @router.post("/orgs/{org_id}/einvoicing/onboard", response_model=EInvoiceSettingsOut)
 def onboard(body: OnboardIn, request: Request, ctx: OrgContext = Depends(require(P.ORG_MANAGE)),
             db: Session = Depends(get_db)):
-    """Onboard the device with a one-time password from ZATCA's Fatoora portal (the sandbox takes 123345)."""
+    """Onboard the device with a one-time password from ZATCA's Fatoora portal (the sandbox takes 123345). Doing it
+    again while onboarded renews the certificate, and the device's chain of documents carries on."""
     s = svc.settings_row(db)
+    renewing = s.status == "onboarded"
     _errors(lambda: svc.onboard(db, request.app.state.settings, s, otp=body.otp, user_id=ctx.user.id,
                                 http=request.app.state.einvoice_http))
-    audit.record(db, actor_user_id=ctx.user.id, action="einvoicing.onboarded", target_type="organization",
-                 target_id=ctx.organization.id, details={"environment": s.environment}, ip_address=client_ip(request))
+    audit.record(db, actor_user_id=ctx.user.id, action="einvoicing.renewed" if renewing else "einvoicing.onboarded",
+                 target_type="organization", target_id=ctx.organization.id, details={"environment": s.environment},
+                 ip_address=client_ip(request))
     db.commit()
     return _settings_out(db, ctx)
 
@@ -133,7 +142,9 @@ def turn_off(request: Request, ctx: OrgContext = Depends(require(P.ORG_MANAGE)),
 @router.get("/orgs/{org_id}/einvoicing/status", response_model=EInvoiceStatusOut)
 def einvoicing_status(_: OrgContext = Depends(require(P.INVOICES_READ)), db: Session = Depends(get_db)):
     s = svc.active(db)
-    return EInvoiceStatusOut(active=s is not None, environment=s.environment if s else None)
+    return EInvoiceStatusOut(active=s is not None, environment=s.environment if s else None,
+                             certificate_state=svc.certificate_state(s) if s else None,
+                             certificate_expires_at=s.certificate_expires_at if s else None)
 
 
 @router.get("/orgs/{org_id}/einvoicing/documents", response_model=list[EInvoiceSummary])

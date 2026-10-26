@@ -93,7 +93,8 @@ def test_onboarding_needs_the_seller_details_and_zatcas_one_time_password(api, e
         row = db.scalar(select(EInvoiceSettings))
         assert row.private_key.startswith("v1:") and "PRIVATE KEY" not in row.private_key
     assert api.req("PUT", OWNER, u(ei, "/einvoicing"), json=SELLER | {"environment": "production"}).status_code == 409
-    assert api.req("GET", SALES, u(ei, "/einvoicing/status")).json() == {"active": True, "environment": "sandbox"}
+    status_now = api.req("GET", SALES, u(ei, "/einvoicing/status")).json()
+    assert (status_now["active"], status_now["environment"], status_now["certificate_state"]) == (True, "sandbox", "ok")
 
 
 def test_every_posted_invoice_is_signed_chained_and_sent(api, ei, zatca, app):

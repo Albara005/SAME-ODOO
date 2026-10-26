@@ -1935,7 +1935,8 @@ export interface paths {
         put?: never;
         /**
          * Onboard
-         * @description Onboard the device with a one-time password from ZATCA's Fatoora portal (the sandbox takes 123345).
+         * @description Onboard the device with a one-time password from ZATCA's Fatoora portal (the sandbox takes 123345). Doing it
+         *     again while onboarded renews the certificate, and the device's chain of documents carries on.
          */
         post: operations["onboard_api_v1_orgs__org_id__einvoicing_onboard_post"];
         delete?: never;
@@ -1973,6 +1974,41 @@ export interface paths {
         put?: never;
         /** Add Rate */
         post: operations["add_rate_api_v1_orgs__org_id__exchange_rates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/exchange-rates/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Feed */
+        get: operations["get_feed_api_v1_orgs__org_id__exchange_rates_feed_get"];
+        /** Put Feed */
+        put: operations["put_feed_api_v1_orgs__org_id__exchange_rates_feed_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/exchange-rates/feed/fetch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fetch Now */
+        post: operations["fetch_now_api_v1_orgs__org_id__exchange_rates_feed_fetch_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6514,8 +6550,12 @@ export interface components {
              * @default
              */
             building_number: string;
+            /** Certificate Days Left */
+            certificate_days_left: number | null;
             /** Certificate Expires At */
             certificate_expires_at: string | null;
+            /** Certificate State */
+            certificate_state: ("ok" | "expiring" | "expired") | null;
             /**
              * City
              * @default
@@ -6574,6 +6614,10 @@ export interface components {
         EInvoiceStatusOut: {
             /** Active */
             active: boolean;
+            /** Certificate Expires At */
+            certificate_expires_at?: string | null;
+            /** Certificate State */
+            certificate_state?: ("ok" | "expiring" | "expired") | null;
             /** Environment */
             environment: ("sandbox" | "simulation" | "production") | null;
         };
@@ -6785,6 +6829,48 @@ export interface components {
             check_out?: string | null;
             /** Note */
             note?: string | null;
+        };
+        /** FeedIn */
+        FeedIn: {
+            /** Currencies */
+            currencies?: string[];
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** FeedOut */
+        FeedOut: {
+            /** Currencies */
+            currencies: string[];
+            /** Enabled */
+            enabled: boolean;
+            /** Last Day */
+            last_day: string | null;
+            /** Last Error */
+            last_error: string;
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Pegged */
+            pegged: {
+                [key: string]: string;
+            };
+            /** Source */
+            source: string;
+        };
+        /** FetchOut */
+        FetchOut: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Kept */
+            kept: string[];
+            /** Saved */
+            saved: {
+                [key: string]: string;
+            };
+            /** Unavailable */
+            unavailable: string[];
         };
         /** FileInfo */
         FileInfo: {
@@ -8927,6 +9013,12 @@ export interface components {
             id: string;
             /** Rate */
             rate: string;
+            /**
+             * Source
+             * @default manual
+             * @enum {string}
+             */
+            source: "manual" | "ecb";
         };
         /** ReceiptIn */
         ReceiptIn: {
@@ -14897,6 +14989,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_feed_api_v1_orgs__org_id__exchange_rates_feed_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_feed_api_v1_orgs__org_id__exchange_rates_feed_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_now_api_v1_orgs__org_id__exchange_rates_feed_fetch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FetchOut"];
                 };
             };
             /** @description Validation Error */

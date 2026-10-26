@@ -70,6 +70,14 @@ function EInvoicingForm({ settings: s, onSaved }: { settings: Settings; onSaved:
             {s.rejected > 0 && ` ${t("einvoice.rejectedCount", { n: s.rejected })}`}
           </p>
         )}
+        {on && s.certificate_state === "expiring" && (
+          <p className="notice notice-warning small" role="status">
+            {t("einvoice.certExpiring", { days: s.certificate_days_left ?? 0, date: date(s.certificate_expires_at) })}
+          </p>
+        )}
+        {on && s.certificate_state === "expired" && (
+          <p className="notice notice-danger small" role="alert">{t("einvoice.certExpired", { date: date(s.certificate_expires_at) })}</p>
+        )}
         {(save.isError || onboard.isError || off.isError) && <ErrorNotice error={save.error ?? onboard.error ?? off.error} />}
         <Field label={t("einvoice.environment")} hint={on ? t("einvoice.environmentLocked") : t("einvoice.environmentHint")}>
           <Select value={form.environment} disabled={on} onChange={(e) => setForm({ ...form, environment: e.target.value as SettingsIn["environment"] })}>
@@ -122,13 +130,40 @@ function EInvoicingForm({ settings: s, onSaved }: { settings: Settings; onSaved:
           <Button type="submit" variant="primary" icon={<PlugZap size={16} />} loading={onboard.isPending}>{t("einvoice.onboard")}</Button>
         </form>
       ) : (
-        <div className="form-actions" style={{ marginBlockStart: "var(--space-4)" }}>
-          <Button variant="danger" icon={<Power size={16} />} loading={off.isPending}
-            onClick={() => window.confirm(t("einvoice.offConfirm")) && off.mutate()}>{t("einvoice.turnOff")}</Button>
+        <div className="stack-sm" style={{ marginBlockStart: "var(--space-4)" }}>
+          {s.certificate_state !== "ok" && (
+            <form className="row" style={{ alignItems: "flex-end" }} onSubmit={(e) => { e.preventDefault(); onboard.mutate(); }}>
+              <Field label={t("einvoice.otp")} hint={t("einvoice.renewHint")}>
+                <Input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} maxLength={6} inputMode="numeric" required ltr />
+              </Field>
+              <Button type="submit" variant="primary" icon={<PlugZap size={16} />} loading={onboard.isPending}>{t("einvoice.renew")}</Button>
+            </form>
+          )}
+          <div className="form-actions">
+            <Button variant="danger" icon={<Power size={16} />} loading={off.isPending}
+              onClick={() => window.confirm(t("einvoice.offConfirm")) && off.mutate()}>{t("einvoice.turnOff")}</Button>
+          </div>
         </div>
       )}
     </Card>
   );
+}
+
+/** On the invoice screens: the e-invoicing certificate expires soon, or has (then nothing can be posted). */
+export function CertificateBanner() {
+  const { t, date } = useI18n();
+  const { org, can } = useOrg();
+  const status = useQuery({
+    queryKey: ["einvoicing-status", org.id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/einvoicing/status", { params: { path: { org_id: org.id } } })),
+    staleTime: 5 * 60_000,
+  });
+  const state = status.data?.certificate_state;
+  if (state !== "expiring" && state !== "expired") return null;
+  const where = can("org.manage") ? ` ${t("einvoice.renewWhere")}` : ` ${t("einvoice.askManager")}`;
+  return state === "expired"
+    ? <p className="notice notice-danger small" role="alert">{t("einvoice.bannerExpired", { date: date(status.data!.certificate_expires_at) })}{where}</p>
+    : <p className="notice notice-warning small" role="status">{t("einvoice.bannerExpiring", { date: date(status.data!.certificate_expires_at) })}{where}</p>;
 }
 
 /** What ZATCA said about one invoice's or credit note's e-invoice. */

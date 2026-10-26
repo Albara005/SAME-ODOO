@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import (JSON, BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, Text,
-                        UniqueConstraint, text)
+from sqlalchemy import (JSON, BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String,
+                        Text, UniqueConstraint, text)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -241,12 +241,28 @@ class ExchangeRate(IdMixin, TimestampMixin, TenantScoped, Base):
     __table_args__ = (
         UniqueConstraint("organization_id", "currency", "day", name="uq_exchange_rate_day"),
         CheckConstraint("CAST(rate AS NUMERIC) > 0", name="ck_exchange_rate_positive"),
+        CheckConstraint("source IN ('manual', 'ecb')", name="ck_exchange_rate_source"),
     )
 
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     day: Mapped[date] = mapped_column(Date, nullable=False)
     rate: Mapped[Decimal] = mapped_column(ExactDecimal(18, 8), nullable=False)
+    # manual: set by someone (it stays); ecb: from the European Central Bank's reference rates (fx_feed.py).
+    source: Mapped[str] = mapped_column(String(10), default="manual", server_default="manual", nullable=False)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class FxFeed(IdMixin, TimestampMixin, TenantScoped, Base):
+    """Rates fetched every working day for the currencies the organization keeps (fx_feed.py)."""
+
+    __tablename__ = "fx_feeds"
+    __table_args__ = (UniqueConstraint("organization_id", name="uq_fx_feed_org"),)
+
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    currencies: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    last_day: Mapped[date | None] = mapped_column(Date, nullable=True)       # the feed's date last saved
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str] = mapped_column(String(300), default="", nullable=False)
 
 
 class FxRevaluation(IdMixin, TimestampMixin, TenantScoped, Base):

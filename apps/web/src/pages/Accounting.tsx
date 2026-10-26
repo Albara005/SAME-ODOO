@@ -672,8 +672,71 @@ function Currencies() {
   return (
     <div className="stack">
       <Revaluation />
+      <RateFeed />
       <Rates />
     </div>
+  );
+}
+
+/** Rates fetched every working day from the European Central Bank, for the currencies chosen. */
+function RateFeed() {
+  const { t, date } = useI18n();
+  const { org, can } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const path = { params: { path: { org_id: org.id } } };
+  const base = org.default_currency;
+  const feed = useQuery({
+    queryKey: ["exchange-rates", org.id, "feed"],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/exchange-rates/feed", path)),
+  });
+  const [draft, setDraft] = useState<{ enabled: boolean; currencies: string[] } | null>(null);
+  const current = draft ?? (feed.data ? { enabled: feed.data.enabled, currencies: feed.data.currencies } : null);
+  const save = useMutation({
+    mutationFn: () => unwrap(api.PUT("/api/v1/orgs/{org_id}/exchange-rates/feed", { ...path, body: current! })),
+    onSuccess: (x) => { qc.setQueryData(["exchange-rates", org.id, "feed"], x); setDraft(null); toast(t("common.saved")); },
+  });
+  const fetchNow = useMutation({
+    mutationFn: () => unwrap(api.POST("/api/v1/orgs/{org_id}/exchange-rates/feed/fetch", path)),
+    onSuccess: (x) => {
+      void qc.invalidateQueries({ queryKey: ["exchange-rates", org.id] });
+      toast(t("fx.feed.fetched", { day: date(x.day), n: Object.keys(x.saved).length }));
+    },
+    onError: (e) => { void qc.invalidateQueries({ queryKey: ["exchange-rates", org.id, "feed"] }); toast(errorText(e, t("common.error")), "error"); },
+  });
+  const manage = can("accounting.journal");
+  if (!current || !feed.data) return null;
+  const toggle = (c: string, on: boolean) =>
+    setDraft({ ...current, currencies: on ? [...current.currencies, c] : current.currencies.filter((x) => x !== c) });
+  return (
+    <Card title={t("fx.feed.title")}>
+      <div className="stack-sm">
+        <p className="muted small">{t("fx.feed.hint", { base })}</p>
+        {feed.data.last_day && (
+          <p className="small">{t("fx.feed.last", { day: date(feed.data.last_day) })}</p>
+        )}
+        {feed.data.last_error && <p className="notice notice-warning small" dir="auto">{feed.data.last_error}</p>}
+        {save.isError && <ErrorNotice error={save.error} />}
+        <Checkbox label={t("fx.feed.enabled")} checked={current.enabled} disabled={!manage}
+          onChange={(e) => setDraft({ ...current, enabled: e.target.checked })} />
+        <fieldset className="stack-sm" style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className="muted small">{t("fx.feed.currencies")}</legend>
+          <div className="row" style={{ flexWrap: "wrap", gap: 12 }}>
+            {FOREIGN.filter((c) => c !== base).map((c) => (
+              <Checkbox key={c} label={c} checked={current.currencies.includes(c)} disabled={!manage}
+                onChange={(e) => toggle(c, e.target.checked)} />
+            ))}
+          </div>
+        </fieldset>
+        {manage && (
+          <div className="form-actions">
+            <Button loading={fetchNow.isPending} disabled={draft !== null || feed.data.currencies.length === 0}
+              onClick={() => fetchNow.mutate()}>{t("fx.feed.fetchNow")}</Button>
+            <Button variant="primary" disabled={draft === null} loading={save.isPending} onClick={() => save.mutate()}>{t("common.save")}</Button>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -733,7 +796,7 @@ function Rates() {
                     <tr key={r.id}>
                       <td className="mono">{r.currency}</td>
                       <td className="num">{date(r.day)}</td>
-                      <td className="end num">{r.rate}</td>
+                      <td className="end num">{r.rate}{r.source === "ecb" && <> <Badge>{t("fx.feed.badge")}</Badge></>}</td>
                       <td className="end">
                         {manage && <IconButton label={t("common.delete")} onClick={() => remove.mutate(r.id)}><Trash2 size={16} /></IconButton>}
                       </td>

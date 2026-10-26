@@ -72,6 +72,13 @@ def create_app():
     from tests.fake_zatca import FakeZatca
     app.state.einvoice_http = httpx.Client(transport=httpx.MockTransport(FakeZatca().handler))
 
+    # The European Central Bank's daily rates: one fixed day, so the browser tests know the numbers.
+    ecb = ('<?xml version="1.0" encoding="UTF-8"?><gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01" '
+           'xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref"><gesmes:subject>Reference rates</gesmes:subject>'
+           "<Cube><Cube time='2026-04-30'><Cube currency='USD' rate='1.0800'/><Cube currency='GBP' rate='0.8600'/>"
+           "</Cube></Cube></gesmes:Envelope>")
+    app.state.fx_http = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, content=ecb.encode())))
+
     @app.get("/api/e2e/mail", include_in_schema=False)
     def mail_to(to: str) -> list[dict]:
         """The browser tests read the emailed links here (password reset, verification, invitations)."""

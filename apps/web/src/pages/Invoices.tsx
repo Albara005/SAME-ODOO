@@ -11,7 +11,7 @@ import {
 import {
   Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
 } from "../components/ui";
-import { EInvoiceStatus } from "../components/EInvoicing";
+import { CertificateBanner, EInvoiceStatus } from "../components/EInvoicing";
 import { PaymentLinksCard } from "../components/OnlinePayments";
 import { ZatcaQr } from "../components/ZatcaQr";
 import { useI18n } from "../i18n/I18n";
@@ -55,6 +55,7 @@ export function InvoicesPage() {
           )
         }
       />
+      <CertificateBanner />
       <div style={{ maxWidth: 240 }}>
         <Select aria-label={t("common.status")} value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">{t("common.all")}</option>
@@ -385,6 +386,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
           </div>
         }
       />
+      {isDraft && <div className="no-print"><CertificateBanner /></div>}
       {inv.status !== "cancelled" && (
         <div className="no-print">
           <Card tight>

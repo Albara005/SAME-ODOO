@@ -24,9 +24,11 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from novara import crypto
+from novara.automation.models import Notification
 from novara.db import utcnow
 from novara.einvoice import client as fatoora, csr, signing, ubl
 from novara.einvoice.models import EInvoiceDocument, EInvoiceSettings
+from novara.modules.access.service import holders
 from novara.modules.accounting.models import Tax
 from novara.modules.invoicing.models import CreditNote, CreditNoteLine, CreditNoteTax, Invoice
 from novara.modules.invoicing.service import lines_of, tax_groups
@@ -144,8 +146,74 @@ def onboard(db: Session, settings, s: EInvoiceSettings, *, otp: str, user_id: st
     s.compliance_token, s.compliance_secret = _seal(db, settings, compliance.token), _seal(db, settings, compliance.secret)
     s.production_token, s.production_secret = _seal(db, settings, production.token), _seal(db, settings, production.secret)
     s.certificate_expires_at = signing.certificate(production.certificate).not_valid_after_utc
+    if s.status != "onboarded":
+        s.icv, s.last_hash = 0, ubl.FIRST_PIH             # a new device starts a new chain
+    # Onboarding again while onboarded renews the device's certificate: its chain carries on.
     s.status, s.onboarded_at, s.onboarded_by, s.last_error = "onboarded", utcnow(), user_id, ""
-    s.icv, s.last_hash = 0, ubl.FIRST_PIH                 # a new device starts a new chain
+
+
+# ---------------------------------------------------------------- the certificate's expiry
+
+EXPIRY_WARNING_DAYS = 30
+REMIND_AT = (30, 14, 7, 3, 1)           # days before the certificate expires; and once more when it has
+
+
+def certificate_days_left(s: EInvoiceSettings, now: datetime | None = None) -> int | None:
+    """Whole days until the production certificate expires (negative once it has), for an onboarded device."""
+    if s.status != "onboarded" or s.certificate_expires_at is None:
+        return None
+    return (_utc(s.certificate_expires_at) - (now or utcnow())).days
+
+
+def certificate_state(s: EInvoiceSettings, now: datetime | None = None) -> str | None:
+    """ok | expiring (within EXPIRY_WARNING_DAYS) | expired; None when not onboarded."""
+    if s.status != "onboarded" or s.certificate_expires_at is None:
+        return None
+    left = _utc(s.certificate_expires_at) - (now or utcnow())
+    if left.total_seconds() <= 0:
+        return "expired"
+    return "expiring" if left.days < EXPIRY_WARNING_DAYS else "ok"
+
+
+def organizations_onboarded(db: Session) -> list[str]:
+    if db.get_bind().dialect.name == "postgresql":
+        return list(db.execute(text("SELECT app_orgs_with_einvoicing()")).scalars())
+    with system_scope(db):
+        return list(db.scalars(select(EInvoiceSettings.organization_id).where(EInvoiceSettings.status == "onboarded")))
+
+
+def remind_expiry(db: Session, now: datetime | None = None) -> int:
+    """Tell the bound organization's managers (org.manage) that the certificate expires soon, at each of REMIND_AT
+    days before and once when it has expired. Each reminder goes once. Returns how many were added."""
+    s = active(db)
+    if s is None:
+        return 0
+    left = certificate_days_left(s, now)
+    state = certificate_state(s, now)
+    if left is None or state == "ok":
+        return 0
+    # The latest reminder due: "expired", or the smallest of REMIND_AT not below the days left (expiring: under 30).
+    step = "expired" if state == "expired" else str(min(d for d in REMIND_AT if d >= left))
+    org = db.get(Organization, current_tenant(db))
+    day = _utc(s.certificate_expires_at).date().isoformat()
+    arabic = org.default_locale == "ar"
+    if state == "expired":
+        title = "انتهت شهادة الفوترة الإلكترونية" if arabic else "The e-invoicing certificate has expired"
+        body = (f"انتهت في {day}. لا تُرحَّل الفواتير حتى تُجدَّد: اربط الجهاز مرة أخرى برمز تحقق جديد من بوابة فاتورة." if arabic
+                else f"It expired on {day}. Invoices can't be posted until it's renewed: onboard again with a new "
+                     "one-time password from the Fatoora portal.")
+    else:
+        title = "شهادة الفوترة الإلكترونية تنتهي قريباً" if arabic else "The e-invoicing certificate expires soon"
+        body = (f"تنتهي في {day}. جدّدها قبل ذلك: اربط الجهاز مرة أخرى برمز تحقق جديد من بوابة فاتورة." if arabic
+                else f"It expires on {day}. Renew it before then: onboard again with a new one-time password from the "
+                     "Fatoora portal.")
+    added = 0
+    for uid in holders(db, "org.manage"):
+        key = f"einvoice-cert:{day}:{step}:{uid}"
+        if db.scalar(select(Notification.id).where(Notification.idempotency_key == key)) is None:
+            db.add(Notification(user_id=uid, title=title, body=body, idempotency_key=key))
+            added += 1
+    return added
 
 
 # ---------------------------------------------------------------- documents
@@ -303,6 +371,9 @@ def issue(db: Session, settings, source_type: str, source_id: str, doc: ubl.Docu
     s = db.scalar(select(EInvoiceSettings).where(EInvoiceSettings.status == "onboarded").with_for_update())
     if s is None:
         raise EInvoiceState("e-invoicing isn't set up")
+    if certificate_state(s) == "expired":
+        raise EInvoiceState(f"the e-invoicing certificate expired on {_utc(s.certificate_expires_at).date().isoformat()}: "
+                            "onboard again with a new one-time password from the Fatoora portal, then post")
     s.icv += 1
     doc.icv, doc.pih, doc.uuid = s.icv, s.last_hash, str(uuid.uuid4())
     key = csr.load_key(_secret(db, settings, s.private_key))

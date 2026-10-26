@@ -3472,6 +3472,17 @@
       "title": "Building Number",
       "type": "string"
      },
+     "certificate_days_left": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Certificate Days Left"
+     },
      "certificate_expires_at": {
       "anyOf": [
        {
@@ -3483,6 +3494,22 @@
        }
       ],
       "title": "Certificate Expires At"
+     },
+     "certificate_state": {
+      "anyOf": [
+       {
+        "enum": [
+         "ok",
+         "expiring",
+         "expired"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Certificate State"
      },
      "city": {
       "default": "",
@@ -3580,6 +3607,8 @@
      "problems",
      "onboarded_at",
      "certificate_expires_at",
+     "certificate_state",
+     "certificate_days_left",
      "documents",
      "pending",
      "rejected"
@@ -3592,6 +3621,34 @@
      "active": {
       "title": "Active",
       "type": "boolean"
+     },
+     "certificate_expires_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Certificate Expires At"
+     },
+     "certificate_state": {
+      "anyOf": [
+       {
+        "enum": [
+         "ok",
+         "expiring",
+         "expired"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Certificate State"
      },
      "environment": {
       "anyOf": [
@@ -4235,6 +4292,130 @@
      }
     },
     "title": "EntryUpdate",
+    "type": "object"
+   },
+   "FeedIn": {
+    "properties": {
+     "currencies": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 40,
+      "title": "Currencies",
+      "type": "array"
+     },
+     "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "enabled"
+    ],
+    "title": "FeedIn",
+    "type": "object"
+   },
+   "FeedOut": {
+    "properties": {
+     "currencies": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Currencies",
+      "type": "array"
+     },
+     "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+     },
+     "last_day": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Day"
+     },
+     "last_error": {
+      "title": "Last Error",
+      "type": "string"
+     },
+     "last_run_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Run At"
+     },
+     "pegged": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Pegged",
+      "type": "object"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     }
+    },
+    "required": [
+     "enabled",
+     "currencies",
+     "last_day",
+     "last_run_at",
+     "last_error",
+     "source",
+     "pegged"
+    ],
+    "title": "FeedOut",
+    "type": "object"
+   },
+   "FetchOut": {
+    "properties": {
+     "day": {
+      "format": "date",
+      "title": "Day",
+      "type": "string"
+     },
+     "kept": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Kept",
+      "type": "array"
+     },
+     "saved": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Saved",
+      "type": "object"
+     },
+     "unavailable": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Unavailable",
+      "type": "array"
+     }
+    },
+    "required": [
+     "day",
+     "saved",
+     "kept",
+     "unavailable"
+    ],
+    "title": "FetchOut",
     "type": "object"
    },
    "FileInfo": {
@@ -10082,6 +10263,15 @@
      },
      "rate": {
       "title": "Rate",
+      "type": "string"
+     },
+     "source": {
+      "default": "manual",
+      "enum": [
+       "manual",
+       "ecb"
+      ],
+      "title": "Source",
       "type": "string"
      }
     },
@@ -21712,7 +21902,7 @@
   },
   "/api/v1/orgs/{org_id}/einvoicing/onboard": {
    "post": {
-    "description": "Onboard the device with a one-time password from ZATCA's Fatoora portal (the sandbox takes 123345).",
+    "description": "Onboard the device with a one-time password from ZATCA's Fatoora portal (the sandbox takes 123345). Doing it\nagain while onboarded renews the certificate, and the device's chain of documents carries on.",
     "operationId": "onboard_api_v1_orgs__org_id__einvoicing_onboard_post",
     "parameters": [
      {
@@ -21933,6 +22123,155 @@
      }
     ],
     "summary": "Add Rate",
+    "tags": [
+     "invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/exchange-rates/feed": {
+   "get": {
+    "operationId": "get_feed_api_v1_orgs__org_id__exchange_rates_feed_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FeedOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Feed",
+    "tags": [
+     "invoicing"
+    ]
+   },
+   "put": {
+    "operationId": "put_feed_api_v1_orgs__org_id__exchange_rates_feed_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FeedIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FeedOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Feed",
+    "tags": [
+     "invoicing"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/exchange-rates/feed/fetch": {
+   "post": {
+    "operationId": "fetch_now_api_v1_orgs__org_id__exchange_rates_feed_fetch_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FetchOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Fetch Now",
     "tags": [
      "invoicing"
     ]
