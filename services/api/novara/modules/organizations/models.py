@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -32,6 +32,11 @@ class Organization(IdMixin, TimestampMixin, Base):
     require_mfa: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # The month the fiscal year starts in (1 = January): year-end closes fall on the day before it.
     fiscal_year_start_month: Mapped[int] = mapped_column(Integer, default=1, server_default="1", nullable=False)
+    # The first-run setup (setup.py): what the business does, the apps its menu shows (None: all of them; the
+    # others stay reachable, the menu just leaves them out), and when the setup was finished or skipped.
+    business_type: Mapped[str] = mapped_column(String(30), default="", server_default="", nullable=False)
+    apps: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    setup_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Membership(IdMixin, TimestampMixin, TenantScoped, Base):

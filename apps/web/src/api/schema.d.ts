@@ -4142,6 +4142,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Setup Catalog */
+        get: operations["setup_catalog_api_v1_orgs__org_id__setup_get"];
+        put?: never;
+        /** Run Setup */
+        post: operations["run_setup_api_v1_orgs__org_id__setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/setup/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip Setup */
+        post: operations["skip_setup_api_v1_orgs__org_id__setup_skip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/studio/projects": {
         parameters: {
             query?: never;
@@ -6270,6 +6305,15 @@ export interface components {
             /** Sales Order Id */
             sales_order_id: string;
         };
+        /** CountryOut */
+        CountryOut: {
+            /** Code */
+            code: string;
+            /** Currency */
+            currency: string;
+            /** Vat Rate */
+            vat_rate: string;
+        };
         /** CreditLineIn */
         CreditLineIn: {
             /** Invoice Line Id */
@@ -8178,8 +8222,15 @@ export interface components {
         };
         /** MyOrgOut */
         MyOrgOut: {
+            /** Apps */
+            apps?: string[] | null;
             /** Books Locked Until */
             books_locked_until: string | null;
+            /**
+             * Business Type
+             * @default
+             */
+            business_type: string;
             /**
              * Created At
              * Format: date-time
@@ -8209,6 +8260,8 @@ export interface components {
             require_mfa: boolean;
             /** Role */
             role: string;
+            /** Setup Completed At */
+            setup_completed_at?: string | null;
             /** Slug */
             slug: string;
             /** Vat Number */
@@ -8392,8 +8445,15 @@ export interface components {
         };
         /** OrgOut */
         OrgOut: {
+            /** Apps */
+            apps?: string[] | null;
             /** Books Locked Until */
             books_locked_until: string | null;
+            /**
+             * Business Type
+             * @default
+             */
+            business_type: string;
             /**
              * Created At
              * Format: date-time
@@ -8419,6 +8479,8 @@ export interface components {
              * @default false
              */
             require_mfa: boolean;
+            /** Setup Completed At */
+            setup_completed_at?: string | null;
             /** Slug */
             slug: string;
             /** Vat Number */
@@ -8426,6 +8488,8 @@ export interface components {
         };
         /** OrgUpdate */
         OrgUpdate: {
+            /** Apps */
+            apps?: string[] | null;
             /** Default Currency */
             default_currency?: string | null;
             /** Default Locale */
@@ -10085,6 +10149,63 @@ export interface components {
             /** Wage */
             wage: string;
         };
+        /** SetupCatalogOut */
+        SetupCatalogOut: {
+            /** Apps */
+            apps: string[];
+            /** Business Types */
+            business_types: components["schemas"]["TypeOut"][];
+            /** Completed */
+            completed: boolean;
+            /** Countries */
+            countries: components["schemas"]["CountryOut"][];
+        };
+        /** SetupIn */
+        SetupIn: {
+            /** Apps */
+            apps: string[];
+            /** Business Type */
+            business_type: string;
+            /**
+             * Country
+             * @default SA
+             */
+            country: string;
+            /**
+             * Sample Data
+             * @default true
+             */
+            sample_data: boolean;
+            /**
+             * Store
+             * @default false
+             */
+            store: boolean;
+            /**
+             * Store Name
+             * @default
+             */
+            store_name: string;
+            /**
+             * Vat Number
+             * @default
+             */
+            vat_number: string;
+        };
+        /** SetupOut */
+        SetupOut: {
+            /** Created */
+            created: {
+                [key: string]: number;
+            };
+            /** Notes */
+            notes?: string[];
+            organization: components["schemas"]["OrgOut"];
+            /** Store Project Id */
+            store_project_id?: string | null;
+            /** Store Url */
+            store_url?: string | null;
+        };
         /** StatementLine */
         StatementLine: {
             /** Account Id */
@@ -10402,6 +10523,13 @@ export interface components {
             stop: string;
             /** Tool Calls */
             tool_calls: components["schemas"]["ActionOut"][];
+        };
+        /** TypeOut */
+        TypeOut: {
+            /** Apps */
+            apps: string[];
+            /** Key */
+            key: string;
         };
         /** UnsubscribeIn */
         UnsubscribeIn: {
@@ -20886,6 +21014,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvoiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_catalog_api_v1_orgs__org_id__setup_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupCatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_setup_api_v1_orgs__org_id__setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skip_setup_api_v1_orgs__org_id__setup_skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgOut"];
                 };
             };
             /** @description Validation Error */

@@ -155,7 +155,9 @@ function Chat({ conversationId, text, setText }: { conversationId?: string; text
 
   const messages = detail.data?.messages ?? [];
   const actions = (detail.data?.actions ?? []).filter((a) => a.kind === "write");
-  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [messages.length, actions.length, sending, live]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });   // not returned: newer browsers give back a promise
+  }, [messages.length, actions.length, sending, live]);
 
   function submit(e?: FormEvent) {
     e?.preventDefault();

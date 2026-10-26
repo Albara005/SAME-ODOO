@@ -1,4 +1,4 @@
-import { visibleNav } from "./nav";
+import { APP_ITEMS, visibleNav } from "./nav";
 
 const labels = (perms: string[]) => visibleNav((p) => perms.includes(p)).flatMap((g) => g.items.map((i) => i.label));
 
@@ -15,4 +15,21 @@ it("hides what the role can't use", () => {
 it("drops empty groups", () => {
   const groups = visibleNav(() => false);
   expect(groups.every((g) => g.items.length > 0)).toBe(true);
+});
+
+it("shows only the apps the organization chose, and the rest of the menu always", () => {
+  const all = (p: string) => p !== "nothing";
+  const chosen = visibleNav(all, ["invoices", "customers"]).flatMap((g) => g.items.map((i) => i.label));
+  expect(chosen).toEqual(expect.arrayContaining(["nav.home", "nav.customers", "nav.invoices", "nav.tasks", "nav.members"]));
+  expect(chosen).not.toContain("nav.products");
+  expect(chosen).not.toContain("nav.studio");
+  expect(visibleNav(all, null).flatMap((g) => g.items)).toHaveLength(visibleNav(all).flatMap((g) => g.items).length);
+});
+
+it("keys the apps by the names the server knows", () => {
+  // services/api/novara/modules/organizations/router.py APPS, in the same order
+  expect(APP_ITEMS.map((i) => i.to)).toEqual([
+    "customers", "products", "sales", "bookings", "invoices", "purchases", "inventory", "projects", "hr", "payroll",
+    "accounting", "reports", "documents", "assistant", "studio", "agents", "creative", "automation",
+  ]);
 });

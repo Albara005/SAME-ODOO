@@ -231,7 +231,9 @@ export function Layout() {
   const [title, setTitle] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useStoredFlag("novara.nav-collapsed");
   const location = useLocation();
-  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -264,7 +266,7 @@ export function Layout() {
             </span>
           </NavLink>
           <nav className="stack-sm nav-scroll">
-            {visibleNav(can).map((group, i) => (
+            {visibleNav(can, org.apps).map((group, i) => (
               <div className="nav-group" key={group.title ?? i}>
                 {group.title && <div className="nav-title">{t(group.title)}</div>}
                 {group.items.map((item) => (

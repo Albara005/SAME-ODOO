@@ -2166,6 +2166,29 @@
     "title": "ConvertedOut",
     "type": "object"
    },
+   "CountryOut": {
+    "properties": {
+     "code": {
+      "title": "Code",
+      "type": "string"
+     },
+     "currency": {
+      "title": "Currency",
+      "type": "string"
+     },
+     "vat_rate": {
+      "title": "Vat Rate",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code",
+     "currency",
+     "vat_rate"
+    ],
+    "title": "CountryOut",
+    "type": "object"
+   },
    "CreditLineIn": {
     "properties": {
      "invoice_line_id": {
@@ -7311,6 +7334,20 @@
    },
    "MyOrgOut": {
     "properties": {
+     "apps": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Apps"
+     },
      "books_locked_until": {
       "anyOf": [
        {
@@ -7322,6 +7359,11 @@
        }
       ],
       "title": "Books Locked Until"
+     },
+     "business_type": {
+      "default": "",
+      "title": "Business Type",
+      "type": "string"
      },
      "created_at": {
       "format": "date-time",
@@ -7368,6 +7410,18 @@
      "role": {
       "title": "Role",
       "type": "string"
+     },
+     "setup_completed_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Setup Completed At"
      },
      "slug": {
       "title": "Slug",
@@ -7845,6 +7899,20 @@
    },
    "OrgOut": {
     "properties": {
+     "apps": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Apps"
+     },
      "books_locked_until": {
       "anyOf": [
        {
@@ -7856,6 +7924,11 @@
        }
       ],
       "title": "Books Locked Until"
+     },
+     "business_type": {
+      "default": "",
+      "title": "Business Type",
+      "type": "string"
      },
      "created_at": {
       "format": "date-time",
@@ -7892,6 +7965,18 @@
       "title": "Require Mfa",
       "type": "boolean"
      },
+     "setup_completed_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Setup Completed At"
+     },
      "slug": {
       "title": "Slug",
       "type": "string"
@@ -7917,6 +8002,22 @@
    },
    "OrgUpdate": {
     "properties": {
+     "apps": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "maxItems": 18,
+        "minItems": 1,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Apps"
+     },
      "default_currency": {
       "anyOf": [
        {
@@ -12548,6 +12649,144 @@
     "title": "SettlementPreviewOut",
     "type": "object"
    },
+   "SetupCatalogOut": {
+    "properties": {
+     "apps": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Apps",
+      "type": "array"
+     },
+     "business_types": {
+      "items": {
+       "$ref": "#/components/schemas/TypeOut"
+      },
+      "title": "Business Types",
+      "type": "array"
+     },
+     "completed": {
+      "title": "Completed",
+      "type": "boolean"
+     },
+     "countries": {
+      "items": {
+       "$ref": "#/components/schemas/CountryOut"
+      },
+      "title": "Countries",
+      "type": "array"
+     }
+    },
+    "required": [
+     "business_types",
+     "apps",
+     "countries",
+     "completed"
+    ],
+    "title": "SetupCatalogOut",
+    "type": "object"
+   },
+   "SetupIn": {
+    "properties": {
+     "apps": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 18,
+      "title": "Apps",
+      "type": "array"
+     },
+     "business_type": {
+      "maxLength": 30,
+      "title": "Business Type",
+      "type": "string"
+     },
+     "country": {
+      "default": "SA",
+      "pattern": "^[A-Z]{2}$",
+      "title": "Country",
+      "type": "string"
+     },
+     "sample_data": {
+      "default": true,
+      "title": "Sample Data",
+      "type": "boolean"
+     },
+     "store": {
+      "default": false,
+      "title": "Store",
+      "type": "boolean"
+     },
+     "store_name": {
+      "default": "",
+      "maxLength": 120,
+      "title": "Store Name",
+      "type": "string"
+     },
+     "vat_number": {
+      "default": "",
+      "maxLength": 20,
+      "pattern": "^[0-9A-Z]*$",
+      "title": "Vat Number",
+      "type": "string"
+     }
+    },
+    "required": [
+     "business_type",
+     "apps"
+    ],
+    "title": "SetupIn",
+    "type": "object"
+   },
+   "SetupOut": {
+    "properties": {
+     "created": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Created",
+      "type": "object"
+     },
+     "notes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+     },
+     "organization": {
+      "$ref": "#/components/schemas/OrgOut"
+     },
+     "store_project_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Store Project Id"
+     },
+     "store_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Store Url"
+     }
+    },
+    "required": [
+     "organization",
+     "created"
+    ],
+    "title": "SetupOut",
+    "type": "object"
+   },
    "StatementLine": {
     "properties": {
      "account_id": {
@@ -13442,6 +13681,27 @@
      "cost_usd"
     ],
     "title": "TurnOut",
+    "type": "object"
+   },
+   "TypeOut": {
+    "properties": {
+     "apps": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Apps",
+      "type": "array"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "apps"
+    ],
+    "title": "TypeOut",
     "type": "object"
    },
    "UnsubscribeIn": {
@@ -32755,6 +33015,155 @@
     "summary": "Invoice Order",
     "tags": [
      "sales"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/setup": {
+   "get": {
+    "operationId": "setup_catalog_api_v1_orgs__org_id__setup_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SetupCatalogOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Setup Catalog",
+    "tags": [
+     "organizations"
+    ]
+   },
+   "post": {
+    "operationId": "run_setup_api_v1_orgs__org_id__setup_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SetupIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SetupOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Run Setup",
+    "tags": [
+     "organizations"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/setup/skip": {
+   "post": {
+    "operationId": "skip_setup_api_v1_orgs__org_id__setup_skip_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Skip Setup",
+    "tags": [
+     "organizations"
     ]
    }
   },

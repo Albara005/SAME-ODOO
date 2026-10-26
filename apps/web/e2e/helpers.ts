@@ -26,6 +26,9 @@ export async function createOrg(page: Page, name: string) {
   await dialog.getByLabel("الاسم", { exact: true }).fill(name);
   await dialog.getByLabel(/الاسم المختصر/).fill(`org-${Date.now()}`);
   await dialog.getByRole("button", { name: "إنشاء" }).click();
+  // A new organization starts at the first-run setup (e2e/setup.spec.ts); skipping it keeps every app on the menu.
+  await expect(page).toHaveURL(/\/o\/[0-9a-f-]+\/setup$/);
+  await page.getByRole("button", { name: "تخطي الإعداد" }).click();
   await expect(page).toHaveURL(/\/o\/[0-9a-f-]+$/);
 }
 

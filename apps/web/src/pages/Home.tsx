@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, Bell, ClipboardCheck, FilePlus2, LayoutGrid, ListChecks, ShoppingCart, Sparkles, TrendingUp, Wallet, type LucideIcon } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { api, unwrap } from "../api/client";
 import { useAuth } from "../auth/Auth";
 import { useOrg } from "../auth/Org";
 import { StarLattice } from "../components/Art";
 import { ColumnChart } from "../components/ColumnChart";
-import { NAV } from "../components/nav";
+import { APP_ITEMS, inMenu } from "../components/nav";
 import { useI18n } from "../i18n/I18n";
 import { addDays, formatDate, locale, sumAmounts, today } from "../lib/format";
 
@@ -22,7 +22,14 @@ function Kpi({ label, value, sub, to, icon: Icon, hue }: { label: string; value:
   );
 }
 
+/** Home; a new organization's manager is sent to the first-run setup until it is done or skipped. */
 export function HomePage() {
+  const { org, can, path } = useOrg();
+  if (!org.setup_completed_at && can("org.manage")) return <Navigate to={path("setup")} replace />;
+  return <Dashboard />;
+}
+
+function Dashboard() {
   const { t, money, lang } = useI18n();
   const { user } = useAuth();
   const { org, can, path } = useOrg();
@@ -59,7 +66,7 @@ export function HomePage() {
     : null;
   const firstName = (user?.full_name || "").split(/\s+/)[0] || user?.email || "";
   const greeting = new Date().getHours() < 12 ? "home.greetMorning" : "home.greetEvening";
-  const apps = NAV.flatMap((g) => g.items).filter((i) => i.desc && (!i.anyOf || i.anyOf.some(can)));
+  const apps = APP_ITEMS.filter((i) => inMenu(i, org.apps) && (!i.anyOf || i.anyOf.some(can)));
 
   return (
     <div className="stack" style={{ gap: "var(--space-5)" }}>

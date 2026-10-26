@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{name}</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-row">
+      <div>
+        <h1 class="brand">{name}</h1>
+        <p class="lead">{description}</p>
+      </div>
+      <button type="button" class="cart-button" id="cart-open" aria-haspopup="dialog">
+        السلة <span class="badge" id="cart-count">0</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p class="status" id="status" role="status">جارٍ تحميل المنتجات…</p>
+    <ul class="grid" id="products" aria-label="المنتجات"></ul>
+  </main>
+
+  <dialog id="cart" aria-labelledby="cart-title">
+    <form class="cart" id="order-form" novalidate>
+      <h2 id="cart-title">سلتك</h2>
+      <ul class="lines" id="cart-lines"></ul>
+      <p class="total">الإجمالي شامل الضريبة: <strong id="cart-total">0</strong></p>
+      <fieldset>
+        <legend>بياناتك لنتواصل معك</legend>
+        <label>الاسم <input name="name" required maxlength="200" autocomplete="name"></label>
+        <label>الجوال <input name="phone" inputmode="tel" maxlength="40" autocomplete="tel"></label>
+        <label>البريد الإلكتروني <input name="email" type="email" maxlength="320" autocomplete="email"></label>
+        <label>ملاحظة <textarea name="note" rows="2" maxlength="1000"></textarea></label>
+        <input class="trap" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      </fieldset>
+      <p class="order-status" id="order-status" role="status"></p>
+      <div class="actions">
+        <button type="button" class="ghost" id="cart-close">متابعة التسوق</button>
+        <button type="submit" id="send">إرسال الطلب</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="wrap foot">نرد على طلبك بأسرع وقت.</footer>
+  <script src="config.js"></script>
+  <script src="proof.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

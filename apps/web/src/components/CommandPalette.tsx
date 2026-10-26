@@ -73,7 +73,7 @@ function useRecords(q: string): Command[] {
 /** Ctrl/⌘ K: go to any app, start a common action, or open a record by its name or number. */
 export function CommandPalette({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
-  const { can, path } = useOrg();
+  const { org, can, path } = useOrg();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
@@ -82,7 +82,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const records = useRecords(q);
 
   const commands = useMemo<Command[]>(() => {
-    const apps = visibleNav(can).flatMap((g) => g.items).map((i) => ({
+    const apps = visibleNav(can, org.apps).flatMap((g) => g.items).map((i) => ({
       id: `a-${i.to}`, group: "apps" as const, label: t(i.label), hint: i.desc ? t(i.desc) : undefined, icon: i.icon, to: i.to,
     }));
     const actions = ACTIONS.filter((a) => a.anyOf.some((p) => can(p))).map((a) => ({
@@ -91,12 +91,16 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     const needle = normal(q.trim());
     const match = (c: Command) => !needle || normal(c.label).includes(needle) || normal(c.hint ?? "").includes(needle);
     return [...apps.filter(match).slice(0, needle ? 8 : 6), ...actions.filter(match).slice(0, needle ? 6 : 4)];
-  }, [can, q, t]);
+  }, [can, org.apps, q, t]);
   const all = [...commands, ...records.map((r) => ({ ...r, hint: r.hint ? t(r.hint as MessageKey) : undefined }))];
   const current = Math.min(active, Math.max(all.length - 1, 0));
 
-  useEffect(() => input.current?.focus(), []);
-  useEffect(() => setActive(0), [q]);
+  useEffect(() => {
+    input.current?.focus();
+  }, []);
+  useEffect(() => {
+    setActive(0);
+  }, [q]);
 
   const go = (c: Command | undefined) => {
     if (!c) return;

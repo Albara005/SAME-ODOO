@@ -8,7 +8,9 @@ import { useOrg } from "../auth/Org";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, useToast,
 } from "../components/ui";
+import { AppsPicker } from "../components/AppsPicker";
 import { EInvoicingCard } from "../components/EInvoicing";
+import { APP_ITEMS } from "../components/nav";
 import { OnlinePaymentsCard } from "../components/OnlinePayments";
 import type { MessageKey } from "../i18n/en";
 import { useI18n, useRoleLabel } from "../i18n/I18n";
@@ -556,10 +558,42 @@ export function OrgSettingsPage() {
           </div>
         </form>
       </Card>
+      {can("org.manage") && <MenuAppsCard />}
       {can("org.manage") && <OnlinePaymentsCard />}
       {can("org.manage") && <EInvoicingCard />}
       <RequireMfaCard />
     </div>
+  );
+}
+
+/** The apps on the organization's menu. Turning one off only takes it off the menu: its data and permissions stay. */
+function MenuAppsCard() {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [apps, setApps] = useState<string[]>(() => org.apps ?? APP_ITEMS.map((i) => i.to));
+  const save = useMutation({
+    mutationFn: () => unwrap(api.PATCH("/api/v1/orgs/{org_id}", { params: { path: { org_id: org.id } }, body: { apps } })),
+    onSuccess: (o) => {
+      qc.setQueryData<typeof org>(["org", org.id], (old) => (old ? { ...old, ...o } : old));
+      void qc.invalidateQueries({ queryKey: ["orgs"] });
+      toast(t("org.appsSaved"));
+    },
+  });
+  return (
+    <Card title={t("org.apps")}>
+      <form className="stack" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <p className="muted small">{t("org.appsHint")}</p>
+        {save.isError && <ErrorNotice error={save.error} />}
+        <AppsPicker value={apps} onChange={setApps} />
+        <div className="form-actions">
+          <Button type="submit" variant="primary" loading={save.isPending} disabled={apps.length === 0}>
+            {t("org.appsSave")}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 

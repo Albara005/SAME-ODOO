@@ -30,6 +30,18 @@ router = APIRouter(tags=["organizations"])
 
 _SLUG = re.compile(r"^[a-z0-9](?:[a-z0-9-]{1,78}[a-z0-9])$")
 
+# The apps an organization's menu can show, in menu order (the keys are the web app's paths). Leaving one out
+# only shapes the menu: permissions decide what people may do (setup.py).
+APPS = ("customers", "products", "sales", "bookings", "invoices", "purchases", "inventory", "projects", "hr",
+        "payroll", "accounting", "reports", "documents", "assistant", "studio", "agents", "creative", "automation")
+
+
+def menu_apps(apps: list[str]) -> list[str]:
+    unknown = sorted(set(apps) - set(APPS))
+    if unknown:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"unknown apps: {', '.join(unknown)}")
+    return [a for a in APPS if a in apps]
+
 
 class OrgIn(BaseModel):
     name: str = Field(min_length=2, max_length=200)
@@ -45,6 +57,7 @@ class OrgUpdate(BaseModel):
     vat_number: str | None = Field(default=None, max_length=20, pattern="^[0-9A-Z]*$")
     require_mfa: bool | None = None
     fiscal_year_start_month: int | None = Field(default=None, ge=1, le=12)
+    apps: list[str] | None = Field(default=None, min_length=1, max_length=len(APPS))   # the apps on the menu
 
 
 class OrgOut(BaseModel):
@@ -61,6 +74,9 @@ class OrgOut(BaseModel):
     require_mfa: bool = False
     fiscal_year_start_month: int = 1
     created_at: datetime
+    business_type: str = ""
+    apps: list[str] | None = None              # the apps on the menu; none: all of them
+    setup_completed_at: datetime | None = None  # none: the first-run setup still to do
 
 
 class MyOrgOut(OrgOut):
@@ -165,6 +181,8 @@ def update_org(body: OrgUpdate, request: Request, ctx: OrgContext = Depends(requ
         # Closed years end on the old boundary; moving it would leave them misaligned.
         raise HTTPException(status.HTTP_409_CONFLICT, "the fiscal year start can't change while a closed year "
                                                       "stands; reopen the closed years first")
+    if "apps" in changes:
+        changes["apps"] = menu_apps(changes["apps"])
     for field, value in changes.items():
         setattr(ctx.organization, field, value)
     audit.record(db, actor_user_id=ctx.user.id, action="org.updated", target_type="organization",

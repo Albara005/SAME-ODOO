@@ -1,19 +1,28 @@
-import { Component, lazy, Suspense, type ComponentType, type ReactNode } from "react";
+import { Component, lazy, Suspense, type ComponentType, type ErrorInfo, type ReactNode } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "./auth/Auth";
 import { lastOrg, OrgProvider, rememberOrg, useOrgQuery } from "./auth/Org";
 import { Layout } from "./components/Layout";
-import { ErrorNotice, Loading, Notice } from "./components/ui";
+import { Button, ErrorNotice, Loading, Notice } from "./components/ui";
 import { useI18n } from "./i18n/I18n";
+import { reloadForNewRelease } from "./lib/release";
 import {
   ForgotPasswordPage, InvitePage, LoginPage, MfaRequiredPage, RegisterPage, ResetPasswordPage, VerifyEmailPage,
 } from "./pages/Auth";
 import { HomePage } from "./pages/Home";
 import { OrgsPage, useMyOrgs } from "./pages/Orgs";
 
-// Each area loads when first opened, so signing in and the home page stay light.
+// Each area loads when first opened, so signing in and the home page stay light. If its code is gone, a release
+// replaced it since this tab opened: reload once for the new one (meanwhile the page keeps showing it is loading).
 function page<K extends string, M extends Record<K, ComponentType>>(load: () => Promise<M>, name: K) {
-  return lazy(() => load().then((m) => ({ default: m[name] })));
+  return lazy(() =>
+    load()
+      .then((m) => ({ default: m[name] }))
+      .catch((e: unknown) => {
+        if (reloadForNewRelease()) return new Promise<never>(() => {});
+        throw e;
+      }),
+  );
 }
 const AccountPage = page(() => import("./pages/Account"), "AccountPage");
 const admin = () => import("./pages/Admin");
@@ -59,6 +68,7 @@ const HrPage = page(() => import("./pages/Hr"), "HrPage");
 const PayrollPage = page(() => import("./pages/Payroll"), "PayrollPage");
 const BookingsPage = page(() => import("./pages/Bookings"), "BookingsPage");
 const ReportsPage = page(() => import("./pages/Reports"), "ReportsPage");
+const SetupPage = page(() => import("./pages/Setup"), "SetupPage");
 const sales = () => import("./pages/Sales");
 const SalesOrderDetailPage = page(sales, "SalesOrderDetailPage");
 const SalesOrderEditorPage = page(sales, "SalesOrderEditorPage");
@@ -71,14 +81,51 @@ const ApprovalsPage = page(work, "ApprovalsPage");
 const NotificationsPage = page(work, "NotificationsPage");
 const TasksPage = page(work, "TasksPage");
 
-class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
+/** A page that throws while rendering: say so, offer a reload, and keep what went wrong for whoever reports it. */
+type Crash = { error: Error; where: string };
+class ErrorBoundary extends Component<{ children: ReactNode; path: string }, { crash: Crash | null; path: string }> {
+  state = { crash: null as Crash | null, path: "" };
+  static getDerivedStateFromError(error: Error) {
+    return { crash: { error, where: "" } };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // The first components on the way down to the one that threw, for the report (the bundle's source maps
+    // turn their file:line:column back into the source).
+    const where = (info.componentStack ?? "").trim().split("\n").slice(0, 4).map((l) => l.trim()).join("\n");
+    this.setState({ crash: { error, where }, path: this.props.path });
+    console.error("NOVARA page error", error, info.componentStack);
+  }
+  componentDidUpdate() {
+    // Going to another page (the browser's back button) tries again there.
+    if (this.state.crash && this.state.path && this.props.path !== this.state.path) this.setState({ crash: null, path: "" });
   }
   render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
+    return this.state.crash ? <Crashed crash={this.state.crash} path={this.state.path || this.props.path} /> : this.props.children;
   }
+}
+
+function Crashed({ crash, path }: { crash: Crash; path: string }) {
+  const { t } = useI18n();
+  const { error, where } = crash;
+  const stack = (error.stack ?? "").split("\n").filter((l) => l.includes("/assets/")).slice(0, 4).map((l) => l.trim());
+  return (
+    <div className="content" style={{ maxWidth: 760 }}>
+      <div className="notice notice-error stack-sm" role="alert">
+        <span>{t("error.boundary")}</span>
+        <div className="row">
+          <Button size="sm" variant="primary" onClick={() => window.location.reload()}>{t("error.reload")}</Button>
+          <Button size="sm" variant="ghost" onClick={() => window.location.assign("/")}>{t("error.home")}</Button>
+        </div>
+        <details className="small">
+          <summary>{t("error.details")}</summary>
+          <pre className="crash-details" dir="ltr">
+            {[`${error.name}: ${error.message}`, `page: ${path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, ":id")}`, ...stack, where]
+              .filter(Boolean).join("\n")}
+          </pre>
+        </details>
+      </div>
+    </div>
+  );
 }
 
 function RequireAuth() {
@@ -106,7 +153,8 @@ function RootRedirect() {
   return <Navigate to={target ? `/o/${target.id}` : "/orgs"} replace />;
 }
 
-function OrgRoute() {
+/** An organization's pages, in the app's shell; the first-run setup (`setup`) has the whole screen. */
+function OrgRoute({ setup = false }: { setup?: boolean }) {
   const { orgId = "" } = useParams();
   const { user } = useAuth();
   const org = useOrgQuery(orgId);
@@ -116,7 +164,13 @@ function OrgRoute() {
   rememberOrg(org.data.id);
   return (
     <OrgProvider org={org.data}>
-      <Layout />
+      {setup ? (
+        <Suspense fallback={<Loading />}>
+          <SetupPage />
+        </Suspense>
+      ) : (
+        <Layout />
+      )}
     </OrgProvider>
   );
 }
@@ -127,9 +181,9 @@ function NotFound() {
 }
 
 export function App() {
-  const { t } = useI18n();
+  const { pathname } = useLocation();
   return (
-    <ErrorBoundary fallback={<div className="content"><ErrorNotice error={new Notice(t("error.boundary"))} /></div>}>
+    <ErrorBoundary path={pathname}>
       <Routes>
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />
@@ -151,6 +205,7 @@ export function App() {
               </Suspense>
             }
           />
+          <Route path="/o/:orgId/setup" element={<OrgRoute setup />} />
           <Route path="/o/:orgId" element={<OrgRoute />}>
             <Route index element={<HomePage />} />
             <Route path="customers" element={<CustomersPage />} />

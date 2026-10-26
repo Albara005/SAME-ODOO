@@ -31,6 +31,7 @@ function useInvoice(id: string) {
   return useQuery({
     queryKey: ["invoice", org.id, id],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/invoices/{invoice_id}", { params: { path: { org_id: org.id, invoice_id: id } } })),
+    enabled: Boolean(id),   // a new one has nothing to load
   });
 }
 
