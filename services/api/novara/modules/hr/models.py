@@ -7,6 +7,10 @@ for people who start or leave during the year, and unused days can carry into th
 to a limit. A single day can be taken as a morning or afternoon half day. Pending and approved
 requests both hold their days, and one person never has two live requests on the same day
 (two halves of one day excepted).
+
+Attendance is what people check in and out for (or HR enters for them), counted on the day it starts in the
+organization's time zone. Time beyond the normal working day, and all of it on a weekend day or public holiday, is
+overtime; what HR or the department's manager approves for a month is paid with that month's pay run.
 """
 
 from __future__ import annotations
@@ -14,7 +18,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, false
+from sqlalchemy import (JSON, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint,
+                        false, text)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -22,13 +27,24 @@ from novara.money import ExactDecimal
 from novara.tenancy import TenantScoped, org_unique_id, same_org_fk
 
 DEFAULT_WEEKEND = [4, 5]  # Friday and Saturday (Monday = 0)
+DEFAULT_TIMEZONE = "Asia/Riyadh"
+DEFAULT_DAILY_MINUTES = 480
 
 
 class HrPolicy(IdMixin, TimestampMixin, TenantScoped, Base):
     __tablename__ = "hr_policies"
-    __table_args__ = (UniqueConstraint("organization_id", name="uq_hr_policy_org"),)
+    __table_args__ = (
+        UniqueConstraint("organization_id", name="uq_hr_policy_org"),
+        CheckConstraint("daily_minutes BETWEEN 60 AND 960", name="ck_hr_policy_daily_minutes"),
+    )
 
     weekend: Mapped[list] = mapped_column(JSON, default=lambda: list(DEFAULT_WEEKEND), nullable=False)
+    # The working day attendance is counted in.
+    timezone: Mapped[str] = mapped_column(String(64), default=DEFAULT_TIMEZONE, server_default=DEFAULT_TIMEZONE,
+                                          nullable=False)
+    # A normal working day: time worked beyond it is overtime (and the hourly wage is a day's wage over it).
+    daily_minutes: Mapped[int] = mapped_column(Integer, default=DEFAULT_DAILY_MINUTES,
+                                               server_default=str(DEFAULT_DAILY_MINUTES), nullable=False)
 
 
 class Holiday(IdMixin, TimestampMixin, TenantScoped, Base):
@@ -117,3 +133,43 @@ class LeaveRequest(IdMixin, TimestampMixin, TenantScoped, Base):
     decided_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decision_note: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+
+
+class AttendanceEntry(IdMixin, TimestampMixin, TenantScoped, Base):
+    """A stretch of work: checked in, and checked out once it's done. One person has at most one open entry, and
+    their entries don't overlap."""
+
+    __tablename__ = "attendance_entries"
+    __table_args__ = (
+        same_org_fk("employee_id", "employees"),
+        CheckConstraint("check_out IS NULL OR check_out > check_in", name="ck_attendance_times"),
+        CheckConstraint("source IN ('self', 'hr')", name="ck_attendance_source"),
+        Index("uq_attendance_open", "organization_id", "employee_id", unique=True,
+              postgresql_where=text("check_out IS NULL"), sqlite_where=text("check_out IS NULL")),
+    )
+
+    employee_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    day: Mapped[date] = mapped_column(Date, nullable=False, index=True)  # the check-in's date in the organization's zone
+    check_in: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    check_out: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    source: Mapped[str] = mapped_column(String(4), nullable=False)  # self: checked in and out; hr: entered by HR
+    note: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class OvertimeApproval(IdMixin, TimestampMixin, TenantScoped, Base):
+    """Overtime approved for payment for one person's month: at most what their attendance shows."""
+
+    __tablename__ = "overtime_approvals"
+    __table_args__ = (
+        same_org_fk("employee_id", "employees"),
+        UniqueConstraint("organization_id", "employee_id", "month", name="uq_overtime_month"),
+        CheckConstraint("minutes > 0 AND minutes <= recorded_minutes", name="ck_overtime_minutes"),
+    )
+
+    employee_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    month: Mapped[date] = mapped_column(Date, nullable=False)          # its first day
+    minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    recorded_minutes: Mapped[int] = mapped_column(Integer, nullable=False)  # what attendance showed when approved
+    note: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    approved_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))

@@ -98,7 +98,7 @@ def test_leave_is_requested_and_decided_by_someone_else(api, hr):
     assert api.req("POST", OTHER, path(s, f"/leave-requests/{req['id']}/cancel")).status_code == 404
 
     # A different weekend changes how new requests are counted (Saturday and Sunday off).
-    assert api.req("PUT", OWNER, path(s, "/policy"), json={"weekend": [6, 5]}).json() == {"weekend": [5, 6]}
+    assert api.req("PUT", OWNER, path(s, "/policy"), json={"weekend": [6, 5]}).json()["weekend"] == [5, 6]
     assert api.req("GET", EMP, path(s, "/leave-days"), params={"start": "2027-03-07", "end": "2027-03-13"}).json() == {
         "days": 4}   # Monday, Wednesday, Thursday and Friday
 

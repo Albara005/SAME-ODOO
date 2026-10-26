@@ -61,6 +61,7 @@ TIMESHEETS_WRITE = "timesheets.write"
 HR_READ = "hr.read"
 HR_MANAGE = "hr.manage"
 LEAVE_REQUEST = "leave.request"
+ATTENDANCE_SELF = "attendance.self"
 PAYROLL_MANAGE = "payroll.manage"
 BOOKINGS_READ = "bookings.read"
 BOOKINGS_MANAGE = "bookings.manage"
@@ -110,8 +111,9 @@ CATALOG: dict[str, str] = {
     PROJECTS_MANAGE: "Create and change projects and their tasks, log anyone's hours, invoice billable hours",
     TIMESHEETS_WRITE: "Log your own hours on projects",
     HR_READ: "View the employee directory and departments",
-    HR_MANAGE: "Add and edit employee records, departments, leave types, the weekend and public holidays; decide anyone's leave",
+    HR_MANAGE: "Add and edit employee records, departments, leave types, the weekend, public holidays and the working day; decide anyone's leave and overtime; correct attendance",
     LEAVE_REQUEST: "Ask for your own leave and see your balance",
+    ATTENDANCE_SELF: "Check in and out, and see your own hours and overtime",
     PAYROLL_MANAGE: "Set everyone's pay and the contributions on it, prepare, post and cancel monthly pay runs (paying them also needs payments.write)",
     BOOKINGS_READ: "View the booking calendar, services and opening hours",
     BOOKINGS_MANAGE: "Book, confirm, decline and cancel bookings; set services, opening hours and booking rules",
@@ -128,8 +130,8 @@ _ACCOUNTING = [
 ]
 # Receiving goods against purchase orders is warehouse work.
 _WAREHOUSE = [PRODUCTS_READ, SALES_READ, INVENTORY_READ, INVENTORY_WRITE, PURCHASES_READ]
-# Every employee role sees the directory and asks for its own leave.
-_PEOPLE = [HR_READ, LEAVE_REQUEST]
+# Every employee role sees the directory, asks for its own leave and checks in and out.
+_PEOPLE = [HR_READ, LEAVE_REQUEST, ATTENDANCE_SELF]
 
 SYSTEM_ROLES: dict[str, tuple[str, list[str]]] = {
     OWNER_ROLE: ("Owner", sorted(CATALOG)),

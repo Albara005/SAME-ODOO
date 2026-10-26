@@ -2229,6 +2229,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/hr/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Entries
+         * @description A person's entries for a month: for HR, their department's manager, and themselves.
+         */
+        get: operations["list_entries_api_v1_orgs__org_id__hr_attendance_get"];
+        put?: never;
+        /**
+         * Add Entry
+         * @description HR puts in someone's hours (a forgotten check-in, work away from the office...).
+         */
+        post: operations["add_entry_api_v1_orgs__org_id__hr_attendance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/hr/attendance/check-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check In Now */
+        post: operations["check_in_now_api_v1_orgs__org_id__hr_attendance_check_in_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/hr/attendance/check-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Out Now */
+        post: operations["check_out_now_api_v1_orgs__org_id__hr_attendance_check_out_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/hr/attendance/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Attendance */
+        get: operations["my_attendance_api_v1_orgs__org_id__hr_attendance_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/hr/attendance/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Entry */
+        delete: operations["delete_entry_api_v1_orgs__org_id__hr_attendance__entry_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Entry
+         * @description Correct an entry's times (or put in when someone left, for a check-in never checked out).
+         */
+        patch: operations["update_entry_api_v1_orgs__org_id__hr_attendance__entry_id__patch"];
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/hr/away": {
         parameters: {
             query?: never;
@@ -2531,6 +2627,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/hr/overtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overtime
+         * @description Everyone employed in the month (HR), or the departments you manage.
+         */
+        get: operations["overtime_api_v1_orgs__org_id__hr_overtime_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orgs/{org_id}/hr/overtime/{employee_id}/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Approve Overtime
+         * @description Approve overtime for payment with the month's pay run: up to what attendance shows (less, if some of it
+         *     wasn't asked for). Approving again replaces the amount.
+         */
+        put: operations["approve_overtime_api_v1_orgs__org_id__hr_overtime__employee_id___month__put"];
+        post?: never;
+        /** Withdraw Overtime */
+        delete: operations["withdraw_overtime_api_v1_orgs__org_id__hr_overtime__employee_id___month__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/hr/policy": {
         parameters: {
             query?: never;
@@ -2542,7 +2680,8 @@ export interface paths {
         get: operations["get_policy_api_v1_orgs__org_id__hr_policy_get"];
         /**
          * Set Policy
-         * @description The weekend days. Requests already made keep the days they were counted with.
+         * @description The weekend days, the time zone attendance is counted in and the normal working day. Leave already asked for
+         *     keeps the days it was counted with; overtime already approved keeps its hours.
          */
         put: operations["set_policy_api_v1_orgs__org_id__hr_policy_put"];
         post?: never;
@@ -5197,6 +5336,16 @@ export interface components {
             /** Total Due */
             total_due: string;
         };
+        /** ApprovalIn */
+        ApprovalIn: {
+            /** Minutes */
+            minutes: number;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
         /** ApproveIn */
         ApproveIn: {
             /**
@@ -5703,6 +5852,14 @@ export interface components {
             challenge_id: string;
             /** Options */
             options: Record<string, unknown>;
+        };
+        /** CheckIn */
+        CheckIn: {
+            /**
+             * Note
+             * @default
+             */
+            note: string;
         };
         /** CheckOut */
         CheckOut: {
@@ -6570,6 +6727,64 @@ export interface components {
             user_id?: string | null;
             /** Work Email */
             work_email?: string | null;
+        };
+        /** EntryIn */
+        EntryIn: {
+            /**
+             * Check In
+             * Format: date-time
+             */
+            check_in: string;
+            /**
+             * Check Out
+             * Format: date-time
+             */
+            check_out: string;
+            /** Employee Id */
+            employee_id: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** EntryOut */
+        EntryOut: {
+            /**
+             * Check In
+             * Format: date-time
+             */
+            check_in: string;
+            /** Check Out */
+            check_out: string | null;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Employee Id */
+            employee_id: string;
+            /** Employee Name */
+            employee_name: string;
+            /** Id */
+            id: string;
+            /** Locked */
+            locked: boolean;
+            /** Minutes */
+            minutes: number | null;
+            /** Note */
+            note: string;
+            /** Source */
+            source: string;
+        };
+        /** EntryUpdate */
+        EntryUpdate: {
+            /** Check In */
+            check_in?: string | null;
+            /** Check Out */
+            check_out?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /** FileInfo */
         FileInfo: {
@@ -7441,6 +7656,31 @@ export interface components {
             /** Secret */
             secret: string;
         };
+        /** MonthOut */
+        MonthOut: {
+            /** Approval Note */
+            approval_note: string;
+            /** Approved Minutes */
+            approved_minutes: number | null;
+            /** Can Approve */
+            can_approve: boolean;
+            /** Checked In */
+            checked_in: boolean;
+            /** Days Present */
+            days_present: number;
+            /** Department Name */
+            department_name: string | null;
+            /** Employee Id */
+            employee_id: string;
+            /** Employee Name */
+            employee_name: string;
+            /** Overtime Minutes */
+            overtime_minutes: number;
+            /** Paid */
+            paid: boolean;
+            /** Worked Minutes */
+            worked_minutes: number;
+        };
         /** MotionOut */
         MotionOut: {
             /** Css */
@@ -7483,6 +7723,28 @@ export interface components {
             value: string;
             /** Warehouse Id */
             warehouse_id: string;
+        };
+        /** MyAttendanceOut */
+        MyAttendanceOut: {
+            /** Approved Minutes */
+            approved_minutes: number | null;
+            /** Daily Minutes */
+            daily_minutes: number;
+            /** Employee Id */
+            employee_id: string | null;
+            /** Entries */
+            entries: components["schemas"]["EntryOut"][];
+            /** Month */
+            month: string;
+            open: components["schemas"]["EntryOut"] | null;
+            /** Overtime Minutes */
+            overtime_minutes: number;
+            /** Paid */
+            paid: boolean;
+            /** Timezone */
+            timezone: string;
+            /** Worked Minutes */
+            worked_minutes: number;
         };
         /** MyLeaveOut */
         MyLeaveOut: {
@@ -7833,6 +8095,11 @@ export interface components {
             /** Amount */
             amount: number | string;
             /**
+             * Basic
+             * @default false
+             */
+            basic: boolean;
+            /**
              * Contributory
              * @default false
              */
@@ -7854,6 +8121,8 @@ export interface components {
         PayItemOut: {
             /** Amount */
             amount: string;
+            /** Basic */
+            basic: boolean;
             /** Contributory */
             contributory: boolean;
             /** End Of Service */
@@ -8149,13 +8418,17 @@ export interface components {
             /** Webhook Url */
             webhook_url: string;
         };
-        /** PayrollSettingsIn */
+        /**
+         * PayrollSettingsIn
+         * @description What is given changes; what is left out stays.
+         */
         PayrollSettingsIn: {
-            /**
-             * Eosb Rule
-             * @enum {string}
-             */
-            eosb_rule: "saudi" | "uae" | "none";
+            /** Eosb Rule */
+            eosb_rule?: ("saudi" | "uae" | "none") | null;
+            /** Overtime Multiplier */
+            overtime_multiplier?: number | string | null;
+            /** Overtime Rule */
+            overtime_rule?: ("none" | "saudi" | "multiplier") | null;
         };
         /** PayrollSettingsOut */
         PayrollSettingsOut: {
@@ -8164,6 +8437,13 @@ export interface components {
              * @enum {string}
              */
             eosb_rule: "saudi" | "uae" | "none";
+            /** Overtime Multiplier */
+            overtime_multiplier: string;
+            /**
+             * Overtime Rule
+             * @enum {string}
+             */
+            overtime_rule: "none" | "saudi" | "multiplier";
             /** Reasons */
             reasons: string[];
         };
@@ -8180,6 +8460,8 @@ export interface components {
             kind: "earning" | "deduction" | "contribution";
             /** Name */
             name: string;
+            /** Overtime Minutes */
+            overtime_minutes?: number | null;
         };
         /** PayslipOut */
         PayslipOut: {
@@ -8292,13 +8574,24 @@ export interface components {
             /** Year Closed Until */
             year_closed_until: string | null;
         };
-        /** PolicyIn */
+        /**
+         * PolicyIn
+         * @description What is given changes; what is left out stays.
+         */
         PolicyIn: {
+            /** Daily Minutes */
+            daily_minutes?: number | null;
+            /** Timezone */
+            timezone?: string | null;
             /** Weekend */
-            weekend: number[];
+            weekend?: number[] | null;
         };
         /** PolicyOut */
         PolicyOut: {
+            /** Daily Minutes */
+            daily_minutes: number;
+            /** Timezone */
+            timezone: string;
             /** Weekend */
             weekend: number[];
         };
@@ -15172,6 +15465,240 @@ export interface operations {
             };
         };
     };
+    list_entries_api_v1_orgs__org_id__hr_attendance_get: {
+        parameters: {
+            query: {
+                employee_id: string;
+                month: string;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_entry_api_v1_orgs__org_id__hr_attendance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_in_now_api_v1_orgs__org_id__hr_attendance_check_in_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_out_now_api_v1_orgs__org_id__hr_attendance_check_out_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_attendance_api_v1_orgs__org_id__hr_attendance_me_get: {
+        parameters: {
+            query?: {
+                month?: string | null;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAttendanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_entry_api_v1_orgs__org_id__hr_attendance__entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_entry_api_v1_orgs__org_id__hr_attendance__entry_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntryUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     who_is_away_api_v1_orgs__org_id__hr_away_get: {
         parameters: {
             query?: {
@@ -15905,6 +16432,107 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MyLeaveOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    overtime_api_v1_orgs__org_id__hr_overtime_get: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_overtime_api_v1_orgs__org_id__hr_overtime__employee_id___month__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                employee_id: string;
+                month: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_overtime_api_v1_orgs__org_id__hr_overtime__employee_id___month__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                employee_id: string;
+                month: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

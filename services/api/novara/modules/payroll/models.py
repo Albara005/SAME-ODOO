@@ -3,8 +3,9 @@
 Generic on purpose: an organization sets up its own earnings and deductions per employee and its own
 contributions (a share of the contributory pay from the employee and from the employer, up to a
 monthly cap: social insurance such as GOSI in Saudi Arabia is one). End-of-service benefits follow the
-market's rules (payroll/eosb.py): provisioned every month and settled when someone leaves. Wage
-protection file formats and overtime are not built in.
+market's rules (payroll/eosb.py): provisioned every month and settled when someone leaves. Overtime approved in
+HR (hr/attendance.py) is paid with the month's run, at the rate the organization's rule gives. Bank-specific wage
+protection file formats are not built in.
 """
 
 from __future__ import annotations
@@ -77,6 +78,8 @@ class PayItem(IdMixin, TimestampMixin, TenantScoped, Base):
     contributory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Counts toward the wage end-of-service benefits are worked out on (e.g. basic salary and housing in Saudi Arabia).
     end_of_service: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
+    # Part of the basic wage (overtime is worked out on it).
+    basic: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
 
 
 class PayRun(IdMixin, TimestampMixin, TenantScoped, Base):
@@ -146,15 +149,23 @@ class Payslip(IdMixin, TenantScoped, Base):
 
 
 class PayrollSettings(IdMixin, TimestampMixin, TenantScoped, Base):
-    """The organization's payroll rules: which market's end-of-service rules apply (payroll/eosb.py)."""
+    """The organization's payroll rules: which market's end-of-service rules apply (payroll/eosb.py), and how
+    overtime is paid (payroll/service.py)."""
 
     __tablename__ = "payroll_settings"
     __table_args__ = (
         UniqueConstraint("organization_id", name="uq_payroll_settings_org"),
         CheckConstraint("eosb_rule IN ('saudi', 'uae', 'none')", name="ck_payroll_settings_rule"),
+        CheckConstraint("overtime_rule IN ('none', 'saudi', 'multiplier')", name="ck_payroll_settings_overtime"),
+        CheckConstraint("CAST(overtime_multiplier AS NUMERIC) BETWEEN 1 AND 5", name="ck_payroll_settings_multiplier"),
     )
 
     eosb_rule: Mapped[str] = mapped_column(String(10), default="none", nullable=False)
+    # none: overtime isn't paid through payroll; saudi: the hourly wage plus half the hourly basic wage (Labor Law,
+    # article 107); multiplier: the hourly basic wage times overtime_multiplier.
+    overtime_rule: Mapped[str] = mapped_column(String(10), default="none", server_default="none", nullable=False)
+    overtime_multiplier: Mapped[Decimal] = mapped_column(ExactDecimal(4, 2), default=Decimal("1.5"), server_default="1.5",
+                                                         nullable=False)
 
 
 class EndOfService(IdMixin, TimestampMixin, TenantScoped, Base):

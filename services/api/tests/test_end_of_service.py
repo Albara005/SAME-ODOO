@@ -183,7 +183,7 @@ def test_what_a_settlement_needs(api, pr):
     assert preview(user=HUDA).status_code == 403                       # payroll.manage only
     assert preview(user=ACCT).status_code == 403
     settings = api.req("GET", OWNER, url(pr, "/payroll/settings")).json()
-    assert settings == {"eosb_rule": "uae", "reasons": ["termination", "contract_end", "resignation"]}
+    assert (settings["eosb_rule"], settings["reasons"]) == ("uae", ["termination", "contract_end", "resignation"])
     assert api.req("PUT", OWNER, url(pr, "/payroll/settings"), json={"eosb_rule": "egypt"}).status_code == 422
 
 

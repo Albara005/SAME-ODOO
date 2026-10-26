@@ -5,6 +5,12 @@ For each employee employed during the month (between their start date and last d
     days paid    = calendar days employed in the month - unpaid leave days
                    (approved leave of an unpaid type, by calendar day inside the month; a half day is 0.5)
     each earning x days paid / days in the month, rounded to the currency's minor unit (a whole month: exact)
+    overtime     the hours approved for the month (hr/attendance.py) x the hourly overtime rate, an earning that
+                 doesn't count for contributions or end of service:
+                   saudi       (wage + half the basic wage) / 30 / the working day's hours (Labor Law, article 107:
+                               the hourly wage plus 50% of the hourly basic wage)
+                   multiplier  basic wage x the multiplier / 30 / the working day's hours
+                 where the wage is every earning in full and the basic wage the earnings marked basic
     deductions   in full
     contributions: each covering contribution's rates x the contributory earnings (up to its monthly cap),
                    from the employee (taken from pay) and from the employer (a cost on top)
@@ -43,7 +49,7 @@ from sqlalchemy.orm import Session
 from novara.db import utcnow
 from novara.modules.accounting.models import JournalEntry
 from novara.modules.accounting.service import LineSpec, post_entry, reverse_entry, system_account
-from novara.modules.hr.models import Employee, LeaveRequest, LeaveType
+from novara.modules.hr.models import DEFAULT_DAILY_MINUTES, Employee, HrPolicy, LeaveRequest, LeaveType, OvertimeApproval
 from novara.modules.invoicing.service import PAYMENT_METHODS
 from novara.modules.payroll import eosb
 from novara.modules.payroll.models import Contribution, EmployeePay, EndOfService, PayItem, PayrollSettings, PayRun, Payslip
@@ -103,8 +109,37 @@ class Worked:
         return self.gross - self.deductions - self.employee_contributions
 
 
+@dataclass
+class OvertimeRule:
+    rule: str                   # none | saudi | multiplier
+    multiplier: Decimal
+    daily_minutes: int
+
+
+def overtime_rule(db: Session) -> OvertimeRule:
+    s = settings_of(db)
+    policy = db.scalar(select(HrPolicy))
+    return OvertimeRule(s.overtime_rule, s.overtime_multiplier, policy.daily_minutes if policy else DEFAULT_DAILY_MINUTES)
+
+
+def overtime_pay(rule: OvertimeRule, items: list[PayItem], minutes: int, who: str) -> int:
+    """What the approved overtime minutes are paid (see the module's docstring)."""
+    if rule.rule == "none":
+        raise PayrollError(f"overtime is approved for {who}, but the payroll settings don't say how overtime is paid")
+    wage = sum(i.amount_minor for i in items if i.kind == "earning")
+    basic = sum(i.amount_minor for i in items if i.kind == "earning" and i.basic)
+    if basic <= 0:
+        raise PayrollError(f"none of {who}'s earnings are marked as basic salary: overtime is worked out on it")
+    per = Fraction(30 * rule.daily_minutes)
+    if rule.rule == "saudi":
+        exact = Fraction(minutes) * (Fraction(wage) + Fraction(basic, 2)) / per
+    else:
+        exact = Fraction(minutes) * Fraction(basic) * Fraction(str(rule.multiplier)) / per
+    return int(exact + Fraction(1, 2))          # half up (always positive)
+
+
 def work_out(db: Session, employee: Employee, items: list[PayItem], contributions: list[Contribution],
-             start: date, end: date) -> Worked:
+             start: date, end: date, overtime: tuple[OvertimeRule, int] | None = None) -> Worked:
     first = max(start, employee.hire_date) if employee.hire_date else start
     last = min(end, employee.end_date) if employee.end_date else end
     days = (end - start).days + 1
@@ -121,6 +156,12 @@ def work_out(db: Session, employee: Employee, items: list[PayItem], contribution
             amount = item.amount_minor
             deductions += amount
         lines.append({"name": item.name, "kind": item.kind, "amount_minor": amount, "employer_minor": 0})
+    if overtime and overtime[1]:
+        rule, minutes = overtime
+        amount = overtime_pay(rule, items, minutes, employee.full_name)
+        gross += amount
+        lines.append({"name": "Overtime", "kind": "earning", "amount_minor": amount, "employer_minor": 0,
+                      "minutes": minutes})
     own = employer = 0
     for c in contributions:
         covered = min(base, c.base_cap_minor) if c.base_cap_minor else base
@@ -152,7 +193,8 @@ def without_pay(db: Session, start: date, end: date) -> list[str]:
 
 
 def settings_of(db: Session) -> PayrollSettings:
-    return db.scalar(select(PayrollSettings)) or PayrollSettings(eosb_rule="none")
+    return db.scalar(select(PayrollSettings)) or PayrollSettings(eosb_rule="none", overtime_rule="none",
+                                                                 overtime_multiplier=Decimal("1.5"))
 
 
 def eosb_wage(items: list[PayItem]) -> int:
@@ -183,6 +225,9 @@ def calculate(db: Session, run: PayRun) -> None:
         raise PayrollState("only a draft run can be recalculated")
     db.execute(delete(Payslip).where(Payslip.run_id == run.id))
     rule = settings_of(db).eosb_rule
+    ot_rule = overtime_rule(db)
+    approved = {a.employee_id: a.minutes for a in db.scalars(select(OvertimeApproval)
+                                                             .where(OvertimeApproval.month == run.period_start))}
     totals = dict(gross=0, deductions=0, own=0, employer=0, net=0, eosb=0)
     employees = db.scalars(select(Employee).where(*employed(run.period_start, run.period_end)).order_by(Employee.full_name))
     for e in employees:
@@ -190,7 +235,8 @@ def calculate(db: Session, run: PayRun) -> None:
         if not any(i.kind == "earning" for i in items):
             continue
         pay = db.scalar(select(EmployeePay).where(EmployeePay.employee_id == e.id))
-        w = work_out(db, e, items, covering(db, pay), run.period_start, run.period_end)
+        w = work_out(db, e, items, covering(db, pay), run.period_start, run.period_end,
+                     overtime=(ot_rule, approved.get(e.id, 0)))
         if w.net < 0:
             raise PayrollError(f"{e.full_name}'s deductions and contributions are more than their pay this month")
         last = min(run.period_end, e.end_date) if e.end_date else run.period_end

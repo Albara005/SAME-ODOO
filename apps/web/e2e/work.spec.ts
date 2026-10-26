@@ -325,3 +325,73 @@ test("end of service: Saudi rules, the provision on each run, a resignation sett
   await page.screenshot({ path: "test-results/screens/end-of-service-ar.png", fullPage: true });
   expect((await call("GET", `/hr/employees/${huda.id}`)).end_date).toBe("2026-11-15");
 });
+
+test("attendance: checking in and out, HR's hours on a day off, overtime approved and paid with the month", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await signUpAndIn(page, uniqueEmail("attendance"));
+  await createOrg(page, "شركة الحضور");
+  const call = await apiFor(page);
+  const [me] = await call("GET", "/members");
+  await call("POST", "/hr/employees", { full_name: "مدير الشركة", hire_date: "2025-01-01", user_id: me.user_id });
+  const huda = await call("POST", "/hr/employees", { full_name: "هدى صالح", hire_date: "2025-01-01" });
+  await call("PUT", `/payroll/employees/${huda.id}`, { iban: "", contribution_ids: [], items: [
+    { name: "الراتب الأساسي", kind: "earning", amount: "6000", basic: true },
+    { name: "بدل سكن", kind: "earning", amount: "1500" },
+  ] });
+
+  // How overtime is paid is payroll's choice.
+  await nav(page, "الرواتب");
+  await page.getByRole("tab", { name: "رواتب الموظفين" }).click();
+  await page.getByLabel("طريقة دفع الساعات الإضافية").selectOption({ label: "نظام العمل السعودي (المادة 107)" });
+  await expect(page.getByText("حُفظت طريقة دفع الساعات الإضافية")).toBeVisible();
+  await expect(page.getByText(/50% من أجر الساعة الأساسي/)).toBeVisible();
+
+  // Checking in and out from my own page.
+  await nav(page, "الموارد البشرية");
+  await page.getByRole("tab", { name: "إجازاتي" }).click();
+  await page.getByRole("button", { name: "تسجيل الحضور" }).click();
+  await expect(page.getByText(/حاضر منذ/)).toBeVisible();
+  await page.getByRole("button", { name: "تسجيل الانصراف" }).click();
+  await expect(page.getByText("لم تسجّل حضورك.")).toBeVisible();
+
+  // HR puts in Huda's Friday (the weekend): all eight hours are overtime.
+  await page.getByRole("tab", { name: "الحضور والإضافي" }).click();
+  await page.getByLabel("الشهر").fill("2026-09");
+  const row = page.getByRole("table", { name: "الحضور والإضافي" }).getByRole("row", { name: /هدى صالح/ });
+  await row.getByRole("button", { name: "السجلات" }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "إضافة ساعات" }).click();
+  await dialog.getByLabel("اليوم", { exact: true }).fill("2026-09-11");
+  await dialog.getByLabel("الحضور", { exact: true }).fill("09:00");
+  await dialog.getByLabel("الانصراف", { exact: true }).fill("17:00");
+  await dialog.getByRole("button", { name: "حفظ" }).click();
+  await expect(dialog.getByRole("cell", { name: "8:00" })).toBeVisible();
+  await expect(dialog.getByText("أدخلتها الموارد البشرية")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(row.getByRole("cell").nth(3)).toHaveText("8:00");
+
+  await row.getByRole("button", { name: "اعتماد", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByText(/يُظهر الحضور/)).toBeVisible();
+  await dialog.getByLabel("ملاحظة").fill("جرد المستودع");
+  await dialog.getByRole("button", { name: "اعتماد", exact: true }).click();
+  await expect(page.getByText("اعتُمدت الساعات الإضافية")).toBeVisible();
+  await expect(row.getByRole("cell").nth(4)).toHaveText("8:00");
+
+  // The month's run pays it: (7,500 + 3,000) / 30 / 8 = 43.75 an hour.
+  await nav(page, "الرواتب");
+  await page.getByLabel("الشهر").fill("2026-09");
+  await page.getByRole("button", { name: "إعداد مسير الشهر" }).click();
+  const slip = page.getByRole("table", { name: "قسائم الرواتب" }).getByRole("row", { name: /هدى صالح/ });
+  await expect(slip).toContainText(/8:00.*350\.00/);
+  await expect(slip).toContainText("7,850.00");
+  await page.getByRole("button", { name: "ترحيل إلى الدفاتر" }).click();
+  await expect(page.getByText("رُحِّل المسير")).toBeVisible();
+
+  await nav(page, "الموارد البشرية");
+  await page.getByRole("tab", { name: "الحضور والإضافي" }).click();
+  await page.getByLabel("الشهر").fill("2026-09");
+  await expect(row).toContainText("مدفوع");
+  await expect(row.getByRole("button", { name: "اعتماد", exact: true })).toHaveCount(0);
+  await page.screenshot({ path: "test-results/screens/attendance-ar.png", fullPage: true });
+});

@@ -43,6 +43,11 @@ export function formatDate(iso: string | null | undefined, lang: Lang): string {
   }).format(d);
 }
 
+/** Minutes as hours and minutes: 510 -> "8:30". */
+export function hm(minutes: number): string {
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
 export function today(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

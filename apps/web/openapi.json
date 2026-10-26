@@ -463,6 +463,27 @@
     "title": "AgingRow",
     "type": "object"
    },
+   "ApprovalIn": {
+    "properties": {
+     "minutes": {
+      "exclusiveMinimum": 0.0,
+      "maximum": 44640.0,
+      "title": "Minutes",
+      "type": "integer"
+     },
+     "note": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "required": [
+     "minutes"
+    ],
+    "title": "ApprovalIn",
+    "type": "object"
+   },
    "ApproveIn": {
     "properties": {
      "confirm_monthly_usd": {
@@ -1765,6 +1786,18 @@
      "options"
     ],
     "title": "CeremonyOut",
+    "type": "object"
+   },
+   "CheckIn": {
+    "properties": {
+     "note": {
+      "default": "",
+      "maxLength": 300,
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "title": "CheckIn",
     "type": "object"
    },
    "CheckOut": {
@@ -4054,6 +4087,154 @@
      }
     },
     "title": "EmployeeUpdate",
+    "type": "object"
+   },
+   "EntryIn": {
+    "properties": {
+     "check_in": {
+      "format": "date-time",
+      "title": "Check In",
+      "type": "string"
+     },
+     "check_out": {
+      "format": "date-time",
+      "title": "Check Out",
+      "type": "string"
+     },
+     "employee_id": {
+      "title": "Employee Id",
+      "type": "string"
+     },
+     "note": {
+      "default": "",
+      "maxLength": 300,
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "required": [
+     "employee_id",
+     "check_in",
+     "check_out"
+    ],
+    "title": "EntryIn",
+    "type": "object"
+   },
+   "EntryOut": {
+    "properties": {
+     "check_in": {
+      "format": "date-time",
+      "title": "Check In",
+      "type": "string"
+     },
+     "check_out": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Check Out"
+     },
+     "day": {
+      "format": "date",
+      "title": "Day",
+      "type": "string"
+     },
+     "employee_id": {
+      "title": "Employee Id",
+      "type": "string"
+     },
+     "employee_name": {
+      "title": "Employee Name",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "locked": {
+      "title": "Locked",
+      "type": "boolean"
+     },
+     "minutes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Minutes"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "employee_id",
+     "employee_name",
+     "day",
+     "check_in",
+     "check_out",
+     "minutes",
+     "source",
+     "note",
+     "locked"
+    ],
+    "title": "EntryOut",
+    "type": "object"
+   },
+   "EntryUpdate": {
+    "properties": {
+     "check_in": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Check In"
+     },
+     "check_out": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Check Out"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     }
+    },
+    "title": "EntryUpdate",
     "type": "object"
    },
    "FileInfo": {
@@ -6364,6 +6545,83 @@
     "title": "MfaSetupOut",
     "type": "object"
    },
+   "MonthOut": {
+    "properties": {
+     "approval_note": {
+      "title": "Approval Note",
+      "type": "string"
+     },
+     "approved_minutes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Approved Minutes"
+     },
+     "can_approve": {
+      "title": "Can Approve",
+      "type": "boolean"
+     },
+     "checked_in": {
+      "title": "Checked In",
+      "type": "boolean"
+     },
+     "days_present": {
+      "title": "Days Present",
+      "type": "integer"
+     },
+     "department_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department Name"
+     },
+     "employee_id": {
+      "title": "Employee Id",
+      "type": "string"
+     },
+     "employee_name": {
+      "title": "Employee Name",
+      "type": "string"
+     },
+     "overtime_minutes": {
+      "title": "Overtime Minutes",
+      "type": "integer"
+     },
+     "paid": {
+      "title": "Paid",
+      "type": "boolean"
+     },
+     "worked_minutes": {
+      "title": "Worked Minutes",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "employee_id",
+     "employee_name",
+     "department_name",
+     "days_present",
+     "worked_minutes",
+     "overtime_minutes",
+     "approved_minutes",
+     "approval_note",
+     "paid",
+     "checked_in",
+     "can_approve"
+    ],
+    "title": "MonthOut",
+    "type": "object"
+   },
    "MotionOut": {
     "properties": {
      "css": {
@@ -6472,6 +6730,87 @@
      "journal_entry_id"
     ],
     "title": "MoveOut",
+    "type": "object"
+   },
+   "MyAttendanceOut": {
+    "properties": {
+     "approved_minutes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Approved Minutes"
+     },
+     "daily_minutes": {
+      "title": "Daily Minutes",
+      "type": "integer"
+     },
+     "employee_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Employee Id"
+     },
+     "entries": {
+      "items": {
+       "$ref": "#/components/schemas/EntryOut"
+      },
+      "title": "Entries",
+      "type": "array"
+     },
+     "month": {
+      "title": "Month",
+      "type": "string"
+     },
+     "open": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/EntryOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "overtime_minutes": {
+      "title": "Overtime Minutes",
+      "type": "integer"
+     },
+     "paid": {
+      "title": "Paid",
+      "type": "boolean"
+     },
+     "timezone": {
+      "title": "Timezone",
+      "type": "string"
+     },
+     "worked_minutes": {
+      "title": "Worked Minutes",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "employee_id",
+     "timezone",
+     "daily_minutes",
+     "month",
+     "open",
+     "entries",
+     "worked_minutes",
+     "overtime_minutes",
+     "approved_minutes",
+     "paid"
+    ],
+    "title": "MyAttendanceOut",
     "type": "object"
    },
    "MyLeaveOut": {
@@ -7396,6 +7735,11 @@
       ],
       "title": "Amount"
      },
+     "basic": {
+      "default": false,
+      "title": "Basic",
+      "type": "boolean"
+     },
      "contributory": {
       "default": false,
       "title": "Contributory",
@@ -7435,6 +7779,10 @@
       "title": "Amount",
       "type": "string"
      },
+     "basic": {
+      "title": "Basic",
+      "type": "boolean"
+     },
      "contributory": {
       "title": "Contributory",
       "type": "boolean"
@@ -7461,7 +7809,8 @@
      "kind",
      "amount",
      "contributory",
-     "end_of_service"
+     "end_of_service",
+     "basic"
     ],
     "title": "PayItemOut",
     "type": "object"
@@ -8198,20 +8547,57 @@
     "type": "object"
    },
    "PayrollSettingsIn": {
+    "description": "What is given changes; what is left out stays.",
     "properties": {
      "eosb_rule": {
-      "enum": [
-       "saudi",
-       "uae",
-       "none"
+      "anyOf": [
+       {
+        "enum": [
+         "saudi",
+         "uae",
+         "none"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
       ],
-      "title": "Eosb Rule",
-      "type": "string"
+      "title": "Eosb Rule"
+     },
+     "overtime_multiplier": {
+      "anyOf": [
+       {
+        "maximum": 5.0,
+        "minimum": 1.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Overtime Multiplier"
+     },
+     "overtime_rule": {
+      "anyOf": [
+       {
+        "enum": [
+         "none",
+         "saudi",
+         "multiplier"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Overtime Rule"
      }
     },
-    "required": [
-     "eosb_rule"
-    ],
     "title": "PayrollSettingsIn",
     "type": "object"
    },
@@ -8226,6 +8612,19 @@
       "title": "Eosb Rule",
       "type": "string"
      },
+     "overtime_multiplier": {
+      "title": "Overtime Multiplier",
+      "type": "string"
+     },
+     "overtime_rule": {
+      "enum": [
+       "none",
+       "saudi",
+       "multiplier"
+      ],
+      "title": "Overtime Rule",
+      "type": "string"
+     },
      "reasons": {
       "items": {
        "type": "string"
@@ -8236,7 +8635,9 @@
     },
     "required": [
      "eosb_rule",
-     "reasons"
+     "reasons",
+     "overtime_rule",
+     "overtime_multiplier"
     ],
     "title": "PayrollSettingsOut",
     "type": "object"
@@ -8263,6 +8664,17 @@
      "name": {
       "title": "Name",
       "type": "string"
+     },
+     "overtime_minutes": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Overtime Minutes"
      }
     },
     "required": [
@@ -8562,24 +8974,63 @@
     "type": "object"
    },
    "PolicyIn": {
+    "description": "What is given changes; what is left out stays.",
     "properties": {
+     "daily_minutes": {
+      "anyOf": [
+       {
+        "maximum": 960.0,
+        "minimum": 60.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Daily Minutes"
+     },
+     "timezone": {
+      "anyOf": [
+       {
+        "maxLength": 64,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Timezone"
+     },
      "weekend": {
-      "items": {
-       "type": "integer"
-      },
-      "maxItems": 6,
-      "title": "Weekend",
-      "type": "array"
+      "anyOf": [
+       {
+        "items": {
+         "type": "integer"
+        },
+        "maxItems": 6,
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Weekend"
      }
     },
-    "required": [
-     "weekend"
-    ],
     "title": "PolicyIn",
     "type": "object"
    },
    "PolicyOut": {
     "properties": {
+     "daily_minutes": {
+      "title": "Daily Minutes",
+      "type": "integer"
+     },
+     "timezone": {
+      "title": "Timezone",
+      "type": "string"
+     },
      "weekend": {
       "items": {
        "type": "integer"
@@ -8589,7 +9040,9 @@
      }
     },
     "required": [
-     "weekend"
+     "weekend",
+     "timezone",
+     "daily_minutes"
     ],
     "title": "PolicyOut",
     "type": "object"
@@ -22450,6 +22903,415 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/hr/attendance": {
+   "get": {
+    "description": "A person's entries for a month: for HR, their department's manager, and themselves.",
+    "operationId": "list_entries_api_v1_orgs__org_id__hr_attendance_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "employee_id",
+      "required": true,
+      "schema": {
+       "title": "Employee Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "month",
+      "required": true,
+      "schema": {
+       "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+       "title": "Month",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/EntryOut"
+         },
+         "title": "Response List Entries Api V1 Orgs  Org Id  Hr Attendance Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Entries",
+    "tags": [
+     "hr"
+    ]
+   },
+   "post": {
+    "description": "HR puts in someone's hours (a forgotten check-in, work away from the office...).",
+    "operationId": "add_entry_api_v1_orgs__org_id__hr_attendance_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EntryIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntryOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Add Entry",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/attendance/check-in": {
+   "post": {
+    "operationId": "check_in_now_api_v1_orgs__org_id__hr_attendance_check_in_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CheckIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntryOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Check In Now",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/attendance/check-out": {
+   "post": {
+    "operationId": "check_out_now_api_v1_orgs__org_id__hr_attendance_check_out_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntryOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Check Out Now",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/attendance/me": {
+   "get": {
+    "operationId": "my_attendance_api_v1_orgs__org_id__hr_attendance_me_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "month",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Month"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MyAttendanceOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "My Attendance",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/attendance/{entry_id}": {
+   "delete": {
+    "operationId": "delete_entry_api_v1_orgs__org_id__hr_attendance__entry_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "entry_id",
+      "required": true,
+      "schema": {
+       "title": "Entry Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete Entry",
+    "tags": [
+     "hr"
+    ]
+   },
+   "patch": {
+    "description": "Correct an entry's times (or put in when someone left, for a check-in never checked out).",
+    "operationId": "update_entry_api_v1_orgs__org_id__hr_attendance__entry_id__patch",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "entry_id",
+      "required": true,
+      "schema": {
+       "title": "Entry Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EntryUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EntryOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update Entry",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/hr/away": {
    "get": {
     "description": "Approved leave overlapping the range (today and the next 13 days by default).",
@@ -23817,6 +24679,200 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/hr/overtime": {
+   "get": {
+    "description": "Everyone employed in the month (HR), or the departments you manage.",
+    "operationId": "overtime_api_v1_orgs__org_id__hr_overtime_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "month",
+      "required": true,
+      "schema": {
+       "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+       "title": "Month",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/MonthOut"
+         },
+         "title": "Response Overtime Api V1 Orgs  Org Id  Hr Overtime Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Overtime",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/hr/overtime/{employee_id}/{month}": {
+   "delete": {
+    "operationId": "withdraw_overtime_api_v1_orgs__org_id__hr_overtime__employee_id___month__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "employee_id",
+      "required": true,
+      "schema": {
+       "title": "Employee Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "month",
+      "required": true,
+      "schema": {
+       "title": "Month",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Withdraw Overtime",
+    "tags": [
+     "hr"
+    ]
+   },
+   "put": {
+    "description": "Approve overtime for payment with the month's pay run: up to what attendance shows (less, if some of it\nwasn't asked for). Approving again replaces the amount.",
+    "operationId": "approve_overtime_api_v1_orgs__org_id__hr_overtime__employee_id___month__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "employee_id",
+      "required": true,
+      "schema": {
+       "title": "Employee Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "month",
+      "required": true,
+      "schema": {
+       "title": "Month",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ApprovalIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MonthOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Approve Overtime",
+    "tags": [
+     "hr"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/hr/policy": {
    "get": {
     "operationId": "get_policy_api_v1_orgs__org_id__hr_policy_get",
@@ -23864,7 +24920,7 @@
     ]
    },
    "put": {
-    "description": "The weekend days. Requests already made keep the days they were counted with.",
+    "description": "The weekend days, the time zone attendance is counted in and the normal working day. Leave already asked for\nkeeps the days it was counted with; overtime already approved keeps its hours.",
     "operationId": "set_policy_api_v1_orgs__org_id__hr_policy_put",
     "parameters": [
      {

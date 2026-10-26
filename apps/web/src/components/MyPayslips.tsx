@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, unwrap } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { useI18n } from "../i18n/I18n";
+import { hm } from "../lib/format";
 import { Card } from "./ui";
 
 /** The signed-in member's own payslips, once their month is posted. Nothing shows until there is one. */
@@ -30,7 +31,7 @@ export function MyPayslips() {
               <dl className="kv small">
                 {s.lines.map((l, i) => (
                   <div key={i} style={{ display: "contents" }}>
-                    <dt>{l.name}</dt>
+                    <dt>{l.overtime_minutes ? t("payroll.overtimeLine", { h: hm(l.overtime_minutes) }) : l.name}</dt>
                     <dd className="num">{l.kind === "earning" ? "" : "−"}{money(l.amount, s.currency)}</dd>
                   </div>
                 ))}

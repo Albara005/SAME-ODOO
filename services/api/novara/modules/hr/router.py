@@ -14,6 +14,7 @@ from novara.automation.models import Notification
 from novara.deps import OrgContext, client_ip, get_db, require, require_any
 from novara.modules.access import permissions as P
 from novara.modules.audit import service as audit
+from novara.modules.hr import attendance
 from novara.modules.hr import service as svc
 from novara.modules.hr.models import Department, Employee, Holiday, HrPolicy, LeaveRequest, LeaveType
 from novara.modules.organizations.models import Membership, Organization
@@ -103,18 +104,23 @@ class LeaveTypeOut(BaseModel):
 
 
 class PolicyIn(BaseModel):
-    weekend: list[int] = Field(max_length=6)
+    """What is given changes; what is left out stays."""
+    weekend: list[int] | None = Field(default=None, max_length=6)
+    timezone: str | None = Field(default=None, min_length=1, max_length=64)
+    daily_minutes: int | None = Field(default=None, ge=60, le=960)   # a normal working day
 
     @field_validator("weekend")
     @classmethod
-    def _days(cls, v: list[int]) -> list[int]:
-        if any(d < 0 or d > 6 for d in v):
+    def _days(cls, v: list[int] | None) -> list[int] | None:
+        if v is not None and any(d < 0 or d > 6 for d in v):
             raise ValueError("weekend days are 0 (Monday) to 6 (Sunday)")
-        return sorted(set(v))
+        return None if v is None else sorted(set(v))
 
 
 class PolicyOut(BaseModel):
     weekend: list[int]
+    timezone: str
+    daily_minutes: int
 
 
 class HolidayIn(BaseModel):
@@ -276,25 +282,47 @@ def _notify(db: Session, users: list[str], title: str, body: str, key: str) -> N
 # ---------------------------------------------------------------- policy and holidays
 
 
+def _policy_out(p: HrPolicy) -> PolicyOut:
+    return PolicyOut(weekend=list(p.weekend), timezone=p.timezone, daily_minutes=p.daily_minutes)
+
+
 @router.get("/orgs/{org_id}/hr/policy", response_model=PolicyOut)
-def get_policy(_: OrgContext = Depends(require_any(P.HR_READ, P.LEAVE_REQUEST, P.HR_MANAGE)), db: Session = Depends(get_db)):
-    return PolicyOut(weekend=svc.weekend(db))
+def get_policy(_: OrgContext = Depends(require_any(P.HR_READ, P.LEAVE_REQUEST, P.HR_MANAGE, P.ATTENDANCE_SELF)),
+               db: Session = Depends(get_db)):
+    return _policy_out(attendance.policy(db))
 
 
 @router.put("/orgs/{org_id}/hr/policy", response_model=PolicyOut)
 def set_policy(body: PolicyIn, request: Request, ctx: OrgContext = Depends(require(P.HR_MANAGE)),
                db: Session = Depends(get_db)):
-    """The weekend days. Requests already made keep the days they were counted with."""
+    """The weekend days, the time zone attendance is counted in and the normal working day. Leave already asked for
+    keeps the days it was counted with; overtime already approved keeps its hours."""
+    if body.timezone is not None:
+        try:
+            attendance.zone(body.timezone)
+        except attendance.AttendanceError as e:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
     policy = db.scalar(select(HrPolicy))
     if policy is None:
-        policy = HrPolicy(weekend=body.weekend)
+        policy = attendance.policy(db)
         db.add(policy)
-    else:
+    if body.weekend is not None and body.weekend != list(policy.weekend):
         policy.weekend = body.weekend
-    audit.record(db, actor_user_id=ctx.user.id, action="hr.weekend_changed", target_type="organization",
-                 target_id=ctx.organization.id, details={"weekend": body.weekend}, ip_address=client_ip(request))
-    db.commit()
-    return PolicyOut(weekend=body.weekend)
+        audit.record(db, actor_user_id=ctx.user.id, action="hr.weekend_changed", target_type="organization",
+                     target_id=ctx.organization.id, details={"weekend": body.weekend}, ip_address=client_ip(request))
+    day = {k: v for k, v in (("timezone", body.timezone), ("daily_minutes", body.daily_minutes))
+           if v is not None and v != getattr(policy, k)}
+    if day:
+        for k, v in day.items():
+            setattr(policy, k, v)
+        audit.record(db, actor_user_id=ctx.user.id, action="hr.working_day_changed", target_type="organization",
+                     target_id=ctx.organization.id, details=day, ip_address=client_ip(request))
+    try:
+        db.commit()
+    except IntegrityError:                          # two first saves at once: the other one won
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "the policy was just changed; try again")
+    return _policy_out(policy)
 
 
 @router.get("/orgs/{org_id}/hr/holidays", response_model=list[HolidayOut])

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarPlus, Check, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useState } from "react";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
+import { useAuth } from "../auth/Auth";
 import { useOrg } from "../auth/Org";
 import { Tabs } from "../components/business";
 import { MyPayslips } from "../components/MyPayslips";
@@ -12,8 +13,9 @@ import {
 import { useI18n } from "../i18n/I18n";
 import type { MessageKey } from "../i18n/en";
 import { today } from "../lib/format";
+import { AttendanceTab, MyAttendance, WorkingDay } from "./Attendance";
 
-type Tab = "mine" | "requests" | "people" | "away" | "settings";
+type Tab = "mine" | "requests" | "people" | "attendance" | "away" | "settings";
 type Leave = Schemas["LeaveOut"];
 type Employee = Schemas["EmployeeOut"];
 
@@ -55,10 +57,15 @@ function StatusBadge({ status }: { status: string }) {
 export function HrPage() {
   const { t } = useI18n();
   const { can } = useOrg();
+  const { user } = useAuth();
+  // Department managers see their department's hours and approve its overtime.
+  const depts = useDepartments(can("hr.read") && !can("hr.manage"));
+  const manages = can("hr.manage") || Boolean(depts.data?.some((d) => d.manager_user_id === user?.id));
   const tabs: { key: Tab; label: string }[] = [
     ...(can("leave.request") ? [{ key: "mine" as Tab, label: t("hr.tab.mine") }] : []),
     ...(can("leave.request") || can("hr.manage") ? [{ key: "requests" as Tab, label: t("hr.tab.requests") }] : []),
     ...(can("hr.read") ? [{ key: "people" as Tab, label: t("hr.tab.people") }] : []),
+    ...(manages ? [{ key: "attendance" as Tab, label: t("hr.tab.attendance") }] : []),
     { key: "away" as Tab, label: t("hr.tab.away") },
     ...(can("hr.manage") ? [{ key: "settings" as Tab, label: t("hr.tab.settings") }] : []),
   ];
@@ -77,6 +84,7 @@ export function HrPage() {
       {tab === "mine" && <MyLeave />}
       {tab === "requests" && <Requests />}
       {tab === "people" && <People />}
+      {tab === "attendance" && <AttendanceTab />}
       {tab === "away" && <Away />}
       {tab === "settings" && <Settings />}
       {asking && <RequestDialog onClose={() => setAsking(false)} />}
@@ -88,6 +96,7 @@ export function HrPage() {
 
 function MyLeave() {
   const { t } = useI18n();
+  const { can } = useOrg();
   const thisYear = Number(today().slice(0, 4));
   const [year, setYear] = useState(thisYear);
   const me = useHr(`me-${year}`, (org_id) => unwrap(api.GET("/api/v1/orgs/{org_id}/hr/me", { params: { path: { org_id }, query: { year } } })));
@@ -95,6 +104,7 @@ function MyLeave() {
     <QueryView query={me}>
       {(m) => !m.employee ? <Empty>{t("hr.notLinked")}</Empty> : (
         <div className="stack">
+          {can("attendance.self") && <MyAttendance />}
           <div className="row">
             <Field label={t("hr.year")}>
               <Select value={String(year)} onChange={(e) => setYear(Number(e.target.value))}>
@@ -548,6 +558,7 @@ function Settings() {
       </div>
       <div className="stack">
         <Weekend />
+        <WorkingDay />
         <Holidays />
       </div>
     </div>

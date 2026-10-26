@@ -8,7 +8,7 @@
     POST     .../runs/{id}/recalculate | post | pay | cancel
     GET      .../runs/{id}/bank-file.csv                    who to pay, to which IBAN, how much
     GET      /orgs/{org}/payroll/my-payslips                the signed-in member's own payslips
-    GET/PUT  /orgs/{org}/payroll/settings                   which market's end-of-service rules apply
+    GET/PUT  /orgs/{org}/payroll/settings                   which market's end-of-service rules apply, how overtime is paid
     POST     /orgs/{org}/payroll/end-of-service/preview     a leaver's settlement worked out, nothing saved
     GET/POST /orgs/{org}/payroll/end-of-service             settlements (created as drafts)
     GET/DELETE /orgs/{org}/payroll/end-of-service/{id}
@@ -76,6 +76,7 @@ class PayItemIn(BaseModel):
     amount: Decimal = Field(gt=0, max_digits=18, decimal_places=3)
     contributory: bool = False
     end_of_service: bool = False
+    basic: bool = False             # part of the basic wage overtime is worked out on
 
 
 class PayItemOut(BaseModel):
@@ -84,6 +85,7 @@ class PayItemOut(BaseModel):
     amount: str
     contributory: bool
     end_of_service: bool
+    basic: bool
 
 
 class EmployeePayIn(BaseModel):
@@ -139,6 +141,7 @@ class PayslipLineOut(BaseModel):
     kind: Literal["earning", "deduction", "contribution"]
     amount: str
     employer_amount: str
+    overtime_minutes: int | None = None     # the overtime line: the approved minutes it pays
 
 
 class PayslipOut(BaseModel):
@@ -209,7 +212,8 @@ def _slip_out(s: Payslip, run: PayRun) -> PayslipOut:
         employee_id=s.employee_id, employee_name=s.employee_name, iban=s.iban, days_in_period=s.days_in_period,
         days_paid=fmt_decimal(s.days_paid), unpaid_leave_days=fmt_decimal(s.unpaid_leave_days),
         lines=[PayslipLineOut(name=l["name"], kind=l["kind"], amount=_money(l["amount_minor"], c),
-                           employer_amount=_money(l["employer_minor"], c)) for l in s.lines],
+                              employer_amount=_money(l["employer_minor"], c), overtime_minutes=l.get("minutes"))
+               for l in s.lines],
         gross=_money(s.gross_minor, c), deductions=_money(s.deductions_minor, c),
         employee_contributions=_money(s.employee_contributions_minor, c),
         employer_contributions=_money(s.employer_contributions_minor, c), net=_money(s.net_minor, c),
@@ -305,7 +309,7 @@ def _pay_out(db: Session, e: Employee, currency: str) -> EmployeePayOut:
         employee_id=e.id, employee_name=e.full_name, currency=currency, iban=pay.iban if pay else "",
         contribution_ids=list(pay.contribution_ids) if pay else [],
         items=[PayItemOut(name=i.name, kind=i.kind, amount=_money(i.amount_minor, currency), contributory=i.contributory,
-                          end_of_service=i.end_of_service) for i in items],
+                          end_of_service=i.end_of_service, basic=i.basic) for i in items],
         monthly_earnings=_money(earn, currency), monthly_deductions=_money(ded, currency))
 
 
@@ -355,7 +359,8 @@ def set_pay(employee_id: str, body: EmployeePayIn, request: Request, ctx: OrgCon
     for n, (item, minor) in enumerate(zip(body.items, amounts)):
         db.add(PayItem(employee_id=e.id, position=n, name=item.name.strip(), kind=item.kind, amount_minor=minor,
                        contributory=item.contributory and item.kind == "earning",
-                       end_of_service=item.end_of_service and item.kind == "earning"))
+                       end_of_service=item.end_of_service and item.kind == "earning",
+                       basic=item.basic and item.kind == "earning"))
     # Who changed whose pay, not the amounts: the audit log is readable more widely than payroll.
     audit.record(db, actor_user_id=ctx.user.id, action="payroll.pay_changed", target_type="employee", target_id=e.id,
                  details={"employee": e.full_name, "items": len(body.items)}, ip_address=client_ip(request))
@@ -498,12 +503,17 @@ def my_payslips(ctx: OrgContext = Depends(org_context), db: Session = Depends(ge
 
 
 class PayrollSettingsIn(BaseModel):
-    eosb_rule: Literal["saudi", "uae", "none"]
+    """What is given changes; what is left out stays."""
+    eosb_rule: Literal["saudi", "uae", "none"] | None = None
+    overtime_rule: Literal["none", "saudi", "multiplier"] | None = None
+    overtime_multiplier: Decimal | None = Field(default=None, ge=1, le=5, max_digits=4, decimal_places=2)
 
 
 class PayrollSettingsOut(BaseModel):
     eosb_rule: Literal["saudi", "uae", "none"]
     reasons: list[str]              # the reasons for leaving these rules know
+    overtime_rule: Literal["none", "saudi", "multiplier"]
+    overtime_multiplier: str
 
 
 EosbReason = Literal["termination", "contract_end", "resignation", "resignation_full", "dismissal"]
@@ -556,13 +566,15 @@ class SettlementOut(SettlementPreviewOut):
     created_at: datetime
 
 
-def _settings_out(rule: str) -> PayrollSettingsOut:
-    return PayrollSettingsOut(eosb_rule=rule, reasons=list(eosb.REASONS[rule]))
+def _settings_out(s: PayrollSettings) -> PayrollSettingsOut:
+    return PayrollSettingsOut(eosb_rule=s.eosb_rule, reasons=list(eosb.REASONS[s.eosb_rule]),
+                              overtime_rule=s.overtime_rule or "none",
+                              overtime_multiplier=fmt_decimal(s.overtime_multiplier or Decimal("1.5")))
 
 
 @router.get("/orgs/{org_id}/payroll/settings", response_model=PayrollSettingsOut)
 def get_settings(_: OrgContext = Depends(require(P.PAYROLL_MANAGE)), db: Session = Depends(get_db)):
-    return _settings_out(svc.settings_of(db).eosb_rule)
+    return _settings_out(svc.settings_of(db))
 
 
 @router.put("/orgs/{org_id}/payroll/settings", response_model=PayrollSettingsOut)
@@ -571,18 +583,25 @@ def put_settings(body: PayrollSettingsIn, request: Request, ctx: OrgContext = De
     """Changing the rules applies to runs and settlements from now on; what is posted stays as it was."""
     current = db.scalar(select(PayrollSettings))
     if current is None:
-        current = PayrollSettings()
+        current = PayrollSettings(eosb_rule="none", overtime_rule="none", overtime_multiplier=Decimal("1.5"))
         db.add(current)
-    before = current.eosb_rule
-    current.eosb_rule = body.eosb_rule
-    audit.record(db, actor_user_id=ctx.user.id, action="payroll.settings_changed", target_type="payroll_settings",
-                 target_id=ctx.organization.id, details={"eosb_rule": [before, body.eosb_rule]}, ip_address=client_ip(request))
+    changes = {}
+    for key in ("eosb_rule", "overtime_rule", "overtime_multiplier"):
+        value = getattr(body, key)
+        if value is not None and value != getattr(current, key):
+            before = getattr(current, key)
+            changes[key] = [fmt_decimal(before) if isinstance(before, Decimal) else before,
+                            fmt_decimal(value) if isinstance(value, Decimal) else value]
+            setattr(current, key, value)
+    if changes:
+        audit.record(db, actor_user_id=ctx.user.id, action="payroll.settings_changed", target_type="payroll_settings",
+                     target_id=ctx.organization.id, details=changes, ip_address=client_ip(request))
     try:
         db.commit()
     except IntegrityError:                          # two first saves at once: the other one won
         db.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, "the settings were just changed; try again")
-    return _settings_out(current.eosb_rule)
+    return _settings_out(current)
 
 
 def _years(days: int) -> str:

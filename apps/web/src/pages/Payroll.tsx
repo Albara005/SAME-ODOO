@@ -9,13 +9,14 @@ import {
   errorText, useToast,
 } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
-import { today } from "../lib/format";
+import { hm, today } from "../lib/format";
 
 type Tab = "runs" | "pay" | "contributions" | "end";
 type Run = Schemas["PayRunOut"];
 type Contribution = Schemas["ContributionOut"];
 type PaySummary = Schemas["PaySummaryOut"];
-type ItemDraft = { name: string; kind: "earning" | "deduction"; amount: string; contributory: boolean; end_of_service: boolean };
+type ItemDraft = { name: string; kind: "earning" | "deduction"; amount: string; contributory: boolean; end_of_service: boolean; basic: boolean };
+type OvertimeRule = Schemas["PayrollSettingsOut"]["overtime_rule"];
 type Settlement = Schemas["SettlementOut"];
 type SettlementIn = Schemas["SettlementIn"];
 type Reason = SettlementIn["reason"];
@@ -129,6 +130,7 @@ function RunDetail({ runId, onGone }: { runId: string; onGone: () => void }) {
   const done = (r: Run) => {
     qc.setQueryData(key, r);
     void qc.invalidateQueries({ queryKey: ["payroll", org.id, "runs"] });
+    void qc.invalidateQueries({ queryKey: ["hr", "attendance"] });   // a posted month's overtime stands
   };
   const onError = (e: Error) => toast(errorText(e, t("common.error")), "error");
   const recalc = useMutation({
@@ -211,6 +213,9 @@ function RunDetail({ runId, onGone }: { runId: string; onGone: () => void }) {
                         <td>
                           {s.employee_name}
                           {s.unpaid_leave_days !== "0" && <div className="muted small">{t("payroll.unpaidDays", { days: s.unpaid_leave_days })}</div>}
+                          {s.lines.filter((l) => l.overtime_minutes).map((l, i) => (
+                            <div key={i} className="muted small">{t("payroll.includesOvertime", { h: hm(l.overtime_minutes ?? 0), amount: money(l.amount, r.currency) })}</div>
+                          ))}
                         </td>
                         <td className="end num">{s.days_paid}/{s.days_in_period}</td>
                         <td className="end num">{money(s.gross, r.currency)}</td>
@@ -297,7 +302,63 @@ function CancelDialog({ run, onClose, onDone }: { run: Run; onClose: () => void;
 
 // ---------------------------------------------------------------- employees' pay
 
+function OvertimeCard() {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const path = { params: { path: { org_id: org.id } } };
+  const settings = useQuery({
+    queryKey: ["payroll", org.id, "settings"],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/payroll/settings", path)),
+  });
+  const [multiplier, setMultiplier] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: (body: { overtime_rule?: OvertimeRule; overtime_multiplier?: string }) =>
+      unwrap(api.PUT("/api/v1/orgs/{org_id}/payroll/settings", { ...path, body })),
+    onSuccess: (x) => { qc.setQueryData(["payroll", org.id, "settings"], x); setMultiplier(null); toast(t("payroll.overtime.saved")); },
+    onError: (e) => toast(errorText(e, t("common.error")), "error"),
+  });
+  const rule = settings.data?.overtime_rule ?? "none";
+  const shown = multiplier ?? settings.data?.overtime_multiplier ?? "1.5";
+  return (
+    <Card title={t("payroll.overtime.title")}>
+      <div className="stack-sm">
+        <div className="grid-2">
+          <Field label={t("payroll.overtime.rule")}>
+            <Select value={rule} disabled={!settings.data || save.isPending}
+              onChange={(e) => save.mutate({ overtime_rule: e.target.value as OvertimeRule })}>
+              <option value="none">{t("payroll.overtime.rule.none")}</option>
+              <option value="saudi">{t("payroll.overtime.rule.saudi")}</option>
+              <option value="multiplier">{t("payroll.overtime.rule.multiplier")}</option>
+            </Select>
+          </Field>
+          {rule === "multiplier" && (
+            <form className="row" style={{ alignItems: "end" }} onSubmit={(e) => { e.preventDefault(); save.mutate({ overtime_multiplier: shown }); }}>
+              <Field label={t("payroll.overtime.multiplier")}>
+                <Input inputMode="decimal" value={shown} onChange={(e) => setMultiplier(e.target.value)} ltr />
+              </Field>
+              <Button type="submit" loading={save.isPending} disabled={multiplier === null}>{t("common.save")}</Button>
+            </form>
+          )}
+        </div>
+        {rule !== "none" && <p className="small">{t(`payroll.overtime.ruleText.${rule}`)}</p>}
+        <p className="muted small">{t("payroll.overtime.hint")}</p>
+      </div>
+    </Card>
+  );
+}
+
 function EmployeesPay() {
+  return (
+    <div className="stack">
+      <OvertimeCard />
+      <EmployeesPayTable />
+    </div>
+  );
+}
+
+function EmployeesPayTable() {
   const { t, money } = useI18n();
   const { org } = useOrg();
   const [editing, setEditing] = useState<PaySummary | null>(null);
@@ -369,7 +430,7 @@ function PayForm({ initial, onClose }: { initial: Schemas["EmployeePayOut"]; onC
   const [iban, setIban] = useState(initial.iban);
   const [covered, setCovered] = useState<string[]>(initial.contribution_ids);
   const [items, setItems] = useState<ItemDraft[]>(initial.items.length ? initial.items.map((i) => ({ ...i }))
-    : [{ name: t("payroll.basic"), kind: "earning", amount: "", contributory: true, end_of_service: true }]);
+    : [{ name: t("payroll.basic"), kind: "earning", amount: "", contributory: true, end_of_service: true, basic: true }]);
   const save = useMutation({
     mutationFn: () => unwrap(api.PUT("/api/v1/orgs/{org_id}/payroll/employees/{employee_id}", {
       params: { path: { org_id: org.id, employee_id: initial.employee_id } },
@@ -394,6 +455,7 @@ function PayForm({ initial, onClose }: { initial: Schemas["EmployeePayOut"]; onC
               <th className="end">{t("payroll.monthlyAmount")}</th>
               <th>{t("payroll.contributory")}</th>
               <th>{t("payroll.eosItem")}</th>
+              <th>{t("payroll.basicItem")}</th>
               <th />
             </tr>
           </thead>
@@ -404,7 +466,7 @@ function PayForm({ initial, onClose }: { initial: Schemas["EmployeePayOut"]; onC
                 <td>
                   <Select aria-label={t("payroll.itemKind", { n: n + 1 })} value={it.kind}
                     onChange={(e) => setItem(n, { kind: e.target.value as ItemDraft["kind"], contributory: e.target.value === "earning" && it.contributory,
-                      end_of_service: e.target.value === "earning" && it.end_of_service })}>
+                      end_of_service: e.target.value === "earning" && it.end_of_service, basic: e.target.value === "earning" && it.basic })}>
                     <option value="earning">{t("payroll.earning")}</option>
                     <option value="deduction">{t("payroll.deduction")}</option>
                   </Select>
@@ -418,6 +480,10 @@ function PayForm({ initial, onClose }: { initial: Schemas["EmployeePayOut"]; onC
                   <Checkbox label={t("payroll.eosItemShort", { n: n + 1 })} checked={it.end_of_service} disabled={it.kind !== "earning"}
                     onChange={(e) => setItem(n, { end_of_service: e.target.checked })} />
                 </td>
+                <td>
+                  <Checkbox label={t("payroll.basicItemShort", { n: n + 1 })} checked={it.basic} disabled={it.kind !== "earning"}
+                    onChange={(e) => setItem(n, { basic: e.target.checked })} />
+                </td>
                 <td className="end">
                   <IconButton label={t("common.delete")} onClick={() => setItems(items.filter((_, i) => i !== n))}><Trash2 size={16} /></IconButton>
                 </td>
@@ -427,7 +493,7 @@ function PayForm({ initial, onClose }: { initial: Schemas["EmployeePayOut"]; onC
         </table>
       </div>
       <div>
-        <Button size="sm" icon={<Plus size={14} />} onClick={() => setItems([...items, { name: "", kind: "earning", amount: "", contributory: false, end_of_service: false }])}>
+        <Button size="sm" icon={<Plus size={14} />} onClick={() => setItems([...items, { name: "", kind: "earning", amount: "", contributory: false, end_of_service: false, basic: false }])}>
           {t("payroll.addItem")}
         </Button>
       </div>
