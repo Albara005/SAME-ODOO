@@ -380,8 +380,10 @@ test("attendance: checking in and out, HR's hours on a day off, overtime approve
 
   // The month's run pays it: (7,500 + 3,000) / 30 / 8 = 43.75 an hour.
   await nav(page, "الرواتب");
+  const prepare = page.getByRole("button", { name: "إعداد مسير الشهر" });
+  await expect(prepare).toBeVisible();          // the HR page's own month field is gone by now
   await page.getByLabel("الشهر").fill("2026-09");
-  await page.getByRole("button", { name: "إعداد مسير الشهر" }).click();
+  await prepare.click();
   const slip = page.getByRole("table", { name: "قسائم الرواتب" }).getByRole("row", { name: /هدى صالح/ });
   await expect(slip).toContainText(/8:00.*350\.00/);
   await expect(slip).toContainText("7,850.00");
