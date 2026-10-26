@@ -140,7 +140,6 @@ def create_vendor_credit(db: Session, bill: VendorBill, *, issue_date: date, rea
     number = next_number(db, f"vendor_credit:{issue_date.year}", f"VC-{issue_date.year}-")
 
     # Goods sent back leave stock at average cost, from the warehouse they were received into.
-    stock_ref, moves = "", []
     returns: dict[str, list[tuple[Product, Decimal, str]]] = defaultdict(list)
     warehouses: dict[str, Warehouse] = {}
     for cl in credit_lines:
