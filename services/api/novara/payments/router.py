@@ -8,6 +8,9 @@
 
     POST /api/v1/public/payments/stripe/{token}         Stripe's signed webhook calls
     POST /api/v1/public/payments/moyasar/{token}        Moyasar's webhook calls (checked against Moyasar's API)
+    GET  /api/v1/public/payments/hyperpay/{session}     the customer's page: HyperPay's widget for a checkout made now
+    GET  /api/v1/public/payments/hyperpay/{session}/result   where HyperPay sends the customer back (checked with HyperPay)
+    POST /api/v1/public/payments/hyperpay/{token}       HyperPay's encrypted webhook calls (checked the same way)
     GET  /api/v1/public/payments/test/{session}         the test provider's checkout page (not in production)
     POST /api/v1/public/payments/test/{session}/pay
     GET  /api/v1/public/payments/done?status=paid       where the customer lands afterwards
@@ -37,17 +40,20 @@ from novara.modules.audit import service as audit
 from novara.modules.invoicing.models import Invoice
 from novara.modules.invoicing.service import lock_invoice
 from novara.modules.organizations.models import Organization
+from novara.modules.partners.models import Customer
 from novara.money import from_minor, to_minor
 from novara.payments import service as svc
 from novara.payments.models import PaymentLink, PaymentSettings
-from novara.payments.providers import (BadSignature, Expired, Moyasar, Paid, ProviderError, moyasar_invoice, stripe_event,
-                                       verify_stripe)
+from novara.payments.providers import (BadSignature, Expired, HyperPay, HyperPayResult, Moyasar, Paid, ProviderError,
+                                       decrypt_hyperpay, moyasar_invoice, stripe_event, verify_stripe)
 from novara.tenancy import bind_tenant, current_tenant, system_scope
 
 MAX_BYTES = 256 * 1024
 STRIPE_KEY = r"^(sk|rk)_(test|live)_[A-Za-z0-9]{10,200}$"
 STRIPE_WEBHOOK_SECRET = r"^whsec_[A-Za-z0-9+/=_-]{10,200}$"
 MOYASAR_KEY = r"^sk_(test|live)_[A-Za-z0-9]{20,200}$"
+HYPERPAY_TOKEN = r"^[A-Za-z0-9+/=_-]{20,300}$"
+HYPERPAY_ENTITY = r"^([A-Za-z0-9]{16,64})?$"
 PAGE_HEADERS = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
                                            "frame-ancestors 'none'; base-uri 'none'",
                 "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"}
@@ -56,7 +62,7 @@ router = APIRouter(tags=["online payments"])
 public_router = APIRouter(tags=["online payments"])
 
 
-Provider = Literal["none", "stripe", "moyasar", "test"]
+Provider = Literal["none", "stripe", "moyasar", "hyperpay", "test"]
 
 
 class PaymentSettingsOut(BaseModel):
@@ -69,6 +75,13 @@ class PaymentSettingsOut(BaseModel):
     has_moyasar_key: bool
     has_moyasar_webhook_secret: bool
     moyasar_webhook_url: str
+    hyperpay_token_hint: str
+    has_hyperpay_token: bool
+    hyperpay_entity_id: str
+    hyperpay_mada_entity_id: str
+    hyperpay_live: bool
+    has_hyperpay_webhook_key: bool
+    hyperpay_webhook_url: str
     test_provider_available: bool
 
 
@@ -79,6 +92,13 @@ class PaymentSettingsIn(BaseModel):
     moyasar_secret_key: str | None = Field(default=None, pattern=MOYASAR_KEY)
     # The secret token typed in when adding the webhook in Moyasar's dashboard.
     moyasar_webhook_secret: str | None = Field(default=None, min_length=16, max_length=200, pattern=r"^\S+$")
+    hyperpay_access_token: str | None = Field(default=None, pattern=HYPERPAY_TOKEN)
+    # Entity ids aren't secret: given, they replace the stored ones ("" clears one).
+    hyperpay_entity_id: str | None = Field(default=None, pattern=HYPERPAY_ENTITY)
+    hyperpay_mada_entity_id: str | None = Field(default=None, pattern=HYPERPAY_ENTITY)
+    hyperpay_live: bool | None = None
+    # The webhook's decryption key from HyperPay's dashboard (64 hex characters).
+    hyperpay_webhook_key: str | None = Field(default=None, pattern=r"^[0-9A-Fa-f]{64}$")
 
 
 class PaymentProviderOut(BaseModel):
@@ -112,6 +132,10 @@ def _settings_out(db: Session, settings, row: PaymentSettings) -> PaymentSetting
                        moyasar_key_hint=row.moyasar_key_hint, has_moyasar_key=row.moyasar_secret_key is not None,
                        has_moyasar_webhook_secret=row.moyasar_webhook_secret is not None,
                        moyasar_webhook_url=svc.webhook_url(db, settings, row, "moyasar"),
+                       hyperpay_token_hint=row.hyperpay_token_hint, has_hyperpay_token=row.hyperpay_access_token is not None,
+                       hyperpay_entity_id=row.hyperpay_entity_id, hyperpay_mada_entity_id=row.hyperpay_mada_entity_id,
+                       hyperpay_live=row.hyperpay_live, has_hyperpay_webhook_key=row.hyperpay_webhook_key is not None,
+                       hyperpay_webhook_url=svc.webhook_url(db, settings, row, "hyperpay"),
                        test_provider_available=svc.test_provider_allowed(settings))
 
 
@@ -165,6 +189,22 @@ def change_settings(body: PaymentSettingsIn, request: Request, ctx: OrgContext =
     if body.moyasar_webhook_secret:
         row.moyasar_webhook_secret = crypto.encrypt(settings, body.moyasar_webhook_secret, context=org)
         changed.append("moyasar_webhook_secret")
+    if body.hyperpay_access_token:
+        row.hyperpay_access_token = crypto.encrypt(settings, body.hyperpay_access_token, context=org)
+        row.hyperpay_token_hint = body.hyperpay_access_token[:6] + "…" + body.hyperpay_access_token[-4:]
+        changed.append("hyperpay_access_token")
+    for field in ("hyperpay_entity_id", "hyperpay_mada_entity_id", "hyperpay_live"):
+        value = getattr(body, field)
+        if value is not None and value != getattr(row, field):
+            setattr(row, field, value)
+            changed.append(field)
+    if body.hyperpay_webhook_key:
+        row.hyperpay_webhook_key = crypto.encrypt(settings, body.hyperpay_webhook_key.lower(), context=org)
+        changed.append("hyperpay_webhook_key")
+    if body.provider == "hyperpay" and (row.hyperpay_access_token is None
+                                        or not (row.hyperpay_entity_id or row.hyperpay_mada_entity_id)):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "HyperPay needs the access token and at least one entity id (cards or mada)")
     if body.provider == "stripe" and (row.stripe_secret_key is None or row.stripe_webhook_secret is None):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                             "Stripe needs the secret key and the webhook's signing secret (whsec_…)")
@@ -176,7 +216,8 @@ def change_settings(body: PaymentSettingsIn, request: Request, ctx: OrgContext =
     audit.record(db, actor_user_id=ctx.user.id, action="payments.settings_changed", target_type="organization",
                  target_id=org, details={"provider": body.provider, "changed": changed,
                                          "stripe_key_hint": row.stripe_key_hint,
-                                         "moyasar_key_hint": row.moyasar_key_hint}, ip_address=client_ip(request))
+                                         "moyasar_key_hint": row.moyasar_key_hint,
+                                         "hyperpay_token_hint": row.hyperpay_token_hint}, ip_address=client_ip(request))
     db.commit()
     return _settings_out(db, settings, row)
 
@@ -426,3 +467,180 @@ def done(state: Literal["paid", "cancelled"] = Query(alias="status")):
     return _page("لم يكتمل الدفع", "<h1>لم يكتمل الدفع</h1><p>لم يُسحب أي مبلغ. يمكنك فتح الرابط مرة أخرى متى شئت.</p>"
                                     "<p class='muted'>The payment wasn't completed and nothing was charged. You can "
                                     "open the link again.</p>")
+
+
+# ---------------------------------------------------------------- HyperPay (COPYandPAY)
+
+BRAND_LABELS = {"mada": ("مدى", "mada", "MADA"), "card": ("فيزا أو ماستركارد", "Visa or Mastercard", "VISA MASTER")}
+
+
+def _hyperpay_link(db: Session, session: str) -> PaymentLink:
+    if not session.startswith("hp_") or len(session) > 100:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+    org_id = _org_by_session(db, "hyperpay", session)
+    if org_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+    bind_tenant(db, org_id)
+    return db.scalar(select(PaymentLink).where(PaymentLink.provider == "hyperpay", PaymentLink.session_id == session))
+
+
+def _hyperpay(db: Session, settings, http) -> HyperPay:
+    try:
+        gateway = svc.provider(db, settings, svc.settings_row(db, settings), http, name="hyperpay")
+    except svc.PaymentsUnavailable:
+        raise HTTPException(status.HTTP_410_GONE, "online payments are no longer taken this way") from None
+    assert isinstance(gateway, HyperPay)
+    return gateway
+
+
+def _widget_headers(host: str) -> dict[str, str]:
+    """HyperPay's widget runs its own scripts and frames, and 3-D Secure goes through the card's bank."""
+    hosts = f"{host} https://*.oppwa.com"
+    return {"Content-Security-Policy": f"default-src 'none'; script-src {hosts} 'unsafe-inline'; style-src {hosts} "
+                                       f"'unsafe-inline'; img-src https: data:; font-src {hosts}; connect-src {hosts}; "
+                                       "frame-src https:; form-action 'self' https:; frame-ancestors 'none'; base-uri 'none'",
+            "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"}
+
+
+def _customer_fields(db: Session, inv: Invoice) -> dict[str, str]:
+    """What HyperPay asks of the buyer for 3-D Secure, as far as the customer's record has it."""
+    c = db.get(Customer, inv.customer_id)
+    if c is None:
+        return {}
+    return {"customer.email": c.email or "", "customer.givenName": (c.name or "")[:48], "billing.street1": c.address_line or "",
+            "billing.city": c.city or "", "billing.postcode": c.postal_code or "", "billing.country": c.country or "SA"}
+
+
+@public_router.get("/public/payments/hyperpay/{session}", response_class=HTMLResponse)
+def hyperpay_checkout(session: str, request: Request, brand: Literal["mada", "card"] | None = None,
+                      db: Session = Depends(get_db)):
+    """The customer's page: choose mada or another card, then HyperPay's widget for a checkout prepared now."""
+    link = _hyperpay_link(db, session)
+    org = db.get(Organization, link.organization_id)
+    inv = db.get(Invoice, link.invoice_id)
+    money = f"{from_minor(link.amount_minor, link.currency)} {link.currency}"
+    state = svc.effective_status(link)
+    if state != "open":
+        return _page("الدفع", f"<h1>هذا الرابط لم يعد متاحاً</h1><p class='muted'>This link is {html.escape(state)}.</p>", 410)
+    settings = request.app.state.settings
+    gateway = _hyperpay(db, settings, request.app.state.payment_http)
+    head = (f"<h1>{html.escape(org.name)}</h1><p>الفاتورة ⁦{html.escape(inv.number or '')}⁩</p>"
+            f"<p class='amount'>{html.escape(money)}</p>")
+    brands = gateway.brands()
+    if brand is not None and brand not in brands:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+    if brand is None and len(brands) > 1:
+        choices = "".join(f"<p><a class='pay' href='{html.escape(session)}?brand={b}'>{BRAND_LABELS[b][0]} · "
+                          f"{BRAND_LABELS[b][1]}</a></p>" for b in brands)
+        return _page("الدفع", head + "<p>اختر طريقة الدفع · Choose how to pay</p>" + choices)
+    brand = brand or brands[0]
+    try:
+        checkout = gateway.prepare(brand=brand, link_id=link.id, amount_minor=link.amount_minor, currency=link.currency,
+                                   customer=_customer_fields(db, inv))
+    except ProviderError as e:
+        return _page("الدفع", head + f"<p>تعذّر بدء الدفع، حاول بعد قليل.</p><p class='muted'>{html.escape(str(e))}</p>", 502)
+    result = f"{settings.app_base_url}/api/v1/public/payments/hyperpay/{session}/result?brand={brand}"
+    integrity = f' integrity="{html.escape(checkout.integrity)}" crossorigin="anonymous"' if checkout.integrity else ""
+    widget = (f'<script src="{gateway.host}/v1/paymentWidgets.js?checkoutId={html.escape(checkout.checkout_id)}"{integrity}>'
+              f'</script><form action="{html.escape(result)}" class="paymentWidgets" '
+              f'data-brands="{BRAND_LABELS[brand][2]}"></form>')
+    page = _page("الدفع", head + widget)
+    page.headers.update(_widget_headers(gateway.host))
+    return page
+
+
+def _not_completed(session: str, outcome: HyperPayResult | None = None, code: int = 200) -> HTMLResponse:
+    detail = f"<p class='muted'>{html.escape(outcome.description)} ({html.escape(outcome.code)})</p>" if outcome else ""
+    return _page("لم يكتمل الدفع", "<h1>لم يكتمل الدفع</h1><p>لم يُسحب أي مبلغ. يمكنك المحاولة مرة أخرى.</p>"
+                                    f"<p><a class='pay' href='../{html.escape(session)}'>حاول مرة أخرى · Try again</a></p>"
+                                    "<p class='muted'>The payment wasn't completed and nothing was charged.</p>" + detail, code)
+
+
+def _record(db: Session, link: PaymentLink, outcome: HyperPayResult) -> str:
+    """What HyperPay said about a payment for this link: recorded when taken, noted when held for review."""
+    if outcome.state == "paid":
+        if outcome.amount_minor is None:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "HyperPay's answer had no amount")
+        result = svc.complete(db, link.id, amount_minor=outcome.amount_minor, currency=outcome.currency,
+                              reference=outcome.payment_id, paid_at=utcnow())
+        db.commit()
+        return result
+    if outcome.state == "review" and link.status == "open":
+        link.note = f"HyperPay is reviewing the payment ({outcome.code}); it is recorded once HyperPay accepts it"[:300]
+        db.commit()
+    return outcome.state
+
+
+def _hyperpay_back(db: Session, settings, http, session: str, brand: str, checkout_id: str):
+    link = _hyperpay_link(db, session)
+    try:
+        outcome = _hyperpay(db, settings, http).checkout_result(checkout_id, brand)
+    except ProviderError as e:
+        if e.invalid:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+        return _page("الدفع", "<h1>لم نتأكد من الدفع بعد</h1><p>إن سُحب المبلغ فسيظهر على الفاتورة خلال لحظات.</p>"
+                              f"<p class='muted'>{html.escape(str(e))}</p>", 502)
+    if outcome.state in ("pending", "failed"):
+        return _not_completed(session, outcome)
+    if outcome.merchant_reference != link.id:                # a checkout made for another link
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "that payment wasn't made for this link")
+    if _record(db, link, outcome) == "review":
+        return _page("الدفع قيد المراجعة", "<h1>دفعتك قيد المراجعة</h1><p>ستظهر على الفاتورة حين يقبلها مزوّد الدفع.</p>"
+                                           "<p class='muted'>Your payment is being reviewed by the provider.</p>")
+    return RedirectResponse(f"{settings.app_base_url}/api/v1/public/payments/done?status=paid",
+                            status_code=status.HTTP_303_SEE_OTHER)
+
+
+@public_router.get("/public/payments/hyperpay/{session}/result", response_class=HTMLResponse)
+def hyperpay_result(session: str, request: Request, brand: Literal["mada", "card"], checkout_id: str = Query(alias="id"),
+                    db: Session = Depends(get_db)):
+    """Where HyperPay sends the customer back. Nothing here is believed: HyperPay is asked what happened."""
+    return _hyperpay_back(db, request.app.state.settings, request.app.state.payment_http, session, brand, checkout_id)
+
+
+def _hyperpay_call(db: Session, settings, http, token: str, body: bytes, iv: str, tag: str) -> JSONResponse:
+    org_id = _org_by_webhook(db, crypto.token_hash(token))
+    if org_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown payment webhook address")
+    bind_tenant(db, org_id)
+    row = db.scalar(select(PaymentSettings))
+    key = svc.secret(db, settings, row.hyperpay_webhook_key)
+    if key is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown payment webhook address")
+    try:
+        event = decrypt_hyperpay(key, iv, tag, body.decode("ascii"))
+    except (BadSignature, UnicodeDecodeError) as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"rejected: {e}")
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    if str(event.get("type", "")).upper() != "PAYMENT" or not payload.get("id"):
+        return JSONResponse({"received": True, "result": "ignored"})
+    link = db.scalar(select(PaymentLink).where(PaymentLink.id == str(payload.get("merchantTransactionId", "")),
+                                               PaymentLink.provider == "hyperpay"))
+    if link is None:
+        return JSONResponse({"received": True, "result": "not ours"})   # a payment made outside NOVARA
+    brand = "mada" if str(payload.get("paymentBrand", "")).upper() == "MADA" else "card"
+    try:
+        outcome = _hyperpay(db, settings, http).payment(str(payload["id"]), brand)   # HyperPay's own answer decides
+    except ProviderError as e:
+        if e.invalid:
+            return JSONResponse({"received": True, "result": "ignored"})
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))         # HyperPay calls again later
+    if outcome.merchant_reference != link.id:
+        return JSONResponse({"received": True, "result": "not ours"})
+    return JSONResponse({"received": True, "result": _record(db, link, outcome)})
+
+
+@public_router.post("/public/payments/hyperpay/{token}")
+async def hyperpay_webhook(token: str, request: Request, db: Session = Depends(get_db)):
+    """HyperPay's webhook calls for this organization: decrypted with its key, then HyperPay's API is asked."""
+    if len(token) > 100:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown payment webhook address")
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too large")
+    body = await request.body()
+    if len(body) > MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too large")
+    return await run_in_threadpool(_hyperpay_call, db, request.app.state.settings, request.app.state.payment_http, token,
+                                   body, request.headers.get("x-initialization-vector", ""),
+                                   request.headers.get("x-authentication-tag", ""))

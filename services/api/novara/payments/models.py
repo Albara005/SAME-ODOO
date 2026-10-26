@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, String, Text, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
 from novara.tenancy import TenantScoped, same_org_fk
 
-PROVIDERS = ("none", "stripe", "moyasar", "test")
+PROVIDERS = ("none", "stripe", "moyasar", "hyperpay", "test")
 LINK_STATUSES = ("open", "paid", "unapplied", "expired", "cancelled")
 
 
@@ -21,7 +21,7 @@ class PaymentSettings(IdMixin, TimestampMixin, TenantScoped, Base):
     __tablename__ = "payment_settings"
     __table_args__ = (
         UniqueConstraint("organization_id", name="uq_payment_settings_org"),
-        CheckConstraint("provider IN ('none', 'stripe', 'moyasar', 'test')", name="ck_payment_settings_provider"),
+        CheckConstraint("provider IN ('none', 'stripe', 'moyasar', 'hyperpay', 'test')", name="ck_payment_settings_provider"),
     )
 
     provider: Mapped[str] = mapped_column(String(10), default="none", nullable=False)
@@ -32,6 +32,14 @@ class PaymentSettings(IdMixin, TimestampMixin, TenantScoped, Base):
     moyasar_key_hint: Mapped[str] = mapped_column(String(16), default="", server_default="", nullable=False)
     # The secret token set on the webhook in Moyasar's dashboard: each call carries it.
     moyasar_webhook_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # HyperPay: the access token (secret), the entity for Visa and Mastercard and the one for mada (not secret), test
+    # or live, and the key its webhook calls are encrypted with (secret).
+    hyperpay_access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hyperpay_token_hint: Mapped[str] = mapped_column(String(16), default="", server_default="", nullable=False)
+    hyperpay_entity_id: Mapped[str] = mapped_column(String(64), default="", server_default="", nullable=False)
+    hyperpay_mada_entity_id: Mapped[str] = mapped_column(String(64), default="", server_default="", nullable=False)
+    hyperpay_live: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
+    hyperpay_webhook_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     webhook_token: Mapped[str] = mapped_column(Text, nullable=False)
     webhook_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     updated_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))

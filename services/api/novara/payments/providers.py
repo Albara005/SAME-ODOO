@@ -14,6 +14,13 @@ gives a hosted page that takes mada, Apple Pay, STC Pay and cards. Its webhook c
 token the organization set in Moyasar's dashboard; even then the call is only a hint: the invoice is
 read back from Moyasar's API with the organization's secret key, and that answer decides.
 
+HyperPay (COPYandPAY, https://hyperpay.docs.oppwa.com), the other common gateway in Saudi Arabia: a checkout is
+prepared on the server for an amount and lives 30 minutes, HyperPay's widget takes the card (mada through its own
+entity), and the result is read back from HyperPay's API with the access token. The link a customer gets is therefore
+NOVARA's own page, which prepares a fresh checkout each time it is opened; the result only counts for the link its
+checkout was made for (the link is its merchantTransactionId). HyperPay's webhook is encrypted with a key from its
+dashboard (AES-256-GCM); a call that decrypts is still only a hint, checked against HyperPay's API the same way.
+
 The test provider is the same flow without a real provider, for development and tests: its
 checkout page is served by NOVARA itself and refused in production.
 """
@@ -23,12 +30,15 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import httpx
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 STRIPE_API = "https://api.stripe.com/v1"
 MOYASAR_API = "https://api.moyasar.com/v1"
@@ -281,6 +291,154 @@ def moyasar_invoice(event: dict) -> str | None:
     if str(event.get("type", "")).startswith("invoice") and data.get("id"):
         return str(data["id"])
     return None
+
+
+# ---------------------------------------------------------------- HyperPay
+
+HYPERPAY_HOSTS = {False: "https://eu-test.oppwa.com", True: "https://eu-prod.oppwa.com"}
+HYPERPAY_CURRENCIES = {"SAR"}
+# Result codes: taken, taken but held for review, still pending (anything else failed).
+HYPERPAY_PAID = re.compile(r"^(000\.000\.|000\.100\.1|000\.[36]|000\.400\.1[12]0)")
+HYPERPAY_REVIEW = re.compile(r"^(000\.400\.0[^3]|000\.400\.100)")
+HYPERPAY_PENDING = re.compile(r"^(000\.200)")
+HYPERPAY_ID = re.compile(r"^[A-Za-z0-9.\-]{8,64}$")
+
+
+@dataclass(frozen=True)
+class HyperPayCheckout:
+    checkout_id: str
+    integrity: str          # the widget script's SRI hash, when HyperPay gives one
+
+
+@dataclass(frozen=True)
+class HyperPayResult:
+    state: str              # paid | review | pending | failed
+    code: str
+    description: str
+    payment_id: str
+    amount_minor: int | None
+    currency: str
+    merchant_reference: str  # merchantTransactionId: the link it was made for
+
+
+class HyperPay:
+    """COPYandPAY (see the module's docstring). The link itself is NOVARA's page and lasts as long as the others."""
+
+    name = "hyperpay"
+
+    def __init__(self, access_token: str, entities: dict[str, str], live: bool, base_url: str,
+                 http: httpx.Client | None = None):
+        self._token = access_token
+        self._entities = entities           # brand group (card | mada) -> entityId
+        self.host = HYPERPAY_HOSTS[live]
+        self._base = base_url
+        self._http = http
+
+    def brands(self) -> list[str]:
+        return [b for b in ("mada", "card") if self._entities.get(b)]
+
+    def entity(self, brand: str) -> str:
+        entity = self._entities.get(brand)
+        if not entity:
+            raise ProviderError(f"HyperPay has no entity for {brand} payments", invalid=True)
+        return entity
+
+    def _call(self, method: str, path: str, *, data: dict | None = None, params: dict | None = None) -> dict:
+        client = self._http or httpx.Client(timeout=TIMEOUT)
+        try:
+            r = client.request(method, f"{self.host}{path}", data=data, params=params,
+                               headers={"Authorization": f"Bearer {self._token}"})
+        except httpx.HTTPError as e:
+            raise ProviderError(f"HyperPay didn't answer ({type(e).__name__}); try again") from None
+        finally:
+            if self._http is None:
+                client.close()
+        try:
+            body = r.json()
+        except ValueError:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        if r.status_code == 401 or r.status_code == 403:
+            raise ProviderError("HyperPay refused the access token")
+        if r.status_code >= 500:
+            raise ProviderError(f"HyperPay answered {r.status_code}; try again")
+        return body
+
+    # The link: a page on NOVARA's own address (nothing is asked of HyperPay until the customer opens it).
+    def create_checkout(self, req: CheckoutRequest) -> Checkout:
+        if req.currency not in HYPERPAY_CURRENCIES:
+            raise ProviderError(f"HyperPay can't charge in {req.currency} here", invalid=True)
+        if not self.brands():
+            raise ProviderError("HyperPay isn't set up: add an entity id", invalid=True)
+        session = "hp_" + secrets.token_urlsafe(24)
+        return Checkout(session_id=session, url=f"{self._base}/api/v1/public/payments/hyperpay/{session}",
+                        expires_at=req.expires_at)
+
+    def expire(self, session_id: str) -> None:
+        return None                         # nothing at HyperPay outlives its 30 minutes
+
+    def prepare(self, *, brand: str, link_id: str, amount_minor: int, currency: str, customer: dict[str, str]) -> HyperPayCheckout:
+        """A checkout for the widget: the amount as HyperPay wants it (two decimals), and the link as the merchant's
+        reference, so a result can only ever pay the link it was made for."""
+        data = {"entityId": self.entity(brand), "amount": f"{amount_minor // 100}.{amount_minor % 100:02d}",
+                "currency": currency, "paymentType": "DB", "merchantTransactionId": link_id}
+        data |= {k: v for k, v in customer.items() if v}
+        body = self._call("POST", "/v1/checkouts", data=data)
+        code = str((body.get("result") or {}).get("code", ""))
+        if not code.startswith("000.200") or not HYPERPAY_ID.match(str(body.get("id", ""))):
+            description = (body.get("result") or {}).get("description") or "no checkout"
+            raise ProviderError(f"HyperPay refused: {description} ({code})"[:300], invalid=code.startswith("200.300"))
+        return HyperPayCheckout(checkout_id=str(body["id"]), integrity=str(body.get("integrity") or ""))
+
+    def _result(self, body: dict) -> HyperPayResult:
+        result = body.get("result") or {}
+        code = str(result.get("code", ""))
+        state = ("paid" if HYPERPAY_PAID.match(code) else "review" if HYPERPAY_REVIEW.match(code)
+                 else "pending" if HYPERPAY_PENDING.match(code) else "failed")
+        amount = None
+        try:
+            whole, _, frac = str(body.get("amount", "")).partition(".")
+            if whole.isdigit() and (frac == "" or (frac.isdigit() and len(frac) <= 2)):
+                amount = int(whole) * 100 + int(frac.ljust(2, "0") or 0)
+        except ValueError:
+            amount = None
+        return HyperPayResult(state=state, code=code, description=str(result.get("description", ""))[:200],
+                              payment_id=str(body.get("id", "")), amount_minor=amount,
+                              currency=str(body.get("currency", "")).upper(),
+                              merchant_reference=str(body.get("merchantTransactionId", "")))
+
+    def checkout_result(self, checkout_id: str, brand: str) -> HyperPayResult:
+        if not HYPERPAY_ID.match(checkout_id):
+            raise ProviderError("not a HyperPay checkout", invalid=True)
+        return self._result(self._call("GET", f"/v1/checkouts/{checkout_id}/payment",
+                                       params={"entityId": self.entity(brand)}))
+
+    def payment(self, payment_id: str, brand: str) -> HyperPayResult:
+        if not HYPERPAY_ID.match(payment_id):
+            raise ProviderError("not a HyperPay payment", invalid=True)
+        return self._result(self._call("GET", f"/v1/query/{payment_id}", params={"entityId": self.entity(brand)}))
+
+
+def decrypt_hyperpay(key_hex: str, iv_hex: str, tag_hex: str, body_hex: str) -> dict:
+    """HyperPay's webhook body: hex AES-256-GCM ciphertext, the IV and tag in headers, under the merchant's key."""
+    try:
+        key, iv, tag, data = (bytes.fromhex(x.strip()) for x in (key_hex, iv_hex, tag_hex, body_hex))
+    except ValueError:
+        raise BadSignature("not hex") from None
+    if len(key) != 32 or not 12 <= len(iv) <= 16 or len(tag) != 16:
+        raise BadSignature("wrong key, IV or tag length")
+    try:
+        plain = AESGCM(key).decrypt(iv, data + tag, None)
+    except InvalidTag:
+        raise BadSignature("the authentication tag doesn't match") from None
+    try:
+        event = json.loads(plain)
+    except ValueError:
+        raise BadSignature("not JSON") from None
+    if not isinstance(event, dict):
+        raise BadSignature("not an event")
+    return event
 
 
 class TestProvider:

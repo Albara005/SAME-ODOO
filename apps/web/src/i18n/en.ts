@@ -1966,6 +1966,17 @@ export const en = {
   "audit.a.exchange_rate.fetched": "Exchange rates fetched",
   "audit.a.fx.revalued": "Receivables revalued",
   "audit.a.fx.revaluation_cancelled": "Revaluation cancelled",
+  "pay.providerHyperpay": "HyperPay (mada, Visa, Mastercard)",
+  "pay.hyperpayToken": "Access token",
+  "pay.hyperpayTokenHint": "From HyperPay's dashboard (the Authorization Bearer token).",
+  "pay.hyperpayEntity": "Entity ID for Visa and Mastercard",
+  "pay.hyperpayEntityHint": "Leave empty if you only take mada.",
+  "pay.hyperpayMada": "Entity ID for mada",
+  "pay.hyperpayMadaHint": "mada has its own entity at HyperPay.",
+  "pay.hyperpayLive": "Live payments (off: HyperPay's test environment)",
+  "pay.hyperpayWebhookHint": "Optional: add a webhook with this address in HyperPay's dashboard, so payments show even if the customer closes the page before coming back.",
+  "pay.hyperpayKey": "Webhook decryption key",
+  "pay.hyperpayKeyHint": "The 64-character key HyperPay shows for the webhook.",
 } as const;
 
 export type MessageKey = keyof typeof en;

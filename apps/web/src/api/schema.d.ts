@@ -5011,6 +5011,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/payments/hyperpay/{session}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hyperpay Checkout
+         * @description The customer's page: choose mada or another card, then HyperPay's widget for a checkout prepared now.
+         */
+        get: operations["hyperpay_checkout_api_v1_public_payments_hyperpay__session__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/payments/hyperpay/{session}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hyperpay Result
+         * @description Where HyperPay sends the customer back. Nothing here is believed: HyperPay is asked what happened.
+         */
+        get: operations["hyperpay_result_api_v1_public_payments_hyperpay__session__result_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/payments/hyperpay/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hyperpay Webhook
+         * @description HyperPay's webhook calls for this organization: decrypted with its key, then HyperPay's API is asked.
+         */
+        post: operations["hyperpay_webhook_api_v1_public_payments_hyperpay__token__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/payments/moyasar/{token}": {
         parameters: {
             query?: never;
@@ -8460,10 +8520,20 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "none" | "stripe" | "moyasar" | "test";
+            provider: "none" | "stripe" | "moyasar" | "hyperpay" | "test";
         };
         /** PaymentSettingsIn */
         PaymentSettingsIn: {
+            /** Hyperpay Access Token */
+            hyperpay_access_token?: string | null;
+            /** Hyperpay Entity Id */
+            hyperpay_entity_id?: string | null;
+            /** Hyperpay Live */
+            hyperpay_live?: boolean | null;
+            /** Hyperpay Mada Entity Id */
+            hyperpay_mada_entity_id?: string | null;
+            /** Hyperpay Webhook Key */
+            hyperpay_webhook_key?: string | null;
             /** Moyasar Secret Key */
             moyasar_secret_key?: string | null;
             /** Moyasar Webhook Secret */
@@ -8472,7 +8542,7 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "none" | "stripe" | "moyasar" | "test";
+            provider: "none" | "stripe" | "moyasar" | "hyperpay" | "test";
             /** Stripe Secret Key */
             stripe_secret_key?: string | null;
             /** Stripe Webhook Secret */
@@ -8480,6 +8550,10 @@ export interface components {
         };
         /** PaymentSettingsOut */
         PaymentSettingsOut: {
+            /** Has Hyperpay Token */
+            has_hyperpay_token: boolean;
+            /** Has Hyperpay Webhook Key */
+            has_hyperpay_webhook_key: boolean;
             /** Has Moyasar Key */
             has_moyasar_key: boolean;
             /** Has Moyasar Webhook Secret */
@@ -8488,6 +8562,16 @@ export interface components {
             has_stripe_key: boolean;
             /** Has Webhook Secret */
             has_webhook_secret: boolean;
+            /** Hyperpay Entity Id */
+            hyperpay_entity_id: string;
+            /** Hyperpay Live */
+            hyperpay_live: boolean;
+            /** Hyperpay Mada Entity Id */
+            hyperpay_mada_entity_id: string;
+            /** Hyperpay Token Hint */
+            hyperpay_token_hint: string;
+            /** Hyperpay Webhook Url */
+            hyperpay_webhook_url: string;
             /** Moyasar Key Hint */
             moyasar_key_hint: string;
             /** Moyasar Webhook Url */
@@ -8496,7 +8580,7 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "none" | "stripe" | "moyasar" | "test";
+            provider: "none" | "stripe" | "moyasar" | "hyperpay" | "test";
             /** Stripe Key Hint */
             stripe_key_hint: string;
             /** Test Provider Available */
@@ -22434,6 +22518,104 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hyperpay_checkout_api_v1_public_payments_hyperpay__session__get: {
+        parameters: {
+            query?: {
+                brand?: ("mada" | "card") | null;
+            };
+            header?: never;
+            path: {
+                session: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hyperpay_result_api_v1_public_payments_hyperpay__session__result_get: {
+        parameters: {
+            query: {
+                brand: "mada" | "card";
+                id: string;
+            };
+            header?: never;
+            path: {
+                session: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hyperpay_webhook_api_v1_public_payments_hyperpay__token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

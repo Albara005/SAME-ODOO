@@ -6,7 +6,7 @@ import { useOrg } from "../auth/Org";
 import { useI18n } from "../i18n/I18n";
 import { isPositive } from "../lib/decimal";
 import { StatusBadge } from "./business";
-import { Button, Card, ErrorNotice, Field, Input, Select, useToast } from "./ui";
+import { Button, Card, Checkbox, ErrorNotice, Field, Input, Select, useToast } from "./ui";
 
 type Invoice = Schemas["InvoiceOut"];
 type Provider = Schemas["PaymentSettingsIn"]["provider"];
@@ -143,6 +143,8 @@ export function OnlinePaymentsCard() {
   const [webhookSecret, setWebhookSecret] = useState("");
   const [moyasarKey, setMoyasarKey] = useState("");
   const [moyasarToken, setMoyasarToken] = useState("");
+  const [hp, setHp] = useState<{ token: string; entity: string | null; mada: string | null; live: boolean | null; key: string }>(
+    { token: "", entity: null, mada: null, live: null, key: "" });
   const save = useMutation({
     mutationFn: () =>
       unwrap(api.PUT("/api/v1/orgs/{org_id}/payments/settings", {
@@ -153,6 +155,11 @@ export function OnlinePaymentsCard() {
           stripe_webhook_secret: webhookSecret.trim() || null,
           moyasar_secret_key: moyasarKey.trim() || null,
           moyasar_webhook_secret: moyasarToken.trim() || null,
+          hyperpay_access_token: hp.token.trim() || null,
+          hyperpay_entity_id: hp.entity === null ? null : hp.entity.trim(),
+          hyperpay_mada_entity_id: hp.mada === null ? null : hp.mada.trim(),
+          hyperpay_live: hp.live,
+          hyperpay_webhook_key: hp.key.trim() || null,
         },
       })),
     onSuccess: (s) => {
@@ -163,6 +170,7 @@ export function OnlinePaymentsCard() {
       setWebhookSecret("");
       setMoyasarKey("");
       setMoyasarToken("");
+      setHp({ token: "", entity: null, mada: null, live: null, key: "" });
       toast(t("common.saved"));
     },
   });
@@ -185,6 +193,7 @@ export function OnlinePaymentsCard() {
           <Select value={chosen} onChange={(e) => setProvider(e.target.value as Provider)}>
             <option value="none">{t("pay.providerNone")}</option>
             <option value="moyasar">{t("pay.providerMoyasar")}</option>
+            <option value="hyperpay">{t("pay.providerHyperpay")}</option>
             <option value="stripe">Stripe</option>
             {s.test_provider_available && <option value="test">{t("pay.providerTest")}</option>}
           </Select>
@@ -225,6 +234,33 @@ export function OnlinePaymentsCard() {
             <Field label={t("pay.moyasarToken")} hint={s.has_moyasar_webhook_secret ? t("pay.stored") : t("pay.moyasarTokenHint")}
               optional={s.has_moyasar_webhook_secret}>
               <Input type="password" value={moyasarToken} onChange={(e) => setMoyasarToken(e.target.value)} autoComplete="off" ltr />
+            </Field>
+          </>
+        )}
+        {chosen === "hyperpay" && (
+          <>
+            <Field label={t("pay.hyperpayToken")} hint={s.has_hyperpay_token ? `${t("pay.stored")} ${s.hyperpay_token_hint}` : t("pay.hyperpayTokenHint")}
+              optional={s.has_hyperpay_token}>
+              <Input type="password" value={hp.token} onChange={(e) => setHp({ ...hp, token: e.target.value })} autoComplete="off" ltr />
+            </Field>
+            <div className="grid-2">
+              <Field label={t("pay.hyperpayEntity")} hint={t("pay.hyperpayEntityHint")} optional>
+                <Input value={hp.entity ?? s.hyperpay_entity_id} onChange={(e) => setHp({ ...hp, entity: e.target.value })} ltr />
+              </Field>
+              <Field label={t("pay.hyperpayMada")} hint={t("pay.hyperpayMadaHint")} optional>
+                <Input value={hp.mada ?? s.hyperpay_mada_entity_id} onChange={(e) => setHp({ ...hp, mada: e.target.value })} ltr />
+              </Field>
+            </div>
+            <Checkbox label={t("pay.hyperpayLive")} checked={hp.live ?? s.hyperpay_live}
+              onChange={(e) => setHp({ ...hp, live: e.target.checked })} />
+            <Field label={t("pay.webhookUrl")} hint={t("pay.hyperpayWebhookHint")}>
+              <div className="row">
+                <Input value={s.hyperpay_webhook_url} readOnly ltr aria-label={t("pay.webhookUrl")} />
+                <Button size="sm" icon={<Copy size={14} />} onClick={() => copy(s.hyperpay_webhook_url)}>{t("pay.copy")}</Button>
+              </div>
+            </Field>
+            <Field label={t("pay.hyperpayKey")} hint={s.has_hyperpay_webhook_key ? t("pay.stored") : t("pay.hyperpayKeyHint")} optional>
+              <Input type="password" value={hp.key} onChange={(e) => setHp({ ...hp, key: e.target.value })} autoComplete="off" ltr />
             </Field>
           </>
         )}

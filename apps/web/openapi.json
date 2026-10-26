@@ -8582,6 +8582,7 @@
        "none",
        "stripe",
        "moyasar",
+       "hyperpay",
        "test"
       ],
       "title": "Provider",
@@ -8596,6 +8597,65 @@
    },
    "PaymentSettingsIn": {
     "properties": {
+     "hyperpay_access_token": {
+      "anyOf": [
+       {
+        "pattern": "^[A-Za-z0-9+/=_-]{20,300}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hyperpay Access Token"
+     },
+     "hyperpay_entity_id": {
+      "anyOf": [
+       {
+        "pattern": "^([A-Za-z0-9]{16,64})?$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hyperpay Entity Id"
+     },
+     "hyperpay_live": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hyperpay Live"
+     },
+     "hyperpay_mada_entity_id": {
+      "anyOf": [
+       {
+        "pattern": "^([A-Za-z0-9]{16,64})?$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hyperpay Mada Entity Id"
+     },
+     "hyperpay_webhook_key": {
+      "anyOf": [
+       {
+        "pattern": "^[0-9A-Fa-f]{64}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hyperpay Webhook Key"
+     },
      "moyasar_secret_key": {
       "anyOf": [
        {
@@ -8627,6 +8687,7 @@
        "none",
        "stripe",
        "moyasar",
+       "hyperpay",
        "test"
       ],
       "title": "Provider",
@@ -8665,6 +8726,14 @@
    },
    "PaymentSettingsOut": {
     "properties": {
+     "has_hyperpay_token": {
+      "title": "Has Hyperpay Token",
+      "type": "boolean"
+     },
+     "has_hyperpay_webhook_key": {
+      "title": "Has Hyperpay Webhook Key",
+      "type": "boolean"
+     },
      "has_moyasar_key": {
       "title": "Has Moyasar Key",
       "type": "boolean"
@@ -8681,6 +8750,26 @@
       "title": "Has Webhook Secret",
       "type": "boolean"
      },
+     "hyperpay_entity_id": {
+      "title": "Hyperpay Entity Id",
+      "type": "string"
+     },
+     "hyperpay_live": {
+      "title": "Hyperpay Live",
+      "type": "boolean"
+     },
+     "hyperpay_mada_entity_id": {
+      "title": "Hyperpay Mada Entity Id",
+      "type": "string"
+     },
+     "hyperpay_token_hint": {
+      "title": "Hyperpay Token Hint",
+      "type": "string"
+     },
+     "hyperpay_webhook_url": {
+      "title": "Hyperpay Webhook Url",
+      "type": "string"
+     },
      "moyasar_key_hint": {
       "title": "Moyasar Key Hint",
       "type": "string"
@@ -8694,6 +8783,7 @@
        "none",
        "stripe",
        "moyasar",
+       "hyperpay",
        "test"
       ],
       "title": "Provider",
@@ -8722,6 +8812,13 @@
      "has_moyasar_key",
      "has_moyasar_webhook_secret",
      "moyasar_webhook_url",
+     "hyperpay_token_hint",
+     "has_hyperpay_token",
+     "hyperpay_entity_id",
+     "hyperpay_mada_entity_id",
+     "hyperpay_live",
+     "has_hyperpay_webhook_key",
+     "hyperpay_webhook_url",
      "test_provider_available"
     ],
     "title": "PaymentSettingsOut",
@@ -35638,6 +35735,175 @@
      }
     },
     "summary": "Done",
+    "tags": [
+     "online payments"
+    ]
+   }
+  },
+  "/api/v1/public/payments/hyperpay/{session}": {
+   "get": {
+    "description": "The customer's page: choose mada or another card, then HyperPay's widget for a checkout prepared now.",
+    "operationId": "hyperpay_checkout_api_v1_public_payments_hyperpay__session__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "session",
+      "required": true,
+      "schema": {
+       "title": "Session",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "brand",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "mada",
+          "card"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Brand"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "text/html": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Hyperpay Checkout",
+    "tags": [
+     "online payments"
+    ]
+   }
+  },
+  "/api/v1/public/payments/hyperpay/{session}/result": {
+   "get": {
+    "description": "Where HyperPay sends the customer back. Nothing here is believed: HyperPay is asked what happened.",
+    "operationId": "hyperpay_result_api_v1_public_payments_hyperpay__session__result_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "session",
+      "required": true,
+      "schema": {
+       "title": "Session",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "brand",
+      "required": true,
+      "schema": {
+       "enum": [
+        "mada",
+        "card"
+       ],
+       "title": "Brand",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "id",
+      "required": true,
+      "schema": {
+       "title": "Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "text/html": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Hyperpay Result",
+    "tags": [
+     "online payments"
+    ]
+   }
+  },
+  "/api/v1/public/payments/hyperpay/{token}": {
+   "post": {
+    "description": "HyperPay's webhook calls for this organization: decrypted with its key, then HyperPay's API is asked.",
+    "operationId": "hyperpay_webhook_api_v1_public_payments_hyperpay__token__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "token",
+      "required": true,
+      "schema": {
+       "title": "Token",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Hyperpay Webhook",
     "tags": [
      "online payments"
     ]

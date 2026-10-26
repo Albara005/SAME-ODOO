@@ -330,6 +330,13 @@ test("online payment: the customer pays through a link and the invoice is paid w
   await provider.selectOption({ label: "ميسّر (مدى، Apple Pay، البطاقات)" });
   await expect(page.getByLabel("عنوان الـ Webhook")).toHaveValue(/\/api\/v1\/public\/payments\/moyasar\/nvpay_/);
   await expect(page.getByLabel(/الرمز السري للـ Webhook/)).toBeVisible();
+  await provider.selectOption({ label: "هايبر باي (مدى، فيزا، ماستركارد)" });
+  await expect(page.getByLabel("عنوان الـ Webhook")).toHaveValue(/\/api\/v1\/public\/payments\/hyperpay\/nvpay_/);
+  await page.getByLabel("رمز الوصول").fill("OGFjN2E0YzlkZDk5ZTRkMTAxZGRhZjRlNDY4MTAzZmF8");
+  await page.getByLabel("معرّف الكيان لمدى").fill("8ac7a4c9dd99e4d101ddaf4e46810400");
+  await page.getByRole("button", { name: "حفظ إعدادات الدفع" }).click();
+  await expect(page.getByText("تم الحفظ")).toBeVisible();
+  await expect(page.getByText(/محفوظ؛.*OGFjN2…/)).toBeVisible();
   await provider.selectOption({ label: "مزوّد تجريبي (للتطوير فقط)" });
   await page.getByRole("button", { name: "حفظ إعدادات الدفع" }).click();
   await expect(page.getByText("تم الحفظ")).toBeVisible();
