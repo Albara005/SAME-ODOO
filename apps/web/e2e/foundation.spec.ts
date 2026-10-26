@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createOrg, PASSWORD, signUpAndIn, uniqueEmail } from "./helpers";
+import { createOrg, PASSWORD, signOut, signUpAndIn, uniqueEmail } from "./helpers";
 
 test("sign up, create an organization, manage customers and products in Arabic", async ({ page }) => {
   await signUpAndIn(page, uniqueEmail("owner"));
@@ -79,7 +79,7 @@ test("a member only sees what their role allows", async ({ page, browser }) => {
   await page.screenshot({ path: "test-results/screens/members-ar.png", fullPage: true });
 
   // Sign in as the viewer: no business or admin menus.
-  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel("البريد الإلكتروني").fill(viewer);
   await page.getByLabel("كلمة المرور").fill(PASSWORD);

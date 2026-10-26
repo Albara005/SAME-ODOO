@@ -82,3 +82,7 @@ export function fiscalYear(startMonth: number, day: string): { start: string; en
   const next = new Date(Date.UTC(year + 1, startMonth - 1, 1) - 86_400_000);
   return { start, end: next.toISOString().slice(0, 10) };
 }
+
+/** Two letters for a name's avatar ("مؤسسة الأفق" -> "مأ"), the article "ال" skipped. */
+export const initialsOf = (name: string) =>
+  name.trim().split(/\s+/).slice(0, 2).map((w) => w.replace(/^ال/, "")[0] ?? "").join("").toUpperCase() || "•";

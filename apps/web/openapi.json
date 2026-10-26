@@ -4609,6 +4609,47 @@
     "title": "HTTPValidationError",
     "type": "object"
    },
+   "HistoryOut": {
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "actor_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actor Name"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "details": {
+      "title": "Details",
+      "type": "object"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "created_at",
+     "action",
+     "actor_name",
+     "details"
+    ],
+    "title": "HistoryOut",
+    "type": "object"
+   },
    "HolidayIn": {
     "properties": {
      "day": {
@@ -23322,6 +23363,88 @@
     ]
    }
   },
+  "/api/v1/orgs/{org_id}/history/{target_type}/{target_id}": {
+   "get": {
+    "description": "What happened to one record, newest first, and who did it (without the addresses the audit log keeps).",
+    "operationId": "record_history_api_v1_orgs__org_id__history__target_type___target_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "target_type",
+      "required": true,
+      "schema": {
+       "title": "Target Type",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "target_id",
+      "required": true,
+      "schema": {
+       "title": "Target Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/HistoryOut"
+         },
+         "title": "Response Record History Api V1 Orgs  Org Id  History  Target Type   Target Id  Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Record History",
+    "tags": [
+     "audit"
+    ]
+   }
+  },
   "/api/v1/orgs/{org_id}/hosting": {
    "get": {
     "operationId": "hosting_status_api_v1_orgs__org_id__hosting_get",
@@ -26689,6 +26812,23 @@
         }
        ],
        "title": "Customer Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
       }
      },
      {
@@ -31780,6 +31920,23 @@
         }
        ],
        "title": "Customer Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
       }
      },
      {

@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, CheckCircle2, FileText, Globe, Pencil, Plus, Truck, X } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import {
@@ -13,8 +13,12 @@ import {
   useToast,
 } from "../components/ui";
 import type { MessageKey } from "../i18n/en";
+import { RecordHistory } from "../components/RecordHistory";
 import { useI18n } from "../i18n/I18n";
-import { isPositive } from "../lib/decimal";
+import { DataTable, type Column } from "../components/DataTable";
+import { ListToolbar } from "../components/ListToolbar";
+import { digitsFor, isPositive, sumDec } from "../lib/decimal";
+import { useDebounced } from "../lib/useDebounced";
 import { today } from "../lib/format";
 
 type Order = Schemas["OrderOut"];
@@ -31,16 +35,41 @@ function useOrder(id: string) {
 
 // ---------------------------------------------------------------- list
 
+type OrderRow = Schemas["OrderSummary"];
+type OrderFilter = "" | (typeof STATUSES)[number];
+
 export function SalesOrdersPage() {
   const { t, money, date } = useI18n();
   const { org, can, path } = useOrg();
-  const [status, setStatus] = useState("");
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const [filter, setFilter] = useState<OrderFilter>((params.get("status") as OrderFilter | null) ?? "");
+  const [q, setQ] = useState(params.get("q") ?? "");
+  const term = useDebounced(q.trim(), 250);
   const orders = useQuery({
-    queryKey: ["orders", org.id, status],
+    queryKey: ["orders", org.id, "list", term],
     queryFn: () =>
-      unwrap(api.GET("/api/v1/orgs/{org_id}/sales-orders", { params: { path: { org_id: org.id }, query: { status: status || undefined } } })),
+      unwrap(api.GET("/api/v1/orgs/{org_id}/sales-orders", { params: { path: { org_id: org.id }, query: { q: term || undefined, limit: 500 } } })),
     placeholderData: keepPreviousData,
   });
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (filter) next.set("status", filter);
+    if (term) next.set("q", term);
+    setParams(next, { replace: true });
+  }, [filter, term, setParams]);
+  const all = orders.data ?? [];
+  const shown = filter ? all.filter((o) => o.status === filter) : all;
+  const columns: Column<OrderRow>[] = [
+    { key: "number", header: t("invoices.number"), sort: (o) => o.number,
+      cell: (o) => <Link to={path(`sales/${o.id}`)} className="cell-strong num">{o.number}</Link> },
+    { key: "customer", header: t("invoices.customer"), sort: (o) => o.customer_name, cell: (o) => <span dir="auto">{o.customer_name}</span> },
+    { key: "date", header: t("sales.orderDate"), sort: (o) => o.order_date, cell: (o) => <span className="num small">{date(o.order_date)}</span> },
+    { key: "total", header: t("invoices.total"), align: "end", sort: (o) => Number(o.total),
+      cell: (o) => <span className="num">{money(o.total, org.default_currency)}</span>,
+      total: <span className="num">{money(sumDec(shown.map((o) => o.total), digitsFor(org.default_currency)), org.default_currency)}</span> },
+    { key: "status", header: t("common.status"), sort: (o) => o.status, cell: (o) => <StatusBadge status={o.status} /> },
+  ];
   return (
     <div className="stack">
       <PageHeader
@@ -54,51 +83,19 @@ export function SalesOrdersPage() {
         }
       />
       <WebOrders />
-      <div style={{ maxWidth: 240 }}>
-        <Select aria-label={t("common.status")} value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">{t("common.all")}</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {t(`status.${s}`)}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <ListToolbar
+        search={q} onSearch={setQ} placeholder={t("invoices.searchHint")}
+        filters={[{ key: "" as OrderFilter, label: t("common.all"), count: all.length },
+          ...STATUSES.map((st) => ({ key: st as OrderFilter, label: t(`status.${st}`), count: all.filter((o) => o.status === st).length }))]}
+        filter={filter} onFilter={setFilter} shown={orders.data ? shown.length : undefined}
+      />
       <QueryView query={orders}>
-        {(list) =>
-          list.length === 0 ? (
-            <Empty />
+        {() =>
+          shown.length === 0 ? (
+            <Empty>{term || filter ? t("common.noMatches") : undefined}</Empty>
           ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("invoices.number")}</th>
-                    <th>{t("invoices.customer")}</th>
-                    <th>{t("sales.orderDate")}</th>
-                    <th className="end">{t("invoices.total")}</th>
-                    <th>{t("common.status")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((o) => (
-                    <tr key={o.id}>
-                      <td>
-                        <Link to={path(`sales/${o.id}`)} className="mono">
-                          {o.number}
-                        </Link>
-                      </td>
-                      <td>{o.customer_name}</td>
-                      <td className="num small">{date(o.order_date)}</td>
-                      <td className="end num">{money(o.total, org.default_currency)}</td>
-                      <td>
-                        <StatusBadge status={o.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable rows={shown} columns={columns} rowKey={(o) => o.id} label={t("sales.title")}
+              onRowClick={(o) => navigate(path(`sales/${o.id}`))} />
           )
         }
       </QueryView>
@@ -374,9 +371,7 @@ function OrderDetail({ order: o }: { order: Order }) {
         }
       />
       {o.status !== "cancelled" && (
-        <Card tight>
-          <Journey label={t("common.progress")} steps={orderJourney(o, t)} />
-        </Card>
+        <Journey label={t("common.progress")} steps={orderJourney(o, t)} />
       )}
       <Card>
         <div className="grid-2">
@@ -458,6 +453,7 @@ function OrderDetail({ order: o }: { order: Order }) {
           navigate(path(`invoices/${invoiceId}`));
         }} />
       )}
+      <RecordHistory kind="sales_order" id={o.id} version={`${o.status}:${JSON.stringify(o.lines.map((l) => [l.qty_delivered, l.qty_invoiced]))}`} />
     </div>
   );
 }

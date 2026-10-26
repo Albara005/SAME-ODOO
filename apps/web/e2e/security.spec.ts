@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createOrg, emailedLink, PASSWORD, signIn, signUpAndIn, totp, uniqueEmail } from "./helpers";
+import { createOrg, emailedLink, PASSWORD, signIn, signOut, signUpAndIn, totp, uniqueEmail } from "./helpers";
 
 test("confirm the email, forget the password, choose a new one", async ({ page }) => {
   const email = uniqueEmail("reset");
@@ -14,7 +14,7 @@ test("confirm the email, forget the password, choose a new one", async ({ page }
   await expect(page).toHaveURL(/\/o\/[0-9a-f-]+$/);
   await expect(banner).toHaveCount(0);
 
-  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await signOut(page);
   await page.getByRole("link", { name: "نسيت كلمة المرور؟" }).click();
   // The login page has an email field too: wait for the new page before filling.
   await expect(page.getByRole("heading", { name: "استعادة كلمة المرور" })).toBeVisible();
@@ -62,7 +62,7 @@ test("two-step sign-in: set up, sign in with a code or a recovery code, turn off
   await expect(page.getByText("مفعّل", { exact: true })).toBeVisible();
 
   // The password alone is no longer enough.
-  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await signOut(page);
   await page.goto("/login");
   await signIn(page, email);
   await expect(page.getByRole("heading", { name: "التحقق بخطوتين" })).toBeVisible();
@@ -76,7 +76,7 @@ test("two-step sign-in: set up, sign in with a code or a recovery code, turn off
 
   // A recovery code works once, and turns it off together with the password.
   await page.goto("/account");
-  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await signOut(page);
   await page.goto("/login");
   await signIn(page, email);
   await page.getByLabel("الرمز").fill(codes[0]!);
@@ -106,7 +106,7 @@ test("invite by email: someone without an account joins with the invited role", 
   await page.screenshot({ path: "test-results/screens/invitations-ar.png", fullPage: true });
 
   const link = await emailedLink(page, newcomer, "/invite");
-  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await signOut(page);
   await page.goto(link);
   await expect(page.getByText("انضم إلى شركة الدعوات بدور مشاهد.")).toBeVisible();
   await page.screenshot({ path: "test-results/screens/invite-ar.png" });
@@ -205,7 +205,7 @@ test("passkeys: added on the account page, then used to sign in without the pass
   await expect(page.getByText("حاسوب العمل", { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/screens/passkeys-ar.png", fullPage: true });
 
-  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await signOut(page);
   await expect(page).toHaveURL(/\/login/);
   await page.getByRole("button", { name: "الدخول بمفتاح مرور" }).click();
   await expect(page).toHaveURL(/\/orgs$/);
@@ -240,7 +240,7 @@ test("a passkey meets the organization's two-step requirement; a password-only s
   await expect(dialog).toHaveCount(0);
 
   // Signed in again with the password only: the account page won't change sign-in methods...
-  await page.getByRole("button", { name: "تسجيل الخروج" }).click();
+  await signOut(page);
   await signIn(page, member);
   await expect(page.getByRole("heading", { name: "يلزم التحقق بخطوتين" })).toBeVisible();   // its only organization
   await page.goto(`${app}/account`);

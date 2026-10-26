@@ -7,7 +7,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -314,6 +314,7 @@ def _domain_errors(fn):
 def list_invoices(
     status_filter: str | None = Query(default=None, alias="status"),
     customer_id: str | None = None,
+    q: str | None = Query(default=None, max_length=100),   # part of the number or the customer's name
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     _: OrgContext = Depends(require(P.INVOICES_READ)),
@@ -325,6 +326,9 @@ def list_invoices(
         stmt = stmt.where(Invoice.status == status_filter)
     if customer_id:
         stmt = stmt.where(Invoice.customer_id == customer_id)
+    if q:
+        like = f"%{q.lower()}%"
+        stmt = stmt.where(or_(func.lower(Invoice.number).like(like), func.lower(Customer.name).like(like)))
     out = []
     for inv, name in db.execute(stmt):
         due = inv.amount_due_minor

@@ -119,5 +119,5 @@ test("CSV import checks the file first and reports bad rows", async ({ page }) =
   await upload("name,email\nشركة أ,a@example.com\nشركة ب,b@example.com\n");
   await expect(page.getByText("2 جديد، 0 محدَّث")).toBeVisible();
   await page.getByRole("dialog").getByRole("button", { name: "استيراد", exact: true }).click();
-  await expect(page.getByRole("cell", { name: "شركة ب", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: /^شركة ب/ })).toBeVisible();     // with the email under the name
 });

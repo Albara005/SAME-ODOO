@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from novara import idempotency
@@ -177,6 +177,7 @@ def _apply(db: Session, order: SalesOrder, body: OrderIn) -> list[SalesOrderLine
 
 @router.get("/orgs/{org_id}/sales-orders", response_model=list[OrderSummary])
 def list_orders(status_filter: str | None = Query(default=None, alias="status"), customer_id: str | None = None,
+                q: str | None = Query(default=None, max_length=100),   # part of the number or the customer's name
                 limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0),
                 _: OrgContext = Depends(require(P.SALES_READ)), db: Session = Depends(get_db)):
     stmt = (select(SalesOrder, Customer.name).join(Customer, Customer.id == SalesOrder.customer_id)
@@ -185,6 +186,9 @@ def list_orders(status_filter: str | None = Query(default=None, alias="status"),
         stmt = stmt.where(SalesOrder.status == status_filter)
     if customer_id:
         stmt = stmt.where(SalesOrder.customer_id == customer_id)
+    if q:
+        like = f"%{q.lower()}%"
+        stmt = stmt.where(or_(func.lower(SalesOrder.number).like(like), func.lower(Customer.name).like(like)))
     return [OrderSummary(id=o.id, number=o.number, status=o.status, customer_id=o.customer_id, customer_name=name,
                          order_date=o.order_date, total=_money(o.total_minor, o.currency))
             for o, name in db.execute(stmt)]

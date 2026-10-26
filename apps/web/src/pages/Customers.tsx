@@ -8,7 +8,10 @@ import {
   Badge, Button, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, Textarea, useToast,
 } from "../components/ui";
 import { CsvActions } from "../components/CsvTools";
+import { DataTable } from "../components/DataTable";
+import { ListToolbar } from "../components/ListToolbar";
 import { useI18n } from "../i18n/I18n";
+import { initialsOf } from "../lib/format";
 import { useDebounced } from "../lib/useDebounced";
 
 type Customer = Schemas["CustomerOut"];
@@ -27,7 +30,7 @@ export function CustomersPage() {
   const { t } = useI18n();
   const { org, can } = useOrg();
   const [params, setParams] = useSearchParams();
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(params.get("q") ?? "");
   const [archived, setArchived] = useState(false);
   const [editing, setEditing] = useState<Customer | "new" | null>(params.get("new") ? "new" : null);
   const query = useDebounced(q);
@@ -72,61 +75,52 @@ export function CustomersPage() {
           </>
         }
       />
-      <div className="row">
-        <div className="grow" style={{ maxWidth: 420 }}>
-          <Input type="search" placeholder={t("customers.searchHint")} aria-label={t("common.search")} value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <Checkbox label={t("customers.includeArchived")} checked={archived} onChange={(e) => setArchived(e.target.checked)} />
-      </div>
+      <ListToolbar
+        search={q} onSearch={setQ} placeholder={t("customers.searchHint")}
+        extra={<Checkbox label={t("customers.includeArchived")} checked={archived} onChange={(e) => setArchived(e.target.checked)} />}
+        shown={customers.data?.length}
+      />
       <QueryView query={customers}>
         {(list) =>
           list.length === 0 ? (
-            <Empty />
+            <Empty>{query ? t("common.noMatches") : undefined}</Empty>
           ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("common.name")}</th>
-                    <th>{t("common.email")}</th>
-                    <th>{t("common.phone")}</th>
-                    <th>{t("customers.taxNumber")}</th>
-                    <th>{t("customers.city")}</th>
-                    <th>{t("common.status")}</th>
-                    {can("customers.write") && <th className="end">{t("common.actions")}</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((c) => (
-                    <tr key={c.id}>
-                      <td>
-                        <strong>{c.name}</strong>
-                      </td>
-                      <td className="mono">{c.email}</td>
-                      <td className="num">{c.phone}</td>
-                      <td className="num">{c.tax_number}</td>
-                      <td>{c.city}</td>
-                      <td>{c.active ? <Badge tone="success">{t("common.active")}</Badge> : <Badge>{t("common.archived")}</Badge>}</td>
-                      {can("customers.write") && (
-                        <td className="end">
-                          <IconButton label={`${t("common.edit")} ${c.name}`} onClick={() => setEditing(c)}>
-                            <Pencil size={16} />
-                          </IconButton>
-                          {c.active && (
-                            <IconButton
-                              label={`${t("common.delete")} ${c.name}`}
-                              onClick={() => window.confirm(t("customers.archiveConfirm")) && remove.mutate(c.id)}
-                            >
-                              <Trash2 size={16} />
-                            </IconButton>
-                          )}
-                        </td>
+            <DataTable
+              rows={list} rowKey={(c) => c.id} label={t("customers.title")}
+              onRowClick={can("customers.write") ? (c) => setEditing(c) : undefined}
+              columns={[
+                {
+                  key: "name", header: t("common.name"), sort: (c) => c.name,
+                  cell: (c) => (
+                    <span className="row" style={{ gap: 10, flexWrap: "nowrap" }}>
+                      <span className="avatar" aria-hidden>{initialsOf(c.name)}</span>
+                      <span className="stack-xs" style={{ gap: 0, minWidth: 0 }}>
+                        <span className="cell-strong" dir="auto">{c.name}</span>
+                        {c.email && <span className="cell-sub ltr-inline">{c.email}</span>}
+                      </span>
+                    </span>
+                  ),
+                },
+                { key: "phone", header: t("common.phone"), cell: (c) => <span className="num">{c.phone}</span> },
+                { key: "tax", header: t("customers.taxNumber"), sort: (c) => c.tax_number, cell: (c) => <span className="num">{c.tax_number}</span> },
+                { key: "city", header: t("customers.city"), sort: (c) => c.city, cell: (c) => <span dir="auto">{c.city}</span> },
+                { key: "status", header: t("common.status"), cell: (c) => (c.active ? <Badge tone="success">{t("common.active")}</Badge> : <Badge>{t("common.archived")}</Badge>) },
+                ...(can("customers.write") ? [{
+                  key: "actions", header: <span className="sr-only">{t("common.actions")}</span>, align: "end" as const,
+                  cell: (c: Customer) => (
+                    <span className="row-actions">
+                      <IconButton label={`${t("common.edit")} ${c.name}`} onClick={() => setEditing(c)}><Pencil size={16} /></IconButton>
+                      {c.active && (
+                        <IconButton label={`${t("common.delete")} ${c.name}`}
+                          onClick={() => window.confirm(t("customers.archiveConfirm")) && remove.mutate(c.id)}>
+                          <Trash2 size={16} />
+                        </IconButton>
                       )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    </span>
+                  ),
+                }] : []),
+              ]}
+            />
           )
         }
       </QueryView>

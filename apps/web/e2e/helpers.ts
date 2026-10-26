@@ -63,3 +63,13 @@ export async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.getByLabel("كلمة المرور").fill(password);
   await page.getByRole("button", { name: "تسجيل الدخول" }).click();
 }
+
+/** Sign out: from the account menu in the app, or the button on pages outside an organization. */
+export async function signOut(page: Page) {
+  const direct = page.getByRole("button", { name: "تسجيل الخروج" });
+  const menu = page.getByRole("button", { name: /^الحساب:/ });
+  await expect(direct.or(menu).first()).toBeVisible();
+  if (await direct.isVisible()) return direct.click();
+  await menu.click();
+  await page.getByRole("menuitem", { name: "تسجيل الخروج" }).click();
+}

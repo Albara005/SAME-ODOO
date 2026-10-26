@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, CheckCircle2, CreditCard, FileMinus, FilePlus, Pencil, Plus, Printer, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import {
@@ -14,8 +14,12 @@ import {
 import { CertificateBanner, EInvoiceStatus } from "../components/EInvoicing";
 import { PaymentLinksCard } from "../components/OnlinePayments";
 import { ZatcaQr } from "../components/ZatcaQr";
+import { RecordHistory } from "../components/RecordHistory";
 import { useI18n } from "../i18n/I18n";
-import { isPositive, subtractDec } from "../lib/decimal";
+import { DataTable, type Column } from "../components/DataTable";
+import { ListToolbar } from "../components/ListToolbar";
+import { digitsFor, isPositive, subtractDec, sumDec } from "../lib/decimal";
+import { useDebounced } from "../lib/useDebounced";
 import { today } from "../lib/format";
 
 type Invoice = Schemas["InvoiceOut"];
@@ -33,16 +37,76 @@ function useInvoice(id: string) {
 
 // ---------------------------------------------------------------- list
 
+type Row = Schemas["InvoiceSummary"];
+type Filter = "" | (typeof STATUSES)[number] | "overdue";
+
+/** Every invoice, newest first: quick filters by state (with counts), search by number or customer, sortable columns,
+ *  and the totals of what is shown when it is all in one currency. */
 export function InvoicesPage() {
   const { t, money, date } = useI18n();
   const { org, can, path } = useOrg();
-  const [status, setStatus] = useState("");
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const [filter, setFilter] = useState<Filter>((params.get("status") as Filter | null) ?? "");
+  const [q, setQ] = useState(params.get("q") ?? "");
+  const term = useDebounced(q.trim(), 250);
   const invoices = useQuery({
-    queryKey: ["invoices", org.id, status],
+    queryKey: ["invoices", org.id, "list", term],
     queryFn: () =>
-      unwrap(api.GET("/api/v1/orgs/{org_id}/invoices", { params: { path: { org_id: org.id }, query: { status: status || undefined } } })),
+      unwrap(api.GET("/api/v1/orgs/{org_id}/invoices", { params: { path: { org_id: org.id }, query: { q: term || undefined, limit: 500 } } })),
     placeholderData: keepPreviousData,
   });
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (filter) next.set("status", filter);
+    if (term) next.set("q", term);
+    setParams(next, { replace: true });
+  }, [filter, term, setParams]);
+  const now = today();
+  const overdue = (i: Row) => isPositive(i.amount_due) && !!i.due_date && i.due_date < now && i.status !== "draft" && i.status !== "cancelled";
+  const all = invoices.data ?? [];
+  const count = (f: Filter) => all.filter((i) => (f === "" ? true : f === "overdue" ? overdue(i) : i.status === f)).length;
+  const shown = all.filter((i) => (filter === "" ? true : filter === "overdue" ? overdue(i) : i.status === filter));
+  const currencies = new Set(shown.map((i) => i.currency));
+  const one = currencies.size === 1 ? [...currencies][0]! : null;
+  const columns: Column<Row>[] = [
+    {
+      key: "number", header: t("invoices.number"), sort: (i) => i.number ?? "",
+      cell: (i) => (
+        <>
+          <Link to={path(`invoices/${i.id}`)} className="cell-strong num">{i.number ?? t("status.draft")}</Link>
+          {i.kind === "debit_note" && <> <Badge tone="info">{t("debit.badge")}</Badge></>}
+        </>
+      ),
+    },
+    { key: "customer", header: t("invoices.customer"), sort: (i) => i.customer_name, cell: (i) => <span dir="auto">{i.customer_name}</span> },
+    { key: "issued", header: t("invoices.issueDate"), sort: (i) => i.issue_date, cell: (i) => <span className="num small">{date(i.issue_date)}</span> },
+    {
+      key: "due", header: t("invoices.dueDate"), sort: (i) => i.due_date ?? "",
+      cell: (i) => <span className={`num small ${overdue(i) ? "text-danger" : ""}`}>{date(i.due_date)}</span>,
+    },
+    {
+      key: "total", header: t("invoices.total"), align: "end", sort: (i) => Number(i.total),
+      cell: (i) => <span className="num">{money(i.total, i.currency)}</span>,
+      total: one ? <span className="num">{money(sumDec(shown.map((i) => i.total), digitsFor(one)), one)}</span> : undefined,
+    },
+    {
+      key: "amount_due", header: t("invoices.due"), align: "end", sort: (i) => Number(i.amount_due),
+      cell: (i) => <span className={`num ${isPositive(i.amount_due) ? "cell-strong" : "muted"}`}>{money(i.amount_due, i.currency)}</span>,
+      total: one ? <span className="num">{money(sumDec(shown.map((i) => i.amount_due), digitsFor(one)), one)}</span> : undefined,
+    },
+    { key: "status", header: t("common.status"), sort: (i) => i.status, cell: (i) => <StatusBadge status={i.status} /> },
+  ];
+  const filters: { key: Filter; label: string; count?: number }[] = [
+    { key: "", label: t("common.all"), count: count("") },
+    { key: "draft", label: t("status.draft"), count: count("draft") },
+    { key: "posted", label: t("status.posted"), count: count("posted") },
+    { key: "partially_paid", label: t("status.partially_paid"), count: count("partially_paid") },
+    { key: "overdue", label: t("invoices.overdue"), count: count("overdue") },
+    { key: "paid", label: t("status.paid"), count: count("paid") },
+    { key: "credited", label: t("status.credited"), count: count("credited") },
+    { key: "cancelled", label: t("status.cancelled"), count: count("cancelled") },
+  ];
   return (
     <div className="stack">
       <PageHeader
@@ -56,56 +120,20 @@ export function InvoicesPage() {
         }
       />
       <CertificateBanner />
-      <div style={{ maxWidth: 240 }}>
-        <Select aria-label={t("common.status")} value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">{t("common.all")}</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {t(`status.${s}`)}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <ListToolbar
+        search={q} onSearch={setQ} placeholder={t("invoices.searchHint")}
+        filters={filters.filter((f) => f.key === "" || f.key === filter || (f.count ?? 0) > 0)} filter={filter} onFilter={setFilter}
+        shown={invoices.data ? shown.length : undefined}
+      />
       <QueryView query={invoices}>
-        {(list) =>
-          list.length === 0 ? (
-            <Empty />
+        {() =>
+          shown.length === 0 ? (
+            <Empty>{term || filter ? t("common.noMatches") : undefined}</Empty>
           ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("invoices.number")}</th>
-                    <th>{t("invoices.customer")}</th>
-                    <th>{t("invoices.issueDate")}</th>
-                    <th>{t("invoices.dueDate")}</th>
-                    <th className="end">{t("invoices.total")}</th>
-                    <th className="end">{t("invoices.due")}</th>
-                    <th>{t("common.status")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((inv) => (
-                    <tr key={inv.id}>
-                      <td>
-                        <Link to={path(`invoices/${inv.id}`)} className="mono">
-                          {inv.number ?? t("status.draft")}
-                        </Link>
-                        {inv.kind === "debit_note" && <> <Badge tone="info">{t("debit.badge")}</Badge></>}
-                      </td>
-                      <td>{inv.customer_name}</td>
-                      <td className="num small">{date(inv.issue_date)}</td>
-                      <td className="num small">{date(inv.due_date)}</td>
-                      <td className="end num">{money(inv.total, inv.currency)}</td>
-                      <td className="end num">{money(inv.amount_due, inv.currency)}</td>
-                      <td>
-                        <StatusBadge status={inv.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              rows={shown} columns={columns} rowKey={(i) => i.id} label={t("invoices.title")}
+              onRowClick={(i) => navigate(path(`invoices/${i.id}`))} rowClassName={(i) => (overdue(i) ? "row-overdue" : "")}
+            />
           )
         }
       </QueryView>
@@ -389,8 +417,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
       {isDraft && <div className="no-print"><CertificateBanner /></div>}
       {inv.status !== "cancelled" && (
         <div className="no-print">
-          <Card tight>
-            <Journey
+          <Journey
             label={t("common.progress")}
             steps={journeySteps(
               [t("invoices.stepDraft"), t("invoices.stepPost"), t("invoices.stepPaid")],
@@ -398,7 +425,6 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
               inv.status === "paid" || inv.status === "credited",
             )}
             />
-          </Card>
         </div>
       )}
       {isDraft && inv.sales_order_id && <div className="notice notice-info no-print">{t("invoices.fromOrder")}</div>}
@@ -592,6 +618,7 @@ function InvoiceDetail({ invoice: inv }: { invoice: Invoice }) {
           navigate(path(`credit-notes/${noteId}`));
         }} />
       )}
+      <RecordHistory kind="invoice" id={inv.id} version={`${inv.status}:${inv.amount_due}:${inv.amount_credited}`} />
     </div>
   );
 }

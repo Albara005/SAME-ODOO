@@ -44,14 +44,14 @@ export function Tabs<K extends string>({ tabs, value, onChange }: { tabs: { key:
 
 // ---------------------------------------------------------------- journey
 
-/** Where a document is in its life: each step a star, gold once reached. */
+/** Where a document is in its life, as a status bar of steps: gold stars once reached, the current one highlighted. */
 export function Journey({ steps, label }: { steps: { label: string; state: "done" | "current" | "todo" }[]; label: string }) {
   return (
-    <ol className="journey" aria-label={label}>
+    <ol className="statusbar" aria-label={label}>
       {steps.map((s, i) => (
-        <li key={i} className={`journey-step ${s.state} ${s.state !== "todo" ? "reached" : ""}`} aria-current={s.state === "current" ? "step" : undefined}>
+        <li key={i} className={`statusbar-step ${s.state}`} aria-current={s.state === "current" ? "step" : undefined}>
           <StepStar state={s.state} />
-          <span className="journey-label">{s.label}</span>
+          <span className="statusbar-label">{s.label}</span>
         </li>
       ))}
     </ol>

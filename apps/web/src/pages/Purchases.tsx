@@ -12,6 +12,7 @@ import {
   Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
 } from "../components/ui";
 import type { MessageKey } from "../i18n/en";
+import { RecordHistory } from "../components/RecordHistory";
 import { useI18n } from "../i18n/I18n";
 import { isPositive, subtractDec } from "../lib/decimal";
 import { today } from "../lib/format";
@@ -468,9 +469,7 @@ function OrderDetail({ order: o }: { order: Order }) {
         }
       />
       {o.status !== "cancelled" && (
-        <Card tight>
-          <Journey label={t("common.progress")} steps={orderJourney(o, t)} />
-        </Card>
+        <Journey label={t("common.progress")} steps={orderJourney(o, t)} />
       )}
       <Card>
         <div className="grid-2">
@@ -543,6 +542,7 @@ function OrderDetail({ order: o }: { order: Order }) {
           navigate(path(`purchases/bills/${billId}`));
         }} />
       )}
+      <RecordHistory kind="purchase_order" id={o.id} version={`${o.status}:${JSON.stringify(o.lines.map((l) => [l.qty_received, l.qty_billed]))}`} />
     </div>
   );
 }
@@ -954,6 +954,7 @@ function BillDetail({ bill: b }: { bill: Bill }) {
         }} />
       )}
       {cancelling && <BillCancelDialog bill={b} onClose={() => setCancelling(false)} onDone={(u) => { setCancelling(false); refresh(u); }} />}
+      <RecordHistory kind="vendor_bill" id={b.id} version={`${b.status}:${b.amount_due}`} />
     </div>
   );
 }

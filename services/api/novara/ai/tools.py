@@ -99,8 +99,8 @@ def _list_invoices(t: ToolContext, a: InvoiceQuery):
     from novara.modules.invoicing.router import list_invoices
 
     today = date.today()
-    rows = list_invoices(status_filter=a.status, customer_id=a.customer_id, limit=500 if a.overdue_only else a.limit,
-                         offset=0, _=t.org, db=t.db)
+    rows = list_invoices(status_filter=a.status, customer_id=a.customer_id, q=None,
+                         limit=500 if a.overdue_only else a.limit, offset=0, _=t.org, db=t.db)
     out = []
     for inv in rows:
         overdue_days = (today - inv.due_date).days
@@ -166,7 +166,7 @@ class OrderQuery(BaseModel):
 def _orders(t: ToolContext, a: OrderQuery):
     from novara.modules.sales.router import list_orders
 
-    return _dump(list_orders(status_filter=a.status, customer_id=a.customer_id, limit=a.limit, offset=0,
+    return _dump(list_orders(status_filter=a.status, customer_id=a.customer_id, q=None, limit=a.limit, offset=0,
                              _=t.org, db=t.db))
 
 

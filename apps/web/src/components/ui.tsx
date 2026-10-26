@@ -1,4 +1,4 @@
-import { Loader2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Inbox, Loader2, X } from "lucide-react";
 import {
   cloneElement,
   createContext,
@@ -19,6 +19,7 @@ import {
 } from "react";
 import { ApiError } from "../api/client";
 import { useI18n } from "../i18n/I18n";
+import { usePageTitle } from "../lib/crumbs";
 
 // ---------------------------------------------------------------- buttons
 
@@ -127,6 +128,7 @@ export function Checkbox({ label, ...rest }: InputHTMLAttributes<HTMLInputElemen
 // ---------------------------------------------------------------- layout pieces
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
+  usePageTitle(title);
   return (
     <header className="page-header">
       <div>
@@ -158,19 +160,28 @@ export function Badge({ tone = "neutral", children }: { tone?: Tone; children: R
   return <span className={`badge ${tone !== "neutral" ? `badge-${tone}` : ""}`}>{children}</span>;
 }
 
+/** Placeholder lines where content is coming, so the page keeps its shape while it loads. */
 export function Loading() {
   const { t } = useI18n();
   return (
-    <div className="loading" role="status">
-      <Loader2 size={18} className="spin" aria-hidden />
-      {t("common.loading")}
+    <div className="loading skeleton-block" role="status">
+      <span className="sr-only">{t("common.loading")}</span>
+      <span className="skeleton" aria-hidden style={{ inlineSize: "38%" }} />
+      <span className="skeleton" aria-hidden />
+      <span className="skeleton" aria-hidden style={{ inlineSize: "86%" }} />
+      <span className="skeleton" aria-hidden style={{ inlineSize: "64%" }} />
     </div>
   );
 }
 
 export function Empty({ children }: { children?: ReactNode }) {
   const { t } = useI18n();
-  return <div className="empty">{children ?? t("common.none")}</div>;
+  return (
+    <div className="empty">
+      <span className="empty-mark" aria-hidden><Inbox size={22} /></span>
+      <span>{children ?? t("common.none")}</span>
+    </div>
+  );
 }
 
 /** An error whose message is already written for the reader (and translated): ErrorNotice shows it as is. */
@@ -235,6 +246,8 @@ export function Dialog({
     if (open && !el.open) {
       if (typeof el.showModal === "function") el.showModal();
       else el.setAttribute("open", "");
+      // Start where the typing starts: the first field (the browser would pick the close button).
+      el.querySelector<HTMLElement>(".dialog-body :is(input:not([type=hidden]):not([type=checkbox]), select, textarea)")?.focus();
     } else if (!open && el.open) {
       if (typeof el.close === "function") el.close();
       else el.removeAttribute("open");
@@ -275,7 +288,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="toasts" aria-live="polite">
         {toasts.map((x) => (
           <div key={x.id} className={`toast ${x.tone === "error" ? "toast-error" : ""}`} role={x.tone === "error" ? "alert" : "status"}>
-            {x.text}
+            {x.tone === "error" ? <AlertCircle size={18} aria-hidden className="toast-icon" /> : <CheckCircle2 size={18} aria-hidden className="toast-icon" />}
+            <span>{x.text}</span>
           </div>
         ))}
       </div>

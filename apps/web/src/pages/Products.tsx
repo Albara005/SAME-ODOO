@@ -1,12 +1,15 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import {
   Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, Textarea,
 } from "../components/ui";
 import { CsvActions } from "../components/CsvTools";
+import { DataTable } from "../components/DataTable";
+import { ListToolbar } from "../components/ListToolbar";
 import { useTaxes } from "../components/business";
 import { useI18n } from "../i18n/I18n";
 import { useDebounced } from "../lib/useDebounced";
@@ -14,13 +17,16 @@ import { useDebounced } from "../lib/useDebounced";
 type Product = Schemas["ProductOut"];
 type Tax = Schemas["TaxOut"];
 type TaxCategory = Schemas["TaxIn"]["zatca_category"];
+type KindFilter = "" | "goods" | "service";
 
 export function ProductsPage() {
   const { t, money } = useI18n();
   const { org, can } = useOrg();
-  const [q, setQ] = useState("");
+  const [params, setParams] = useSearchParams();
+  const [q, setQ] = useState(params.get("q") ?? "");
   const query = useDebounced(q);
-  const [editing, setEditing] = useState<Product | "new" | null>(null);
+  const [kind, setKind] = useState<KindFilter>("");
+  const [editing, setEditing] = useState<Product | "new" | null>(params.get("new") ? "new" : null);
   const taxes = useTaxes();
   const products = useQuery({
     queryKey: ["products", org.id, query],
@@ -29,6 +35,12 @@ export function ProductsPage() {
     placeholderData: keepPreviousData,
   });
   const taxName = (id: string | null) => taxes.data?.find((x) => x.id === id)?.name ?? "—";
+  const all = products.data ?? [];
+  const shown = kind ? all.filter((p) => p.kind === kind) : all;
+  const close = () => {
+    setEditing(null);
+    if (params.get("new")) setParams({}, { replace: true });
+  };
 
   return (
     <div className="stack">
@@ -45,58 +57,54 @@ export function ProductsPage() {
           </>
         }
       />
-      <div style={{ maxWidth: 420 }}>
-        <Input type="search" placeholder={t("common.search")} aria-label={t("common.search")} value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
+      <ListToolbar
+        search={q} onSearch={setQ} placeholder={t("products.searchHint")}
+        filters={[{ key: "" as KindFilter, label: t("common.all"), count: all.length },
+          { key: "goods" as KindFilter, label: t("products.goods"), count: all.filter((p) => p.kind === "goods").length },
+          { key: "service" as KindFilter, label: t("products.service"), count: all.filter((p) => p.kind === "service").length }]}
+        filter={kind} onFilter={setKind} filterLabel={t("products.kind")} shown={products.data ? shown.length : undefined}
+      />
       <QueryView query={products}>
-        {(list) =>
-          list.length === 0 ? (
-            <Empty />
+        {() =>
+          shown.length === 0 ? (
+            <Empty>{query || kind ? t("common.noMatches") : undefined}</Empty>
           ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("common.name")}</th>
-                    <th>{t("products.sku")}</th>
-                    <th>{t("products.kind")}</th>
-                    <th className="end">{t("products.price")}</th>
-                    <th>{t("products.tax")}</th>
-                    {can("products.write") && <th className="end">{t("common.actions")}</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((p) => (
-                    <tr key={p.id}>
-                      <td>
-                        <strong>{p.name}</strong>
-                        <div className="muted small">{p.unit}</div>
-                      </td>
-                      <td className="mono">{p.sku ?? "—"}</td>
-                      <td>
-                        <Badge tone={p.kind === "goods" ? "info" : "neutral"}>
-                          {p.kind === "goods" ? t("products.goods") : t("products.service")}
-                        </Badge>
-                      </td>
-                      <td className="end num">{money(p.sale_price, org.default_currency)}</td>
-                      <td>{taxName(p.default_tax_id)}</td>
-                      {can("products.write") && (
-                        <td className="end">
-                          <IconButton label={`${t("common.edit")} ${p.name}`} onClick={() => setEditing(p)}>
-                            <Pencil size={16} />
-                          </IconButton>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              rows={shown} rowKey={(p) => p.id} label={t("products.title")}
+              onRowClick={can("products.write") ? (p) => setEditing(p) : undefined}
+              columns={[
+                {
+                  key: "name", header: t("common.name"), sort: (p) => p.name,
+                  cell: (p) => (
+                    <span className="stack-xs" style={{ gap: 0 }}>
+                      <span className="cell-strong" dir="auto">{p.name}</span>
+                      <span className="cell-sub">{p.unit}</span>
+                    </span>
+                  ),
+                },
+                { key: "sku", header: t("products.sku"), sort: (p) => p.sku ?? "", cell: (p) => <span className="mono">{p.sku ?? "—"}</span> },
+                {
+                  key: "kind", header: t("products.kind"), sort: (p) => p.kind,
+                  cell: (p) => <Badge tone={p.kind === "goods" ? "info" : "neutral"}>{p.kind === "goods" ? t("products.goods") : t("products.service")}</Badge>,
+                },
+                { key: "price", header: t("products.price"), align: "end", sort: (p) => Number(p.sale_price),
+                  cell: (p) => <span className="num">{money(p.sale_price, org.default_currency)}</span> },
+                { key: "tax", header: t("products.tax"), cell: (p) => taxName(p.default_tax_id) },
+                ...(can("products.write") ? [{
+                  key: "actions", header: <span className="sr-only">{t("common.actions")}</span>, align: "end" as const,
+                  cell: (p: Product) => (
+                    <span className="row-actions">
+                      <IconButton label={`${t("common.edit")} ${p.name}`} onClick={() => setEditing(p)}><Pencil size={16} /></IconButton>
+                    </span>
+                  ),
+                }] : []),
+              ]}
+            />
           )
         }
       </QueryView>
       {can("taxes.manage") && <TaxesCard taxes={taxes.data ?? []} />}
-      {editing && <ProductDialog product={editing === "new" ? null : editing} taxes={taxes.data ?? []} onClose={() => setEditing(null)} />}
+      {editing && <ProductDialog product={editing === "new" ? null : editing} taxes={taxes.data ?? []} onClose={close} />}
     </div>
   );
 }
