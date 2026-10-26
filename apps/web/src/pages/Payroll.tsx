@@ -168,6 +168,12 @@ function RunDetail({ runId, onGone }: { runId: string; onGone: () => void }) {
                   {t("payroll.bankFile")}
                 </Button>
               )}
+              {(r.status === "posted" || r.status === "paid") && r.currency === "AED" && (
+                <Button size="sm" icon={<Download size={14} />}
+                  onClick={() => download(`/api/v1/orgs/${org.id}/payroll/runs/${r.id}/wps.sif`, `wps-${r.month}.sif`).catch(onError)}>
+                  {t("payroll.wpsFile")}
+                </Button>
+              )}
               {r.status === "posted" && (
                 <>
                   <Button size="sm" variant="danger" icon={<Ban size={14} />} onClick={() => setDialog("cancel")}>{t("common.cancel")}</Button>
@@ -350,11 +356,53 @@ function OvertimeCard() {
 }
 
 function EmployeesPay() {
+  const { org } = useOrg();
   return (
     <div className="stack">
       <OvertimeCard />
+      {org.default_currency === "AED" && <WpsCard />}
       <EmployeesPayTable />
     </div>
+  );
+}
+
+/** The UAE wage protection system: the employer's ids the salary file (SIF) carries. */
+function WpsCard() {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const path = { params: { path: { org_id: org.id } } };
+  const settings = useQuery({
+    queryKey: ["payroll", org.id, "settings"],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/payroll/settings", path)),
+  });
+  const [form, setForm] = useState<{ employer: string; bank: string } | null>(null);
+  const shown = form ?? { employer: settings.data?.wps_employer_id ?? "", bank: settings.data?.wps_bank_code ?? "" };
+  const save = useMutation({
+    mutationFn: () => unwrap(api.PUT("/api/v1/orgs/{org_id}/payroll/settings", {
+      ...path, body: { wps_employer_id: shown.employer.trim(), wps_bank_code: shown.bank.trim() },
+    })),
+    onSuccess: (x) => { qc.setQueryData(["payroll", org.id, "settings"], x); setForm(null); toast(t("common.saved")); },
+  });
+  return (
+    <Card title={t("payroll.wps.title")}>
+      <form className="stack-sm" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <p className="muted small">{t("payroll.wps.hint")}</p>
+        {save.isError && <ErrorNotice error={save.error} />}
+        <div className="grid-2">
+          <Field label={t("payroll.wps.employer")}>
+            <Input value={shown.employer} maxLength={13} inputMode="numeric" ltr
+              onChange={(e) => setForm({ ...shown, employer: e.target.value.replace(/\D/g, "") })} />
+          </Field>
+          <Field label={t("payroll.wps.bank")}>
+            <Input value={shown.bank} maxLength={9} inputMode="numeric" ltr
+              onChange={(e) => setForm({ ...shown, bank: e.target.value.replace(/\D/g, "") })} />
+          </Field>
+        </div>
+        <div><Button type="submit" disabled={form === null} loading={save.isPending}>{t("common.save")}</Button></div>
+      </form>
+    </Card>
   );
 }
 
@@ -428,13 +476,15 @@ function PayForm({ initial, onClose }: { initial: Schemas["EmployeePayOut"]; onC
   const qc = useQueryClient();
   const contributions = useContributions();
   const [iban, setIban] = useState(initial.iban);
+  const [wps, setWps] = useState({ person: initial.wps_person_id, routing: initial.wps_routing_code });
   const [covered, setCovered] = useState<string[]>(initial.contribution_ids);
   const [items, setItems] = useState<ItemDraft[]>(initial.items.length ? initial.items.map((i) => ({ ...i }))
     : [{ name: t("payroll.basic"), kind: "earning", amount: "", contributory: true, end_of_service: true, basic: true }]);
   const save = useMutation({
     mutationFn: () => unwrap(api.PUT("/api/v1/orgs/{org_id}/payroll/employees/{employee_id}", {
       params: { path: { org_id: org.id, employee_id: initial.employee_id } },
-      body: { iban, contribution_ids: covered, items: items.filter((i) => i.name.trim() && i.amount) },
+      body: { iban, contribution_ids: covered, items: items.filter((i) => i.name.trim() && i.amount),
+              wps_person_id: wps.person.trim(), wps_routing_code: wps.routing.trim() },
     })),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["payroll", org.id] }); onClose(); },
   });
@@ -446,6 +496,16 @@ function PayForm({ initial, onClose }: { initial: Schemas["EmployeePayOut"]; onC
       <Field label={t("payroll.iban")} optional error={err["iban"]}>
         <Input value={iban} onChange={(e) => setIban(e.target.value.toUpperCase())} maxLength={42} placeholder="SA00 0000 0000 0000 0000 0000" ltr />
       </Field>
+      {org.default_currency === "AED" && (
+        <div className="grid-2">
+          <Field label={t("payroll.wpsPerson")} optional error={err["wps_person_id"]}>
+            <Input value={wps.person} onChange={(e) => setWps({ ...wps, person: e.target.value.replace(/\D/g, "") })} maxLength={14} inputMode="numeric" ltr />
+          </Field>
+          <Field label={t("payroll.wpsRouting")} optional error={err["wps_routing_code"]}>
+            <Input value={wps.routing} onChange={(e) => setWps({ ...wps, routing: e.target.value.replace(/\D/g, "") })} maxLength={9} inputMode="numeric" ltr />
+          </Field>
+        </div>
+      )}
       <div className="table-wrap">
         <table aria-label={t("payroll.items")}>
           <thead>

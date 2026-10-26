@@ -1982,4 +1982,11 @@ export const ar: Record<MessageKey, string> = {
   "dataKeys.scope.checkout": "الدفع",
   "dataKeys.scope.checkoutLong": "الدفع في الموقع: يدفع الزائر عند الطلب، ويصبح الطلب المدفوع فاتورة مرحّلة ومدفوعة (يحتاج صلاحية ترحيل الفواتير وتسجيل الدفعات، ومزوّد دفع إلكتروني)",
   "webOrders.awaitingPayment": "بانتظار الدفع",
+  "payroll.wpsFile": "ملف حماية الأجور (SIF)",
+  "payroll.wpsPerson": "الرقم الشخصي (وزارة الموارد البشرية، 14 رقماً)",
+  "payroll.wpsRouting": "رمز توجيه البنك (9 أرقام)",
+  "payroll.wps.title": "نظام حماية الأجور (الإمارات)",
+  "payroll.wps.hint": "لملف الرواتب (SIF) الذي يأخذه البنك أو شركة الصرافة. أضف الرقم الشخصي ورمز توجيه البنك لكل موظف في راتبه.",
+  "payroll.wps.employer": "رقم المنشأة (13 رقماً)",
+  "payroll.wps.bank": "رمز توجيه بنك المنشأة (9 أرقام)",
 };

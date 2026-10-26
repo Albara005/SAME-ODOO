@@ -1980,6 +1980,13 @@ export const en = {
   "dataKeys.scope.checkout": "Checkout",
   "dataKeys.scope.checkoutLong": "Take payment on the site: the visitor pays when ordering, and a paid order becomes a posted, paid invoice (needs posting invoices and taking payments, and an online payment provider)",
   "webOrders.awaitingPayment": "Awaiting payment",
+  "payroll.wpsFile": "WPS file (SIF)",
+  "payroll.wpsPerson": "Person number (MOHRE, 14 digits)",
+  "payroll.wpsRouting": "Bank routing code (9 digits)",
+  "payroll.wps.title": "Wage protection (UAE)",
+  "payroll.wps.hint": "For the salary file (SIF) your bank or exchange house takes. Add each employee's person number and bank routing code in their pay.",
+  "payroll.wps.employer": "Establishment id (13 digits)",
+  "payroll.wps.bank": "Your bank's routing code (9 digits)",
 } as const;
 
 export type MessageKey = keyof typeof en;

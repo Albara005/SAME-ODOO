@@ -56,6 +56,10 @@ class EmployeePay(IdMixin, TimestampMixin, TenantScoped, Base):
     employee_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     iban: Mapped[str] = mapped_column(String(34), default="", nullable=False)
     contribution_ids: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    # The UAE's wage protection system (payroll/wps.py): the person's 14-digit number with the labour ministry, and
+    # the 9-digit routing code of the bank or exchange house their salary goes to.
+    wps_person_id: Mapped[str] = mapped_column(String(14), default="", server_default="", nullable=False)
+    wps_routing_code: Mapped[str] = mapped_column(String(9), default="", server_default="", nullable=False)
 
 
 class PayItem(IdMixin, TimestampMixin, TenantScoped, Base):
@@ -166,6 +170,9 @@ class PayrollSettings(IdMixin, TimestampMixin, TenantScoped, Base):
     overtime_rule: Mapped[str] = mapped_column(String(10), default="none", server_default="none", nullable=False)
     overtime_multiplier: Mapped[Decimal] = mapped_column(ExactDecimal(4, 2), default=Decimal("1.5"), server_default="1.5",
                                                          nullable=False)
+    # The UAE's wage protection system: the employer's 13-digit establishment id and its bank's 9-digit routing code.
+    wps_employer_id: Mapped[str] = mapped_column(String(13), default="", server_default="", nullable=False)
+    wps_bank_code: Mapped[str] = mapped_column(String(9), default="", server_default="", nullable=False)
 
 
 class EndOfService(IdMixin, TimestampMixin, TenantScoped, Base):

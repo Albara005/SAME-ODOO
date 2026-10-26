@@ -7,6 +7,7 @@
     GET/DELETE /orgs/{org}/payroll/runs/{id}
     POST     .../runs/{id}/recalculate | post | pay | cancel
     GET      .../runs/{id}/bank-file.csv                    who to pay, to which IBAN, how much
+    GET      .../runs/{id}/wps.sif                          the UAE wage protection system's salary file
     GET      /orgs/{org}/payroll/my-payslips                the signed-in member's own payslips
     GET/PUT  /orgs/{org}/payroll/settings                   which market's end-of-service rules apply, how overtime is paid
     POST     /orgs/{org}/payroll/end-of-service/preview     a leaver's settlement worked out, nothing saved
@@ -37,7 +38,7 @@ from novara.modules.audit import service as audit
 from novara.modules.hr.models import Employee
 from novara.modules.hr.service import balances, status_of
 from novara.modules.organizations.models import Organization
-from novara.modules.payroll import eosb
+from novara.modules.payroll import eosb, wps
 from novara.modules.payroll import service as svc
 from novara.modules.payroll.models import Contribution, EmployeePay, EndOfService, PayItem, PayrollSettings, PayRun, Payslip
 from novara.money import fmt_decimal, from_minor, to_minor
@@ -92,6 +93,9 @@ class EmployeePayIn(BaseModel):
     iban: str = Field(default="", max_length=42)
     contribution_ids: list[str] = Field(default_factory=list, max_length=20)
     items: list[PayItemIn] = Field(default_factory=list, max_length=40)
+    # UAE wage protection: the person's 14-digit number and their bank's 9-digit routing code (empty: not used).
+    wps_person_id: str = Field(default="", pattern=r"^(\d{14})?$")
+    wps_routing_code: str = Field(default="", pattern=r"^(\d{9})?$")
 
     @field_validator("iban")
     @classmethod
@@ -107,6 +111,8 @@ class EmployeePayOut(BaseModel):
     employee_name: str
     currency: str
     iban: str
+    wps_person_id: str
+    wps_routing_code: str
     contribution_ids: list[str]
     items: list[PayItemOut]
     monthly_earnings: str
@@ -307,6 +313,7 @@ def _pay_out(db: Session, e: Employee, currency: str) -> EmployeePayOut:
     earn, ded = _sums(items)
     return EmployeePayOut(
         employee_id=e.id, employee_name=e.full_name, currency=currency, iban=pay.iban if pay else "",
+        wps_person_id=pay.wps_person_id if pay else "", wps_routing_code=pay.wps_routing_code if pay else "",
         contribution_ids=list(pay.contribution_ids) if pay else [],
         items=[PayItemOut(name=i.name, kind=i.kind, amount=_money(i.amount_minor, currency), contributory=i.contributory,
                           end_of_service=i.end_of_service, basic=i.basic) for i in items],
@@ -355,6 +362,7 @@ def set_pay(employee_id: str, body: EmployeePayIn, request: Request, ctx: OrgCon
         pay = EmployeePay(employee_id=e.id)
         db.add(pay)
     pay.iban, pay.contribution_ids = body.iban, ids
+    pay.wps_person_id, pay.wps_routing_code = body.wps_person_id, body.wps_routing_code
     db.execute(delete(PayItem).where(PayItem.employee_id == e.id))
     for n, (item, minor) in enumerate(zip(body.items, amounts)):
         db.add(PayItem(employee_id=e.id, position=n, name=item.name.strip(), kind=item.kind, amount_minor=minor,
@@ -487,6 +495,26 @@ def bank_file(run_id: str, _: OrgContext = Depends(require(P.PAYROLL_MANAGE)), d
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
+@router.get("/orgs/{org_id}/payroll/runs/{run_id}/wps.sif", response_class=Response)
+def wps_file(run_id: str, _: OrgContext = Depends(require(P.PAYROLL_MANAGE)), db: Session = Depends(get_db)):
+    """The salary file for the UAE's wage protection system (payroll/wps.py): what each employee is paid, for the
+    bank or exchange house to transfer."""
+    run = _run(db, run_id)
+    if run.status not in ("posted", "paid"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "post the run first")
+    s = svc.settings_of(db)
+    slips = list(db.scalars(select(Payslip).where(Payslip.run_id == run.id).order_by(Payslip.employee_name)))
+    pays = {p.employee_id: p for p in db.scalars(select(EmployeePay).where(
+        EmployeePay.employee_id.in_([x.employee_id for x in slips])))} if slips else {}
+    try:
+        f = wps.build(run, slips, pays, employer_id=s.wps_employer_id, bank_code=s.wps_bank_code, now=wps.now(),
+                      reference=f"Salary {run.period_start:%Y-%m}")
+    except wps.WpsError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+    return Response(f.content, media_type="text/plain; charset=us-ascii",
+                    headers={"Content-Disposition": f'attachment; filename="{f.name}"'})
+
+
 @router.get("/orgs/{org_id}/payroll/my-payslips", response_model=list[PayslipOut])
 def my_payslips(ctx: OrgContext = Depends(org_context), db: Session = Depends(get_db)):
     """The signed-in member's own payslips (when their account is linked to an employee record), once posted."""
@@ -507,6 +535,8 @@ class PayrollSettingsIn(BaseModel):
     eosb_rule: Literal["saudi", "uae", "none"] | None = None
     overtime_rule: Literal["none", "saudi", "multiplier"] | None = None
     overtime_multiplier: Decimal | None = Field(default=None, ge=1, le=5, max_digits=4, decimal_places=2)
+    wps_employer_id: str | None = Field(default=None, pattern=r"^(\d{13})?$")    # "" clears it
+    wps_bank_code: str | None = Field(default=None, pattern=r"^(\d{9})?$")
 
 
 class PayrollSettingsOut(BaseModel):
@@ -514,6 +544,8 @@ class PayrollSettingsOut(BaseModel):
     reasons: list[str]              # the reasons for leaving these rules know
     overtime_rule: Literal["none", "saudi", "multiplier"]
     overtime_multiplier: str
+    wps_employer_id: str
+    wps_bank_code: str
 
 
 EosbReason = Literal["termination", "contract_end", "resignation", "resignation_full", "dismissal"]
@@ -569,7 +601,8 @@ class SettlementOut(SettlementPreviewOut):
 def _settings_out(s: PayrollSettings) -> PayrollSettingsOut:
     return PayrollSettingsOut(eosb_rule=s.eosb_rule, reasons=list(eosb.REASONS[s.eosb_rule]),
                               overtime_rule=s.overtime_rule or "none",
-                              overtime_multiplier=fmt_decimal(s.overtime_multiplier or Decimal("1.5")))
+                              overtime_multiplier=fmt_decimal(s.overtime_multiplier or Decimal("1.5")),
+                              wps_employer_id=s.wps_employer_id or "", wps_bank_code=s.wps_bank_code or "")
 
 
 @router.get("/orgs/{org_id}/payroll/settings", response_model=PayrollSettingsOut)
@@ -583,10 +616,11 @@ def put_settings(body: PayrollSettingsIn, request: Request, ctx: OrgContext = De
     """Changing the rules applies to runs and settlements from now on; what is posted stays as it was."""
     current = db.scalar(select(PayrollSettings))
     if current is None:
-        current = PayrollSettings(eosb_rule="none", overtime_rule="none", overtime_multiplier=Decimal("1.5"))
+        current = PayrollSettings(eosb_rule="none", overtime_rule="none", overtime_multiplier=Decimal("1.5"),
+                                  wps_employer_id="", wps_bank_code="")
         db.add(current)
     changes = {}
-    for key in ("eosb_rule", "overtime_rule", "overtime_multiplier"):
+    for key in ("eosb_rule", "overtime_rule", "overtime_multiplier", "wps_employer_id", "wps_bank_code"):
         value = getattr(body, key)
         if value is not None and value != getattr(current, key):
             before = getattr(current, key)

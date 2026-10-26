@@ -194,7 +194,8 @@ def without_pay(db: Session, start: date, end: date) -> list[str]:
 
 def settings_of(db: Session) -> PayrollSettings:
     return db.scalar(select(PayrollSettings)) or PayrollSettings(eosb_rule="none", overtime_rule="none",
-                                                                 overtime_multiplier=Decimal("1.5"))
+                                                                 overtime_multiplier=Decimal("1.5"), wps_employer_id="",
+                                                                 wps_bank_code="")
 
 
 def eosb_wage(items: list[PayItem]) -> int:

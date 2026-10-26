@@ -3493,6 +3493,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orgs/{org_id}/payroll/runs/{run_id}/wps.sif": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Wps File
+         * @description The salary file for the UAE's wage protection system (payroll/wps.py): what each employee is paid, for the
+         *     bank or exchange house to transfer.
+         */
+        get: operations["wps_file_api_v1_orgs__org_id__payroll_runs__run_id__wps_sif_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orgs/{org_id}/payroll/settings": {
         parameters: {
             query?: never;
@@ -6798,6 +6819,16 @@ export interface components {
             iban: string;
             /** Items */
             items?: components["schemas"]["PayItemIn"][];
+            /**
+             * Wps Person Id
+             * @default
+             */
+            wps_person_id: string;
+            /**
+             * Wps Routing Code
+             * @default
+             */
+            wps_routing_code: string;
         };
         /** EmployeePayOut */
         EmployeePayOut: {
@@ -6817,6 +6848,10 @@ export interface components {
             monthly_deductions: string;
             /** Monthly Earnings */
             monthly_earnings: string;
+            /** Wps Person Id */
+            wps_person_id: string;
+            /** Wps Routing Code */
+            wps_routing_code: string;
         };
         /** EmployeeUpdate */
         EmployeeUpdate: {
@@ -8606,6 +8641,10 @@ export interface components {
             overtime_multiplier?: number | string | null;
             /** Overtime Rule */
             overtime_rule?: ("none" | "saudi" | "multiplier") | null;
+            /** Wps Bank Code */
+            wps_bank_code?: string | null;
+            /** Wps Employer Id */
+            wps_employer_id?: string | null;
         };
         /** PayrollSettingsOut */
         PayrollSettingsOut: {
@@ -8623,6 +8662,10 @@ export interface components {
             overtime_rule: "none" | "saudi" | "multiplier";
             /** Reasons */
             reasons: string[];
+            /** Wps Bank Code */
+            wps_bank_code: string;
+            /** Wps Employer Id */
+            wps_employer_id: string;
         };
         /** PayslipLineOut */
         PayslipLineOut: {
@@ -18787,6 +18830,36 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PayRunOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wps_file_api_v1_orgs__org_id__payroll_runs__run_id__wps_sif_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

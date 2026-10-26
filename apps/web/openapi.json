@@ -3986,6 +3986,18 @@
       "maxItems": 40,
       "title": "Items",
       "type": "array"
+     },
+     "wps_person_id": {
+      "default": "",
+      "pattern": "^(\\d{14})?$",
+      "title": "Wps Person Id",
+      "type": "string"
+     },
+     "wps_routing_code": {
+      "default": "",
+      "pattern": "^(\\d{9})?$",
+      "title": "Wps Routing Code",
+      "type": "string"
      }
     },
     "title": "EmployeePayIn",
@@ -4030,6 +4042,14 @@
      "monthly_earnings": {
       "title": "Monthly Earnings",
       "type": "string"
+     },
+     "wps_person_id": {
+      "title": "Wps Person Id",
+      "type": "string"
+     },
+     "wps_routing_code": {
+      "title": "Wps Routing Code",
+      "type": "string"
      }
     },
     "required": [
@@ -4037,6 +4057,8 @@
      "employee_name",
      "currency",
      "iban",
+     "wps_person_id",
+     "wps_routing_code",
      "contribution_ids",
      "items",
      "monthly_earnings",
@@ -8892,6 +8914,30 @@
        }
       ],
       "title": "Overtime Rule"
+     },
+     "wps_bank_code": {
+      "anyOf": [
+       {
+        "pattern": "^(\\d{9})?$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Wps Bank Code"
+     },
+     "wps_employer_id": {
+      "anyOf": [
+       {
+        "pattern": "^(\\d{13})?$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Wps Employer Id"
      }
     },
     "title": "PayrollSettingsIn",
@@ -8927,13 +8973,23 @@
       },
       "title": "Reasons",
       "type": "array"
+     },
+     "wps_bank_code": {
+      "title": "Wps Bank Code",
+      "type": "string"
+     },
+     "wps_employer_id": {
+      "title": "Wps Employer Id",
+      "type": "string"
      }
     },
     "required": [
      "eosb_rule",
      "reasons",
      "overtime_rule",
-     "overtime_multiplier"
+     "overtime_multiplier",
+     "wps_employer_id",
+     "wps_bank_code"
     ],
     "title": "PayrollSettingsOut",
     "type": "object"
@@ -28870,6 +28926,56 @@
      }
     ],
     "summary": "Recalculate",
+    "tags": [
+     "payroll"
+    ]
+   }
+  },
+  "/api/v1/orgs/{org_id}/payroll/runs/{run_id}/wps.sif": {
+   "get": {
+    "description": "The salary file for the UAE's wage protection system (payroll/wps.py): what each employee is paid, for the\nbank or exchange house to transfer.",
+    "operationId": "wps_file_api_v1_orgs__org_id__payroll_runs__run_id__wps_sif_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "run_id",
+      "required": true,
+      "schema": {
+       "title": "Run Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "title": "Org Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Wps File",
     "tags": [
      "payroll"
     ]

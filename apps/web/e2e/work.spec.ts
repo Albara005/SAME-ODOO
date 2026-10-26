@@ -397,3 +397,41 @@ test("attendance: checking in and out, HR's hours on a day off, overtime approve
   await expect(row.getByRole("button", { name: "اعتماد", exact: true })).toHaveCount(0);
   await page.screenshot({ path: "test-results/screens/attendance-ar.png", fullPage: true });
 });
+
+test("WPS: the employer's and each employee's ids, then the posted month's salary file (SIF)", async ({ page }) => {
+  await signUpAndIn(page, uniqueEmail("wps"));
+  await createOrg(page, "شركة دبي");
+  const call = await apiFor(page);
+  const orgId = page.url().match(/\/o\/([0-9a-f-]+)/)![1]!;
+  const token = await page.evaluate(() => localStorage.getItem("novara.token"));
+  const patched = await page.request.patch(`/api/v1/orgs/${orgId}`, { headers: { Authorization: `Bearer ${token}` },
+    data: { default_currency: "AED" } });
+  expect(patched.ok(), await patched.text()).toBeTruthy();
+  await page.reload();
+  const huda = await call("POST", "/hr/employees", { full_name: "هدى صالح", hire_date: "2025-01-01" });
+  await call("PUT", `/payroll/employees/${huda.id}`, { iban: "AE070331234567890123456", contribution_ids: [], items: [
+    { name: "الراتب الأساسي", kind: "earning", amount: "12000", basic: true }] });
+
+  await nav(page, "الرواتب");
+  await page.getByRole("tab", { name: "رواتب الموظفين" }).click();
+  await page.getByLabel("رقم المنشأة (13 رقماً)").fill("1234567890123");
+  await page.getByLabel("رمز توجيه بنك المنشأة (9 أرقام)").fill("803320101");
+  await page.locator(".card", { has: page.getByRole("heading", { name: "نظام حماية الأجور (الإمارات)" }) })
+    .getByRole("button", { name: "حفظ" }).click();
+  await expect(page.getByText("تم الحفظ")).toBeVisible();
+  await page.getByRole("button", { name: "تعديل راتب هدى صالح" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/الرقم الشخصي/).fill("10012345678901");
+  await dialog.getByLabel(/رمز توجيه البنك/).fill("803320101");
+  await dialog.getByRole("button", { name: "حفظ" }).click();
+  await expect(dialog).toHaveCount(0);
+
+  const run = await call("POST", "/payroll/runs", { month: "2026-09" });
+  await call("POST", `/payroll/runs/${run.id}/post`);
+  await page.getByRole("tab", { name: "مسيرات الرواتب" }).click();
+  await page.getByRole("table", { name: "مسيرات الرواتب" }).getByRole("row", { name: /2026-09/ }).getByRole("button").click();
+  const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "ملف حماية الأجور (SIF)" }).click()]);
+  const text = await (await file.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString("ascii"));
+  expect(text).toContain("EDR,10012345678901,803320101,AE070331234567890123456,2026-09-01,2026-09-30,30,12000.00,0.00,0");
+  expect(text).toMatch(/SCR,1234567890123,803320101,\d{4}-\d{2}-\d{2},\d{4},092026,1,12000\.00,AED,Salary 2026-09/);
+});
