@@ -32,6 +32,7 @@ function useOrder(id: string) {
   return useQuery({
     queryKey: ["purchase-order", org.id, id],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/purchase-orders/{order_id}", { params: { path: { org_id: org.id, order_id: id } } })),
+    enabled: Boolean(id),   // a new one has nothing to load
   });
 }
 
@@ -40,6 +41,7 @@ function useBill(id: string) {
   return useQuery({
     queryKey: ["bill", org.id, id],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/bills/{bill_id}", { params: { path: { org_id: org.id, bill_id: id } } })),
+    enabled: Boolean(id),   // a new one has nothing to load
   });
 }
 

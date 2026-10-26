@@ -30,6 +30,7 @@ function useOrder(id: string) {
   return useQuery({
     queryKey: ["order", org.id, id],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/sales-orders/{order_id}", { params: { path: { org_id: org.id, order_id: id } } })),
+    enabled: Boolean(id),   // a new one has nothing to load
   });
 }
 

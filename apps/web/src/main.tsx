@@ -14,8 +14,13 @@ import { AuthProvider } from "./auth/Auth";
 import { ToastProvider } from "./components/ui";
 import { I18nProvider } from "./i18n/I18n";
 import { registerServiceWorker } from "./lib/pwa";
+import { reloadForNewRelease } from "./lib/release";
 
 registerServiceWorker();
+// A module this tab still asks for was replaced by a new release (Vite reports it here): reload once for it.
+window.addEventListener("vite:preloadError", (event) => {
+  if (reloadForNewRelease()) event.preventDefault();
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {

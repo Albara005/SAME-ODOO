@@ -1,19 +1,28 @@
-import { Component, lazy, Suspense, type ComponentType, type ReactNode } from "react";
+import { Component, lazy, Suspense, type ComponentType, type ErrorInfo, type ReactNode } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "./auth/Auth";
 import { lastOrg, OrgProvider, rememberOrg, useOrgQuery } from "./auth/Org";
 import { Layout } from "./components/Layout";
-import { ErrorNotice, Loading, Notice } from "./components/ui";
+import { Button, ErrorNotice, Loading, Notice } from "./components/ui";
 import { useI18n } from "./i18n/I18n";
+import { reloadForNewRelease } from "./lib/release";
 import {
   ForgotPasswordPage, InvitePage, LoginPage, MfaRequiredPage, RegisterPage, ResetPasswordPage, VerifyEmailPage,
 } from "./pages/Auth";
 import { HomePage } from "./pages/Home";
 import { OrgsPage, useMyOrgs } from "./pages/Orgs";
 
-// Each area loads when first opened, so signing in and the home page stay light.
+// Each area loads when first opened, so signing in and the home page stay light. If its code is gone, a release
+// replaced it since this tab opened: reload once for the new one (meanwhile the page keeps showing it is loading).
 function page<K extends string, M extends Record<K, ComponentType>>(load: () => Promise<M>, name: K) {
-  return lazy(() => load().then((m) => ({ default: m[name] })));
+  return lazy(() =>
+    load()
+      .then((m) => ({ default: m[name] }))
+      .catch((e: unknown) => {
+        if (reloadForNewRelease()) return new Promise<never>(() => {});
+        throw e;
+      }),
+  );
 }
 const AccountPage = page(() => import("./pages/Account"), "AccountPage");
 const admin = () => import("./pages/Admin");
@@ -72,14 +81,42 @@ const ApprovalsPage = page(work, "ApprovalsPage");
 const NotificationsPage = page(work, "NotificationsPage");
 const TasksPage = page(work, "TasksPage");
 
-class ErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
+/** A page that throws while rendering: say so, offer a reload, and keep what went wrong for whoever reports it. */
+class ErrorBoundary extends Component<{ children: ReactNode; path: string }, { error: Error | null; path: string }> {
+  state = { error: null as Error | null, path: "" };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    this.setState({ path: this.props.path });
+    console.error("NOVARA page error", error, info.componentStack);
+  }
+  componentDidUpdate() {
+    // Going to another page (the browser's back button) tries again there.
+    if (this.state.error && this.state.path && this.props.path !== this.state.path) this.setState({ error: null, path: "" });
   }
   render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
+    return this.state.error ? <Crashed error={this.state.error} /> : this.props.children;
   }
+}
+
+function Crashed({ error }: { error: Error }) {
+  const { t } = useI18n();
+  return (
+    <div className="content" style={{ maxWidth: 760 }}>
+      <div className="notice notice-error stack-sm" role="alert">
+        <span>{t("error.boundary")}</span>
+        <div className="row">
+          <Button size="sm" variant="primary" onClick={() => window.location.reload()}>{t("error.reload")}</Button>
+          <Button size="sm" variant="ghost" onClick={() => window.location.assign("/")}>{t("error.home")}</Button>
+        </div>
+        <details className="small">
+          <summary>{t("error.details")}</summary>
+          <code dir="ltr">{error.name}: {error.message}</code>
+        </details>
+      </div>
+    </div>
+  );
 }
 
 function RequireAuth() {
@@ -135,9 +172,9 @@ function NotFound() {
 }
 
 export function App() {
-  const { t } = useI18n();
+  const { pathname } = useLocation();
   return (
-    <ErrorBoundary fallback={<div className="content"><ErrorNotice error={new Notice(t("error.boundary"))} /></div>}>
+    <ErrorBoundary path={pathname}>
       <Routes>
         <Route element={<GuestOnly />}>
           <Route path="/login" element={<LoginPage />} />
