@@ -789,6 +789,21 @@
       ],
       "title": "Due Date"
      },
+     "exchange_rate": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Rate"
+     },
      "vendor_reference": {
       "default": "",
       "maxLength": 60,
@@ -809,6 +824,18 @@
       "title": "Bill Date",
       "type": "string"
      },
+     "currency": {
+      "anyOf": [
+       {
+        "pattern": "^[A-Z]{3}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Currency"
+     },
      "due_date": {
       "anyOf": [
        {
@@ -820,6 +847,21 @@
        }
       ],
       "title": "Due Date"
+     },
+     "exchange_rate": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Rate"
      },
      "lines": {
       "items": {
@@ -982,6 +1024,33 @@
       "title": "Amount Paid",
       "type": "string"
      },
+     "base_currency": {
+      "default": "",
+      "title": "Base Currency",
+      "type": "string"
+     },
+     "base_due": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Due"
+     },
+     "base_total": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Total"
+     },
      "bill_date": {
       "format": "date",
       "title": "Bill Date",
@@ -999,6 +1068,11 @@
      "due_date": {
       "format": "date",
       "title": "Due Date",
+      "type": "string"
+     },
+     "exchange_rate": {
+      "default": "1",
+      "title": "Exchange Rate",
       "type": "string"
      },
      "id": {
@@ -1153,6 +1227,21 @@
       ],
       "title": "Amount"
      },
+     "exchange_rate": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Rate"
+     },
      "method": {
       "pattern": "^(bank|cash)$",
       "title": "Method",
@@ -1184,6 +1273,17 @@
       "title": "Amount",
       "type": "string"
      },
+     "base_amount": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Amount"
+     },
      "bill_id": {
       "title": "Bill Id",
       "type": "string"
@@ -1191,6 +1291,22 @@
      "created_at": {
       "format": "date-time",
       "title": "Created At",
+      "type": "string"
+     },
+     "exchange_difference": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Difference"
+     },
+     "exchange_rate": {
+      "default": "1",
+      "title": "Exchange Rate",
       "type": "string"
      },
      "id": {
@@ -1237,6 +1353,11 @@
      "bill_date": {
       "format": "date",
       "title": "Bill Date",
+      "type": "string"
+     },
+     "currency": {
+      "default": "",
+      "title": "Currency",
       "type": "string"
      },
      "due_date": {
@@ -4858,6 +4979,21 @@
       ],
       "title": "Due Date"
      },
+     "exchange_rate": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Rate"
+     },
      "issue_date": {
       "format": "date",
       "title": "Issue Date",
@@ -7333,6 +7469,18 @@
    },
    "OrderIn": {
     "properties": {
+     "currency": {
+      "anyOf": [
+       {
+        "pattern": "^[A-Z]{3}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Currency"
+     },
      "customer_id": {
       "title": "Customer Id",
       "type": "string"
@@ -7614,6 +7762,11 @@
    },
    "OrderSummary": {
     "properties": {
+     "currency": {
+      "default": "",
+      "title": "Currency",
+      "type": "string"
+     },
      "customer_id": {
       "title": "Customer Id",
       "type": "string"
@@ -10222,6 +10375,18 @@
    },
    "PurchaseOrderIn": {
     "properties": {
+     "currency": {
+      "anyOf": [
+       {
+        "pattern": "^[A-Z]{3}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Currency"
+     },
      "expected_date": {
       "anyOf": [
        {
@@ -10493,6 +10658,11 @@
    },
    "PurchaseOrderSummary": {
     "properties": {
+     "currency": {
+      "default": "",
+      "title": "Currency",
+      "type": "string"
+     },
      "expected_date": {
       "anyOf": [
        {
@@ -10783,6 +10953,21 @@
    },
    "ReceiveIn": {
     "properties": {
+     "exchange_rate": {
+      "anyOf": [
+       {
+        "exclusiveMinimum": 0.0,
+        "type": "number"
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange Rate"
+     },
      "lines": {
       "anyOf": [
        {
@@ -11247,6 +11432,17 @@
    },
    "RevaluationLineOut": {
     "properties": {
+     "bill_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bill Id"
+     },
      "booked": {
       "title": "Booked",
       "type": "string"
@@ -11271,7 +11467,23 @@
       "type": "string"
      },
      "invoice_id": {
-      "title": "Invoice Id",
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Invoice Id"
+     },
+     "kind": {
+      "default": "receivable",
+      "enum": [
+       "receivable",
+       "payable"
+      ],
+      "title": "Kind",
       "type": "string"
      },
      "number": {
@@ -11298,7 +11510,6 @@
      }
     },
     "required": [
-     "invoice_id",
      "number",
      "currency",
      "due",
@@ -19059,6 +19270,23 @@
         }
        ],
        "title": "Vendor Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
       }
      },
      {
@@ -31008,6 +31236,23 @@
         }
        ],
        "title": "Vendor Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
       }
      },
      {

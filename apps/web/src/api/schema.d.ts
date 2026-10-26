@@ -5746,6 +5746,8 @@ export interface components {
             bill_date: string;
             /** Due Date */
             due_date?: string | null;
+            /** Exchange Rate */
+            exchange_rate?: number | string | null;
             /**
              * Vendor Reference
              * @default
@@ -5759,8 +5761,12 @@ export interface components {
              * Format: date
              */
             bill_date: string;
+            /** Currency */
+            currency?: string | null;
             /** Due Date */
             due_date?: string | null;
+            /** Exchange Rate */
+            exchange_rate?: number | string | null;
             /** Lines */
             lines: components["schemas"]["PurchaseLineIn"][];
             /**
@@ -5825,6 +5831,15 @@ export interface components {
             /** Amount Paid */
             amount_paid: string;
             /**
+             * Base Currency
+             * @default
+             */
+            base_currency: string;
+            /** Base Due */
+            base_due?: string | null;
+            /** Base Total */
+            base_total?: string | null;
+            /**
              * Bill Date
              * Format: date
              */
@@ -5841,6 +5856,11 @@ export interface components {
              * Format: date
              */
             due_date: string;
+            /**
+             * Exchange Rate
+             * @default 1
+             */
+            exchange_rate: string;
             /** Id */
             id: string;
             /** Journal Entry Id */
@@ -5878,6 +5898,8 @@ export interface components {
         BillPaymentIn: {
             /** Amount */
             amount: number | string;
+            /** Exchange Rate */
+            exchange_rate?: number | string | null;
             /** Method */
             method: string;
             /**
@@ -5895,6 +5917,8 @@ export interface components {
         BillPaymentOut: {
             /** Amount */
             amount: string;
+            /** Base Amount */
+            base_amount?: string | null;
             /** Bill Id */
             bill_id: string;
             /**
@@ -5902,6 +5926,13 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Exchange Difference */
+            exchange_difference?: string | null;
+            /**
+             * Exchange Rate
+             * @default 1
+             */
+            exchange_rate: string;
             /** Id */
             id: string;
             /** Journal Entry Id */
@@ -5925,6 +5956,11 @@ export interface components {
              * Format: date
              */
             bill_date: string;
+            /**
+             * Currency
+             * @default
+             */
+            currency: string;
             /**
              * Due Date
              * Format: date
@@ -7298,6 +7334,8 @@ export interface components {
         InvoiceFromOrderIn: {
             /** Due Date */
             due_date?: string | null;
+            /** Exchange Rate */
+            exchange_rate?: number | string | null;
             /**
              * Issue Date
              * Format: date
@@ -8208,6 +8246,8 @@ export interface components {
         };
         /** OrderIn */
         OrderIn: {
+            /** Currency */
+            currency?: string | null;
             /** Customer Id */
             customer_id: string;
             /** Lines */
@@ -8310,6 +8350,11 @@ export interface components {
         };
         /** OrderSummary */
         OrderSummary: {
+            /**
+             * Currency
+             * @default
+             */
+            currency: string;
             /** Customer Id */
             customer_id: string;
             /** Customer Name */
@@ -9207,6 +9252,8 @@ export interface components {
         };
         /** PurchaseOrderIn */
         PurchaseOrderIn: {
+            /** Currency */
+            currency?: string | null;
             /** Expected Date */
             expected_date?: string | null;
             /** Lines */
@@ -9302,6 +9349,11 @@ export interface components {
         };
         /** PurchaseOrderSummary */
         PurchaseOrderSummary: {
+            /**
+             * Currency
+             * @default
+             */
+            currency: string;
             /** Expected Date */
             expected_date: string | null;
             /** Id */
@@ -9419,6 +9471,8 @@ export interface components {
         };
         /** ReceiveIn */
         ReceiveIn: {
+            /** Exchange Rate */
+            exchange_rate?: number | string | null;
             /** Lines */
             lines?: components["schemas"]["ReceiveLineIn"][] | null;
             /**
@@ -9617,6 +9671,8 @@ export interface components {
         };
         /** RevaluationLineOut */
         RevaluationLineOut: {
+            /** Bill Id */
+            bill_id?: string | null;
             /** Booked */
             booked: string;
             /** Currency */
@@ -9626,7 +9682,13 @@ export interface components {
             /** Due */
             due: string;
             /** Invoice Id */
-            invoice_id: string;
+            invoice_id?: string | null;
+            /**
+             * Kind
+             * @default receivable
+             * @enum {string}
+             */
+            kind: "receivable" | "payable";
             /** Number */
             number: string | null;
             /** Revalued */
@@ -13457,6 +13519,7 @@ export interface operations {
             query?: {
                 status?: string | null;
                 vendor_id?: string | null;
+                q?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -20052,6 +20115,7 @@ export interface operations {
             query?: {
                 status?: string | null;
                 vendor_id?: string | null;
+                q?: string | null;
                 limit?: number;
                 offset?: number;
             };

@@ -5,6 +5,8 @@ import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useAuth } from "../auth/Auth";
 import { useOrg } from "../auth/Org";
 import { Tabs } from "../components/business";
+import { DataTable, type Column } from "../components/DataTable";
+import { ListToolbar } from "../components/ListToolbar";
 import { MyPayslips } from "../components/MyPayslips";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, Textarea,
@@ -12,7 +14,7 @@ import {
 } from "../components/ui";
 import { useI18n } from "../i18n/I18n";
 import type { MessageKey } from "../i18n/en";
-import { today } from "../lib/format";
+import { initialsOf, today } from "../lib/format";
 import { AttendanceTab, MyAttendance, ReducedHoursCard, Schedules, WorkingDay, useSchedules } from "./Attendance";
 
 type Tab = "mine" | "requests" | "people" | "attendance" | "away" | "settings";
@@ -372,65 +374,58 @@ function RequestDialog({ onClose }: { onClose: () => void }) {
 function People() {
   const { t, date } = useI18n();
   const { can } = useOrg();
-  const [filter, setFilter] = useState("active");
+  const [filter, setFilter] = useState<"active" | "left">("active");
+  const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Employee | "new" | null>(null);
   const people = useHr(`employees-${filter}`, (org_id) => unwrap(api.GET("/api/v1/orgs/{org_id}/hr/employees", {
     params: { path: { org_id }, query: { status_filter: filter } },
   })));
+  const term = q.trim().toLowerCase();
+  const shown = (people.data ?? []).filter((p) => !term || [p.full_name, p.job_title, p.department_name, p.work_email, p.phone]
+    .some((v) => v?.toLowerCase().includes(term)));
+  const manage = can("hr.manage");
+  const columns: Column<Employee>[] = [
+    { key: "name", header: t("common.name"), sort: (p) => p.full_name,
+      cell: (p) => (
+        <span className="row" style={{ gap: 10, flexWrap: "nowrap" }}>
+          <span className="avatar" aria-hidden>{initialsOf(p.full_name)}</span>
+          <span className="stack-xs" style={{ gap: 0, minWidth: 0 }}>
+            <span className="cell-strong" dir="auto">{p.full_name}</span>
+            {p.job_title && <span className="cell-sub" dir="auto">{p.job_title}</span>}
+          </span>
+        </span>
+      ) },
+    { key: "department", header: t("hr.department"), sort: (p) => p.department_name ?? "",
+      cell: (p) => (p.department_name ? <span dir="auto">{p.department_name}</span> : <span className="muted">—</span>) },
+    { key: "contact", header: t("hr.contact"),
+      cell: (p) => (
+        <span className="stack-xs small" style={{ gap: 0 }}>
+          {p.work_email && <span className="ltr-inline">{p.work_email}</span>}
+          {p.phone && <span className="num" dir="ltr">{p.phone}</span>}
+        </span>
+      ) },
+    { key: "hired", header: t("hr.hired"), sort: (p) => p.hire_date,
+      cell: (p) => <span className="num small">{p.status === "left" ? `${date(p.hire_date)} – ${date(p.end_date)}` : date(p.hire_date)}</span> },
+    { key: "actions", header: <span className="sr-only">{t("common.actions")}</span>, align: "end",
+      cell: (p) => (
+        <span className="row-actions">
+          {p.away_today && <Badge tone="info">{t("hr.awayToday")}</Badge>}
+          {manage && <IconButton label={`${t("common.edit")} ${p.full_name}`} onClick={() => setEditing(p)}><Pencil size={16} /></IconButton>}
+        </span>
+      ) },
+  ];
   return (
     <div className="stack">
-      <div className="row-between">
-        <Field label={t("hr.show")}>
-          <Select value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="active">{t("hr.current")}</option>
-            <option value="left">{t("hr.former")}</option>
-          </Select>
-        </Field>
-        {can("hr.manage") && <Button icon={<UserPlus size={16} />} onClick={() => setEditing("new")}>{t("hr.newEmployee")}</Button>}
-      </div>
+      <ListToolbar
+        search={q} onSearch={setQ} placeholder={t("hr.searchHint")} filterLabel={t("hr.show")}
+        filters={[{ key: "active" as const, label: t("hr.current") }, { key: "left" as const, label: t("hr.former") }]}
+        filter={filter} onFilter={setFilter} shown={people.data ? shown.length : undefined}
+        extra={manage && <Button icon={<UserPlus size={16} />} onClick={() => setEditing("new")}>{t("hr.newEmployee")}</Button>}
+      />
       <QueryView query={people}>
-        {(list) => list.length === 0 ? <Empty>{t("hr.noPeople")}</Empty> : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("common.name")}</th>
-                  <th>{t("hr.department")}</th>
-                  <th>{t("hr.contact")}</th>
-                  <th>{t("hr.hired")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((p) => (
-                  <tr key={p.id}>
-                    <td>
-                      <span className="stack-sm" style={{ gap: 2 }}>
-                        <strong dir="auto">{p.full_name}</strong>
-                        {p.job_title && <span className="muted small" dir="auto">{p.job_title}</span>}
-                      </span>
-                    </td>
-                    <td dir="auto">{p.department_name ?? "—"}</td>
-                    <td className="small">
-                      <span className="stack-sm" style={{ gap: 2 }}>
-                        {p.work_email && <span className="mono">{p.work_email}</span>}
-                        {p.phone && <span className="num" dir="ltr">{p.phone}</span>}
-                      </span>
-                    </td>
-                    <td className="num small">{p.status === "left" ? `${date(p.hire_date)} – ${date(p.end_date)}` : date(p.hire_date)}</td>
-                    <td className="end">
-                      <span className="row" style={{ justifyContent: "flex-end", gap: 4 }}>
-                        {p.away_today && <Badge tone="info">{t("hr.awayToday")}</Badge>}
-                        {can("hr.manage") && (
-                          <IconButton label={`${t("common.edit")} ${p.full_name}`} onClick={() => setEditing(p)}><Pencil size={14} /></IconButton>
-                        )}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {() => shown.length === 0 ? <Empty>{term ? t("common.noMatches") : t("hr.noPeople")}</Empty> : (
+          <DataTable rows={shown} columns={columns} rowKey={(p) => p.id} label={t("hr.tab.people")}
+            onRowClick={manage ? (p) => setEditing(p) : undefined} />
         )}
       </QueryView>
       {editing && <EmployeeDialog employee={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}

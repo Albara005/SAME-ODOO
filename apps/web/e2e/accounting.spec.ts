@@ -28,7 +28,7 @@ test("purchasing: vendor, order, receipt, bill, payment", async ({ page }) => {
   let dialog = page.getByRole("dialog");
   await dialog.getByLabel("الاسم").fill("مؤسسة الخليج للتوريد");
   await dialog.getByRole("button", { name: "حفظ" }).click();
-  await expect(page.getByRole("cell", { name: "مؤسسة الخليج للتوريد" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "مؤسسة الخليج للتوريد", exact: true })).toBeVisible();
 
   await page.getByRole("tab", { name: "أوامر الشراء" }).click();
   await page.getByRole("link", { name: "أمر شراء جديد" }).click();
@@ -507,7 +507,7 @@ test("currencies: a stored rate is suggested on invoices, and what is owed in do
   await expect(page.getByRole("table", { name: "أسعار الصرف" }).getByRole("cell", { name: "3.76" })).toBeVisible();
 
   await page.getByLabel("في يوم").fill("2026-04-30");
-  const preview = page.getByRole("table", { name: "إعادة تقييم ما يستحق على العملاء بعملات أخرى" });
+  const preview = page.getByRole("table", { name: "إعادة تقييم المستحق بعملات أخرى" });
   await expect(preview.getByRole("link", { name: posted.number })).toBeVisible();
   await expect(preview.getByRole("row", { name: new RegExp(posted.number) })).toContainText("3,760.00");
   await expect(page.locator("p", { hasText: "صافي الفرق غير المحقق" })).toContainText("10.00");
@@ -553,4 +553,58 @@ test("exchange rates: fetched from the European Central Bank for the chosen curr
   await expect(rates.getByRole("row", { name: /EUR/ })).not.toContainText("البنك الأوروبي");
   await expect(card).toContainText("آخر أسعار محفوظة");
   await page.screenshot({ path: "test-results/screens/fx-feed-ar.png", fullPage: true });
+});
+
+test("purchasing in dollars: the rate is suggested, the books stay in riyals", async ({ page }) => {
+  page.on("dialog", (d) => d.accept());
+  await signUpAndIn(page, uniqueEmail("usd-buyer"));
+  await createOrg(page, "مستورد الأثاث");
+  const call = await apiFor(page);
+  const tax = await call("POST", "/taxes", { name: "ضريبة القيمة المضافة", rate: "15" });
+  await call("POST", "/products", { name: "كرسي مكتب", sku: "CH-1", kind: "goods", sale_price: "500", default_tax_id: tax.id });
+  await call("POST", "/vendors", { name: "Texas Furniture" });
+  await call("POST", "/exchange-rates", { currency: "USD", day: "2026-01-01", rate: "3.75" });
+
+  await nav(page, "المشتريات");
+  await page.getByRole("link", { name: "أمر شراء جديد" }).click();
+  await page.getByLabel("المورد").selectOption({ label: "Texas Furniture" });
+  await page.getByLabel("العملة").selectOption("USD");
+  await page.getByLabel("المنتج 1").selectOption({ label: "كرسي مكتب (CH-1)" });
+  await page.getByLabel("الكمية 1").fill("10");
+  await page.getByLabel("تكلفة الوحدة 1").fill("100");
+  await page.getByRole("button", { name: "حفظ الأمر" }).click();
+  await expect(page.getByRole("heading", { name: /^PO-\d{4}-00001$/ })).toBeVisible();
+  await page.getByRole("button", { name: "تأكيد الأمر" }).click();
+
+  // The receipt takes the kept rate unless another is typed.
+  await page.getByRole("button", { name: "استلام البضاعة" }).click();
+  let dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel(/سعر الصرف/)).toHaveValue("3.75");
+  await dialog.getByRole("button", { name: "استلام البضاعة" }).click();
+  await expect(page.getByText(/تم الاستلام \(REC-/)).toBeVisible();
+
+  await page.getByRole("button", { name: "تسجيل فاتورة المورد" }).click();
+  dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/سعر الصرف/).fill("3.76");
+  await dialog.getByRole("button", { name: "تسجيل فاتورة المورد" }).click();
+  await expect(page.getByText("هذه الفاتورة تتبع أمر الشراء")).toBeVisible();
+  await page.getByRole("button", { name: "ترحيل الفاتورة" }).click();
+  await expect(page.getByRole("heading", { name: /^BILL-\d{4}-00001$/ })).toBeVisible();
+  await expect(page.getByRole("definition").filter({ hasText: /4,324\.00/ }).first()).toBeVisible();   // 1,150 at 3.76
+
+  await page.getByRole("button", { name: "دفع للمورد" }).click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel(/سعر الصرف يوم الدفع/)).toHaveValue("3.75");
+  await dialog.getByLabel(/سعر الصرف يوم الدفع/).fill("3.74");
+  await dialog.getByRole("button", { name: "دفع للمورد" }).click();
+  await expect(page.getByRole("main").getByText("مدفوعة", { exact: true })).toBeVisible();
+  await expect(page.getByText(/فرق صرف/)).toBeVisible();                                           // 23.00 cheaper: a gain
+  await page.screenshot({ path: "test-results/screens/vendor-bill-usd-ar.png", fullPage: true });
+
+  await nav(page, "المشتريات");
+  await page.getByRole("tab", { name: "فواتير الموردين" }).click();
+  await expect(page.getByRole("cell", { name: /1,150\.00/ }).first()).toBeVisible();
+  await nav(page, "التقارير");
+  await page.getByRole("tab", { name: "الميزانية العمومية" }).click();
+  await expect(page.getByText("متوازن")).toBeVisible();
 });

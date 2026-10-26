@@ -25,7 +25,7 @@ from novara.modules.partners.router import CustomerFields, CustomerUpdate
 from novara.modules.purchasing import service as svc
 from novara.modules.purchasing.models import (BillPayment, PurchaseOrder, PurchaseOrderLine, VendorBill, VendorBillLine,
                                               VendorCredit, VendorCreditLine)
-from novara.money import fmt_decimal, from_minor, to_minor
+from novara.money import CURRENCY_DIGITS, fmt_decimal, from_minor, to_minor
 
 router = APIRouter(tags=["purchases"])
 
@@ -179,11 +179,21 @@ def _resolve_lines(db: Session, lines: list[PurchaseLineIn], *, bill: bool) -> l
     return out
 
 
+def _currency(db: Session, currency: str | None) -> str:
+    """The document's currency: the organization's unless another is given (prices are then in it)."""
+    currency = currency or svc.base_currency(db)
+    if currency not in CURRENCY_DIGITS:
+        raise _unprocessable(f"unsupported currency: {currency}")
+    return currency
+
+
 # ---------------------------------------------------------------- purchase orders
 
 
 class PurchaseOrderIn(BaseModel):
     vendor_id: str
+    # Another currency than the organization's: line costs are in it; receipts and bills take the day's rate.
+    currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
     order_date: date
     expected_date: date | None = None
     warehouse_id: str | None = None
@@ -205,12 +215,16 @@ class ReceiveLineIn(BaseModel):
 class ReceiveIn(BaseModel):
     move_date: date
     lines: list[ReceiveLineIn] | None = None  # omit to receive everything outstanding
+    # An order in another currency: the rate on the receipt day (default: the latest kept on or before it).
+    exchange_rate: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=8)
 
 
 class BillFromOrderIn(BaseModel):
     bill_date: date
     due_date: date | None = None
     vendor_reference: str = Field(default="", max_length=60)
+    # An order in another currency: the bill's rate (default: the latest kept on or before the bill date).
+    exchange_rate: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=8)
 
 
 class PurchaseOrderLineOut(BaseModel):
@@ -258,6 +272,7 @@ class PurchaseOrderSummary(BaseModel):
     vendor_name: str
     order_date: date
     expected_date: date | None
+    currency: str = ""
     total: str
 
 
@@ -296,6 +311,7 @@ def _apply_order(db: Session, order: PurchaseOrder, body: PurchaseOrderIn) -> li
             raise _unprocessable("unknown or inactive warehouse")
     order.vendor_id, order.order_date, order.expected_date = vendor.id, body.order_date, body.expected_date
     order.warehouse_id, order.notes = body.warehouse_id, body.notes
+    order.currency = _currency(db, body.currency)
     lines = [PurchaseOrderLine(**f) for f in _resolve_lines(db, body.lines, bill=False)]
     svc.recompute(order, lines)
     return lines
@@ -303,6 +319,7 @@ def _apply_order(db: Session, order: PurchaseOrder, body: PurchaseOrderIn) -> li
 
 @router.get("/orgs/{org_id}/purchase-orders", response_model=list[PurchaseOrderSummary])
 def list_orders(status_filter: str | None = Query(default=None, alias="status"), vendor_id: str | None = None,
+                q: str | None = Query(default=None, max_length=100),   # part of the number or the vendor's name
                 limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0),
                 _: OrgContext = Depends(require(P.PURCHASES_READ)), db: Session = Depends(get_db)):
     stmt = (select(PurchaseOrder, Vendor.name).join(Vendor, Vendor.id == PurchaseOrder.vendor_id)
@@ -311,8 +328,12 @@ def list_orders(status_filter: str | None = Query(default=None, alias="status"),
         stmt = stmt.where(PurchaseOrder.status == status_filter)
     if vendor_id:
         stmt = stmt.where(PurchaseOrder.vendor_id == vendor_id)
+    if q:
+        like = f"%{q.lower()}%"
+        stmt = stmt.where(or_(func.lower(PurchaseOrder.number).like(like), func.lower(Vendor.name).like(like)))
     return [PurchaseOrderSummary(id=o.id, number=o.number, status=o.status, vendor_id=o.vendor_id, vendor_name=name,
-                         order_date=o.order_date, expected_date=o.expected_date, total=_money(o.total_minor, o.currency))
+                                 order_date=o.order_date, expected_date=o.expected_date, currency=o.currency,
+                                 total=_money(o.total_minor, o.currency))
             for o, name in db.execute(stmt)]
 
 
@@ -401,7 +422,7 @@ def receive_order(order_id: str, body: ReceiveIn, request: Request, response: Re
     for l in body.lines or []:
         quantities[l.line_id] = quantities.get(l.line_id, Decimal(0)) + l.quantity
     result = _domain(lambda: svc.receive(db, order, move_date=body.move_date, quantities=quantities,
-                                         user_id=ctx.user.id))
+                                         user_id=ctx.user.id, exchange_rate=body.exchange_rate))
     idempotency.remember(db, "purchase.receipt", idempotency_key, h, result.reference)
     audit.record(db, actor_user_id=ctx.user.id, action="purchase_order.received", target_type="purchase_order",
                  target_id=order.id, details={"reference": result.reference, "lines": len(result.moves)},
@@ -415,6 +436,10 @@ def receive_order(order_id: str, body: ReceiveIn, request: Request, response: Re
 
 class BillIn(BaseModel):
     vendor_id: str
+    # Another currency than the organization's: line costs are in it, and the rate (units of the
+    # organization's currency per unit of this one) books the bill in the ledger.
+    currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
+    exchange_rate: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=8)
     vendor_reference: str = Field(default="", max_length=60)
     bill_date: date
     due_date: date | None = None
@@ -433,6 +458,8 @@ class BillPaymentIn(BaseModel):
     payment_date: date
     method: str = Field(pattern="^(bank|cash)$")
     reference: str = Field(default="", max_length=120)
+    # Bills in another currency: the rate on the payment date (required for them).
+    exchange_rate: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=8)
 
 
 class BillCancelIn(BaseModel):
@@ -480,6 +507,11 @@ class BillOut(BaseModel):
     posted_at: datetime | None
     created_at: datetime
     lines: list[BillLineOut]
+    # Another currency: its rate and the amounts in the organization's currency (the ledger's).
+    exchange_rate: str = "1"
+    base_currency: str = ""
+    base_total: str | None = None
+    base_due: str | None = None
 
 
 class BillSummary(BaseModel):
@@ -491,6 +523,7 @@ class BillSummary(BaseModel):
     vendor_name: str
     bill_date: date
     due_date: date
+    currency: str = ""
     total: str
     amount_due: str
 
@@ -504,6 +537,9 @@ class BillPaymentOut(BaseModel):
     reference: str
     journal_entry_id: str
     created_at: datetime
+    exchange_rate: str = "1"
+    base_amount: str | None = None           # what left the bank, in the organization's currency
+    exchange_difference: str | None = None   # gain (+) or loss (-) in the organization's currency
 
 
 def _order_of_bill(db: Session, bill: VendorBill) -> PurchaseOrder | None:
@@ -514,6 +550,8 @@ def _order_of_bill(db: Session, bill: VendorBill) -> PurchaseOrder | None:
 
 def bill_out(db: Session, bill: VendorBill) -> BillOut:
     c = bill.currency
+    base = svc.base_currency(db)
+    foreign = c != base and bill.status != "draft"
     order = _order_of_bill(db, bill)
     credited: dict[str, tuple[Decimal, Decimal]] = {}
     if bill.amount_credited_minor or bill.status in ("paid", "credited"):
@@ -542,6 +580,9 @@ def bill_out(db: Session, bill: VendorBill) -> BillOut:
                            qty_credited=fmt_decimal(credited.get(l.id, (Decimal(0), Decimal(0)))[0]),
                            qty_returned=fmt_decimal(credited.get(l.id, (Decimal(0), Decimal(0)))[1]))
                for l in lines],
+        exchange_rate=fmt_decimal(bill.exchange_rate), base_currency=base,
+        base_total=_money(bill.base_total_minor, base) if foreign else None,
+        base_due=_money(bill.base_due_minor, base) if foreign else None,
     )
 
 
@@ -558,6 +599,11 @@ def _apply_bill(db: Session, bill: VendorBill, body: BillIn) -> list[VendorBillL
         raise _unprocessable("unknown or archived vendor")
     bill.vendor_id, bill.vendor_reference, bill.bill_date = vendor.id, body.vendor_reference, body.bill_date
     bill.due_date, bill.notes = body.due_date or body.bill_date, body.notes
+    bill.currency = _currency(db, body.currency)
+    base = svc.base_currency(db)
+    if bill.currency != base and body.exchange_rate is None:
+        raise _unprocessable(f"a bill in {bill.currency} needs the exchange rate to {base}")
+    bill.exchange_rate = body.exchange_rate if bill.currency != base else Decimal(1)
     lines = [VendorBillLine(**f) for f in _resolve_lines(db, body.lines, bill=True)]
     svc.recompute(bill, lines)
     return lines
@@ -572,7 +618,8 @@ def bill_order(order_id: str, body: BillFromOrderIn, request: Request,
         raise _unprocessable("due_date cannot be before bill_date")
     order = _get_order(db, order_id, lock=True)
     bill = _domain(lambda: svc.bill_from_order(db, order, bill_date=body.bill_date, due_date=body.due_date,
-                                               vendor_reference=body.vendor_reference, user_id=ctx.user.id))
+                                               vendor_reference=body.vendor_reference, user_id=ctx.user.id,
+                                               exchange_rate=body.exchange_rate))
     audit.record(db, actor_user_id=ctx.user.id, action="bill.created", target_type="vendor_bill", target_id=bill.id,
                  details={"purchase_order": order.number, "total": _money(bill.total_minor, bill.currency)},
                  ip_address=client_ip(request))
@@ -582,6 +629,7 @@ def bill_order(order_id: str, body: BillFromOrderIn, request: Request,
 
 @router.get("/orgs/{org_id}/bills", response_model=list[BillSummary])
 def list_bills(status_filter: str | None = Query(default=None, alias="status"), vendor_id: str | None = None,
+               q: str | None = Query(default=None, max_length=100),   # our number, the vendor's, or the vendor's name
                limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0),
                _: OrgContext = Depends(require(P.PURCHASES_READ)), db: Session = Depends(get_db)):
     stmt = (select(VendorBill, Vendor.name).join(Vendor, Vendor.id == VendorBill.vendor_id)
@@ -590,8 +638,13 @@ def list_bills(status_filter: str | None = Query(default=None, alias="status"), 
         stmt = stmt.where(VendorBill.status == status_filter)
     if vendor_id:
         stmt = stmt.where(VendorBill.vendor_id == vendor_id)
+    if q:
+        like = f"%{q.lower()}%"
+        stmt = stmt.where(or_(func.lower(VendorBill.number).like(like), func.lower(VendorBill.vendor_reference).like(like),
+                              func.lower(Vendor.name).like(like)))
     return [BillSummary(id=b.id, number=b.number, vendor_reference=b.vendor_reference, status=b.status,
                         vendor_id=b.vendor_id, vendor_name=name, bill_date=b.bill_date, due_date=b.due_date,
+                        currency=b.currency,
                         total=_money(b.total_minor, b.currency), amount_due=_money(b.amount_due_minor, b.currency))
             for b, name in db.execute(stmt)]
 
@@ -699,13 +752,18 @@ def cancel_bill(bill_id: str, body: BillCancelIn, request: Request, ctx: OrgCont
 def list_bill_payments(bill_id: str, _: OrgContext = Depends(require(P.PURCHASES_READ)), db: Session = Depends(get_db)):
     bill = _get_bill(db, bill_id)
     rows = db.scalars(select(BillPayment).where(BillPayment.bill_id == bill.id).order_by(BillPayment.payment_date))
-    return [_payment_out(p, bill.currency) for p in rows]
+    base = svc.base_currency(db)
+    return [_payment_out(p, bill.currency, base) for p in rows]
 
 
-def _payment_out(p: BillPayment, currency: str) -> BillPaymentOut:
+def _payment_out(p: BillPayment, currency: str, base: str) -> BillPaymentOut:
+    foreign = currency != base
     return BillPaymentOut(id=p.id, bill_id=p.bill_id, payment_date=p.payment_date,
                           amount=_money(p.amount_minor, currency), method=p.method, reference=p.reference,
-                          journal_entry_id=p.journal_entry_id, created_at=p.created_at)
+                          journal_entry_id=p.journal_entry_id, created_at=p.created_at,
+                          exchange_rate=fmt_decimal(p.exchange_rate),
+                          base_amount=_money(p.base_amount_minor, base) if foreign else None,
+                          exchange_difference=_money(-p.fx_minor, base) if foreign else None)
 
 
 @router.post("/orgs/{org_id}/bills/{bill_id}/payments", response_model=BillPaymentOut,
@@ -716,7 +774,8 @@ def pay_bill(bill_id: str, body: BillPaymentIn, request: Request, response: Resp
     bill = _get_bill(db, bill_id, lock=True)
     payment, created = _domain(lambda: svc.pay_bill(
         db, bill, amount_minor=to_minor(body.amount, bill.currency), payment_date=body.payment_date,
-        method=body.method, reference=body.reference, user_id=ctx.user.id, idempotency_key=idempotency_key))
+        method=body.method, reference=body.reference, user_id=ctx.user.id, idempotency_key=idempotency_key,
+        exchange_rate=body.exchange_rate))
     if created:
         audit.record(db, actor_user_id=ctx.user.id, action="bill.payment_registered", target_type="vendor_bill",
                      target_id=bill.id, details={"number": bill.number, "amount": _money(payment.amount_minor, bill.currency)},
@@ -724,7 +783,7 @@ def pay_bill(bill_id: str, body: BillPaymentIn, request: Request, response: Resp
         db.commit()
     else:
         response.status_code = status.HTTP_200_OK
-    return _payment_out(payment, bill.currency)
+    return _payment_out(payment, bill.currency, svc.base_currency(db))
 
 
 # ---------------------------------------------------------------- payables
@@ -759,9 +818,10 @@ def payables_aging(as_of: date | None = None, ctx: OrgContext = Depends(require(
     for bill, name in rows:
         bucket = _bucket((as_of - bill.due_date).days)
         v = per_vendor.setdefault(bill.vendor_id, {"name": name, "buckets": defaultdict(int), "count": 0})
-        v["buckets"][bucket] += bill.amount_due_minor
+        due = bill.base_due_minor            # in the organization's currency, whatever the bill's
+        v["buckets"][bucket] += due
         v["count"] += 1
-        totals[bucket] += bill.amount_due_minor
+        totals[bucket] += due
     names = [b[0] for b in AGING_BUCKETS]
     ordered = sorted(per_vendor.items(), key=lambda kv: -sum(kv[1]["buckets"].values()))
     return PayablesOut(

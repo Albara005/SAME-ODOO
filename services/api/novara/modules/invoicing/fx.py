@@ -1,14 +1,16 @@
-"""Exchange rates by day, and revaluing what customers still owe in other currencies at a period's end.
+"""Exchange rates by day, and revaluing what is owed in other currencies at a period's end.
 
 An invoice in another currency is booked at its own rate (service.py) and payments clear it at that rate, with the
-difference realized as they come in. At a period's end what is still owed is worth something else at that day's
-rate: the difference is an unrealized gain or loss, so the balance sheet shows the receivable at today's value.
+difference realized as they come in; vendor bills likewise (purchasing/service.py). At a period's end what is still
+owed is worth something else at that day's rate: the difference is an unrealized gain or loss, so the balance sheet
+shows receivables and payables at today's value.
 
-For each invoice open on the day (in its currency: total less payments and credit notes dated up to that day):
+For each invoice or bill open on the day (in its currency: total less payments and credits dated up to that day):
 
-    booked    = its total in the organization's currency, less what payments and credit notes up to the day cleared
+    booked    = its total in the organization's currency, less what payments and credits up to the day cleared
     revalued  = what is owed x the day's rate
-    Dr/Cr Accounts Receivable (with the customer)      revalued - booked
+    gain      = revalued - booked for what customers owe, booked - revalued for what is owed to vendors
+    Dr/Cr Accounts Receivable (with the customer) / Accounts Payable (with the vendor)      gain
         Cr/Dr Unrealized Exchange Gains and Losses (4910)
 
 posted on the day and reversed the next day, so the books carry on from the invoice's own rate and every payment
@@ -43,6 +45,7 @@ from novara.modules.accounting.service import (LedgerError, LineSpec, PeriodLock
 from novara.modules.audit import service as audit
 from novara.modules.invoicing.models import CreditNote, ExchangeRate, FxRevaluation, Invoice, Payment
 from novara.modules.invoicing.service import base_currency
+from novara.modules.purchasing.models import BillPayment, VendorBill, VendorCredit
 from novara.money import CURRENCY_DIGITS, convert, fmt_decimal, from_minor
 
 router = APIRouter(tags=["invoicing"])
@@ -60,6 +63,19 @@ def rate_on(db: Session, currency: str, day: date) -> ExchangeRate | None:
                      .order_by(ExchangeRate.day.desc()).limit(1))
 
 
+def rate_for(db: Session, currency: str, day: date, given: Decimal | None = None) -> Decimal:
+    """The rate to book a document in another currency on a day: the one given, else the latest kept on or before it."""
+    base = base_currency(db)
+    if currency == base:
+        return Decimal(1)
+    if given is not None:
+        return given
+    row = rate_on(db, currency, day)
+    if row is None:
+        raise FxError(f"give the exchange rate from {currency} to {base} on {day.isoformat()}")
+    return row.rate
+
+
 def set_rate(db: Session, currency: str, day: date, rate: Decimal, user_id: str) -> ExchangeRate:
     row = db.scalar(select(ExchangeRate).where(ExchangeRate.currency == currency, ExchangeRate.day == day))
     if row is None:
@@ -75,7 +91,7 @@ def set_rate(db: Session, currency: str, day: date, rate: Decimal, user_id: str)
 
 
 def _open_lines(db: Session, as_of: date) -> list[dict]:
-    """Every invoice in another currency that still had something owed at the end of the day."""
+    """Every invoice and vendor bill in another currency that still had something owed at the end of the day."""
     base = base_currency(db)
     out = []
     invoices = db.scalars(select(Invoice).where(Invoice.currency != base, Invoice.status != "draft",
@@ -95,14 +111,35 @@ def _open_lines(db: Session, as_of: date) -> list[dict]:
         due = inv.total_minor - int(paid) - int(credited)
         if due <= 0:
             continue
-        out.append({"invoice_id": inv.id, "number": inv.number, "customer_id": inv.customer_id, "currency": inv.currency,
-                    "due_minor": due, "booked_minor": inv.base_total_minor - int(cleared) - int(credit_cleared)})
+        out.append({"kind": "receivable", "invoice_id": inv.id, "number": inv.number, "customer_id": inv.customer_id,
+                    "currency": inv.currency, "due_minor": due,
+                    "booked_minor": inv.base_total_minor - int(cleared) - int(credit_cleared)})
+    bills = db.scalars(select(VendorBill).where(VendorBill.currency != base, VendorBill.status != "draft",
+                                                VendorBill.bill_date <= as_of, VendorBill.posted_at.is_not(None))
+                       .order_by(VendorBill.bill_date, VendorBill.number))
+    for bill in bills:
+        if bill.status == "cancelled" and (bill.cancelled_at is None or bill.cancelled_at.date() <= as_of):
+            continue
+        paid, cleared = db.execute(
+            select(func.coalesce(func.sum(BillPayment.amount_minor), 0),
+                   func.coalesce(func.sum(BillPayment.base_amount_minor - BillPayment.fx_minor), 0))
+            .where(BillPayment.bill_id == bill.id, BillPayment.payment_date <= as_of)).one()
+        credited, credit_cleared = db.execute(
+            select(func.coalesce(func.sum(VendorCredit.applied_minor), 0),
+                   func.coalesce(func.sum(VendorCredit.base_applied_minor), 0))
+            .where(VendorCredit.bill_id == bill.id, VendorCredit.issue_date <= as_of)).one()
+        due = bill.total_minor - int(paid) - int(credited)
+        if due <= 0:
+            continue
+        out.append({"kind": "payable", "bill_id": bill.id, "number": bill.number, "vendor_id": bill.vendor_id,
+                    "currency": bill.currency, "due_minor": due,
+                    "booked_minor": bill.base_total_minor - int(cleared) - int(credit_cleared)})
     return out
 
 
 def work_out(db: Session, as_of: date, given: dict[str, Decimal]) -> tuple[dict[str, Decimal], list[dict], list[str]]:
-    """The rates used (given, else the latest on or before the day), each open invoice revalued, and the currencies
-    with no rate."""
+    """The rates used (given, else the latest on or before the day), each open invoice and bill revalued (with the
+    gain it makes: a loss is negative), and the currencies with no rate."""
     base = base_currency(db)
     lines = _open_lines(db, as_of)
     rates: dict[str, Decimal] = {}
@@ -117,7 +154,9 @@ def work_out(db: Session, as_of: date, given: dict[str, Decimal]) -> tuple[dict[
     for l in lines:
         rate = rates.get(l["currency"])
         l["revalued_minor"] = convert(l["due_minor"], l["currency"], rate, base) if rate else None
-        l["difference_minor"] = l["revalued_minor"] - l["booked_minor"] if rate else None
+        change = l["revalued_minor"] - l["booked_minor"] if rate else None
+        # Owing a vendor more is a loss.
+        l["difference_minor"] = change if change is None or l.get("kind", "receivable") == "receivable" else -change
     return rates, lines, missing
 
 
@@ -131,13 +170,18 @@ def revalue(db: Session, as_of: date, given: dict[str, Decimal], user_id: str) -
     if not lines:
         raise FxError("nothing owed in another currency changed value: there is nothing to post")
     base = base_currency(db)
-    receivable, unrealized = system_account(db, "receivable"), system_account(db, "fx_unrealized")
+    receivable, payable = system_account(db, "receivable"), system_account(db, "payable")
+    unrealized = system_account(db, "fx_unrealized")
     specs = []
     for l in lines:
-        d = l["difference_minor"]
+        d = l["difference_minor"]          # a gain makes the receivable larger, or the payable smaller
         label = f"Revaluation of {l['number']} at {fmt_decimal(rates[l['currency']])}"
-        specs.append(LineSpec(receivable, debit_minor=max(d, 0), credit_minor=max(-d, 0), customer_id=l["customer_id"],
-                              label=label))
+        if l["kind"] == "payable":
+            specs.append(LineSpec(payable, debit_minor=max(d, 0), credit_minor=max(-d, 0), vendor_id=l["vendor_id"],
+                                  label=label))
+        else:
+            specs.append(LineSpec(receivable, debit_minor=max(d, 0), credit_minor=max(-d, 0),
+                                  customer_id=l["customer_id"], label=label))
     net = sum(l["difference_minor"] for l in lines)
     specs.append(LineSpec(unrealized, debit_minor=max(-net, 0), credit_minor=max(net, 0),
                           label=f"Unrealized exchange difference on {as_of.isoformat()}"))
@@ -145,7 +189,7 @@ def revalue(db: Session, as_of: date, given: dict[str, Decimal], user_id: str) -
                         difference_minor=net, created_by=user_id)
     db.add(doc)
     db.flush()
-    memo = f"Revaluation of receivables in other currencies on {as_of.isoformat()}"
+    memo = f"Revaluation of what is owed in other currencies on {as_of.isoformat()}"
     entry = post_entry(db, entry_date=as_of, currency=base, lines=specs, memo=memo, source_type="fx_revaluation",
                        source_id=doc.id, created_by=user_id)
     reversal = reverse_entry(db, entry, entry_date=as_of + timedelta(days=1), memo=f"Reversal: {memo}", created_by=user_id)
@@ -164,7 +208,8 @@ def _mirror(db: Session, entry: JournalEntry, memo: str, user_id: str) -> Journa
     return post_entry(db, entry_date=entry.entry_date, currency=entry.currency, memo=memo, source_type=entry.source_type,
                       source_id=entry.source_id, created_by=user_id, lines=[
                           LineSpec(accounts[l.account_id], debit_minor=l.credit_minor, credit_minor=l.debit_minor,
-                                   customer_id=l.customer_id, label=f"Cancelled: {l.label}"[:300]) for l in lines])
+                                   customer_id=l.customer_id, vendor_id=l.vendor_id,
+                                   label=f"Cancelled: {l.label}"[:300]) for l in lines])
 
 
 def cancel(db: Session, doc: FxRevaluation, user_id: str) -> None:
@@ -200,7 +245,9 @@ class RevaluationIn(BaseModel):
 
 
 class RevaluationLineOut(BaseModel):
-    invoice_id: str
+    kind: Literal["receivable", "payable"] = "receivable"
+    invoice_id: str | None = None        # what a customer owes
+    bill_id: str | None = None           # what is owed to a vendor
     number: str | None
     currency: str
     due: str
@@ -213,7 +260,7 @@ class RevaluationPreviewOut(BaseModel):
     as_of: date
     base_currency: str
     rates: dict[str, str]
-    missing: list[str]                  # currencies with open invoices and no rate on or before the day
+    missing: list[str]                  # currencies with open invoices or bills and no rate on or before the day
     lines: list[RevaluationLineOut]
     difference: str | None              # the net unrealized gain (negative: a loss), once every rate is known
 
@@ -233,7 +280,8 @@ class RevaluationOut(BaseModel):
 
 def _line_out(l: dict, base: str) -> RevaluationLineOut:
     m = lambda minor, c: str(from_minor(minor, c)) if minor is not None else None  # noqa: E731
-    return RevaluationLineOut(invoice_id=l["invoice_id"], number=l["number"], currency=l["currency"],
+    return RevaluationLineOut(kind=l.get("kind", "receivable"), invoice_id=l.get("invoice_id"), bill_id=l.get("bill_id"),
+                              number=l["number"], currency=l["currency"],
                               due=m(l["due_minor"], l["currency"]), booked=m(l["booked_minor"], base),
                               revalued=m(l["revalued_minor"], base), difference=m(l["difference_minor"], base))
 

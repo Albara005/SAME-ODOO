@@ -5,8 +5,8 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import {
-  Journey, journeySteps, LinesEditor, newLine, StatusBadge, toLineIn, TotalsBox, useCustomers, useIdempotencyKey,
-  type LineDraft,
+  CURRENCIES, Journey, journeySteps, LinesEditor, newLine, StatusBadge, toLineIn, TotalsBox, useCustomers, useIdempotencyKey,
+  useSuggestedRate, type LineDraft,
 } from "../components/business";
 import {
   Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
@@ -24,7 +24,6 @@ import { today } from "../lib/format";
 
 type Invoice = Schemas["InvoiceOut"];
 const STATUSES = ["draft", "posted", "partially_paid", "paid", "credited", "cancelled"] as const;
-const CURRENCIES = ["SAR", "AED", "QAR", "KWD", "BHD", "OMR", "EGP", "JOD", "IQD", "MAD", "TND", "LYD", "TRY", "USD", "EUR", "GBP", "JPY"];
 const CREDITABLE = ["posted", "partially_paid", "paid", "credited"];
 
 function useInvoice(id: string) {
@@ -142,18 +141,6 @@ export function InvoicesPage() {
 }
 
 // ---------------------------------------------------------------- editor
-
-/** The organization's latest rate for a currency on or before a day (Accounting > Currencies), to suggest on a form. */
-function useSuggestedRate(currency: string, day: string, enabled: boolean) {
-  const { org } = useOrg();
-  return useQuery({
-    queryKey: ["exchange-rate", org.id, currency, day],
-    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/exchange-rates/latest", {
-      params: { path: { org_id: org.id }, query: { currency, on: day } } })),
-    enabled: enabled && currency !== org.default_currency && Boolean(day),
-    staleTime: 60_000,
-  }).data ?? null;
-}
 
 function toDraft(inv: Invoice): LineDraft[] {
   return inv.lines.map((l) => ({

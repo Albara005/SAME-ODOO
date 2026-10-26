@@ -1,21 +1,25 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, CheckCircle2, CreditCard, FileText, PackageCheck, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import {
-  Journey, journeySteps, LinesEditor, newLine, StatusBadge, Tabs, toPurchaseLineIn, TotalsBox, useIdempotencyKey, useVendors,
-  useWarehouses, type LineDraft,
+  CurrencyField, Journey, journeySteps, LinesEditor, newLine, RateField, StatusBadge, Tabs, toPurchaseLineIn, TotalsBox,
+  useIdempotencyKey, useRate, useVendors, useWarehouses, type LineDraft,
 } from "../components/business";
 import {
-  Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, useToast,
+  Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, Textarea,
+  useToast,
 } from "../components/ui";
+import { DataTable, type Column } from "../components/DataTable";
+import { ListToolbar } from "../components/ListToolbar";
 import type { MessageKey } from "../i18n/en";
 import { RecordHistory } from "../components/RecordHistory";
 import { useI18n } from "../i18n/I18n";
-import { isPositive, subtractDec } from "../lib/decimal";
-import { today } from "../lib/format";
+import { digitsFor, isPositive, subtractDec, sumDec } from "../lib/decimal";
+import { initialsOf, today } from "../lib/format";
+import { useDebounced } from "../lib/useDebounced";
 import { VendorCreditDialog } from "./VendorCredits";
 
 type Order = Schemas["PurchaseOrderOut"];
@@ -94,149 +98,197 @@ export function PurchasesPage() {
   );
 }
 
+/** Status and search kept in the address with the tab, so a filtered list can be shared and comes back on reload. */
+function useListParams<F extends string>() {
+  const [params, setParams] = useSearchParams();
+  const [filter, setFilter] = useState<F | "">((params.get("status") as F | null) ?? "");
+  const [q, setQ] = useState(params.get("q") ?? "");
+  const term = useDebounced(q.trim(), 250);
+  useEffect(() => {
+    setParams((prev) => {
+      const next = new URLSearchParams();
+      const tab = prev.get("tab");
+      if (tab) next.set("tab", tab);
+      if (filter) next.set("status", filter);
+      if (term) next.set("q", term);
+      return next;
+    }, { replace: true });
+  }, [filter, term, setParams]);
+  return { filter, setFilter, q, setQ, term };
+}
+
+/** The total of a column when every row shown is in the same currency (amounts in two currencies don't add up). */
+function totalIn<T>(rows: T[], currency: (r: T) => string, amount: (r: T) => string, money: (a: string, c: string) => string) {
+  const currencies = new Set(rows.map(currency));
+  if (currencies.size !== 1) return undefined;
+  const one = [...currencies][0]!;
+  return <span className="num">{money(sumDec(rows.map(amount), digitsFor(one)), one)}</span>;
+}
+
+type OrderRow = Schemas["PurchaseOrderSummary"];
+type OrderFilter = "draft" | "confirmed" | "cancelled";
+
 function OrdersList() {
   const { t, money, date } = useI18n();
   const { org, path } = useOrg();
+  const navigate = useNavigate();
+  const { filter, setFilter, q, setQ, term } = useListParams<OrderFilter>();
   const orders = useQuery({
-    queryKey: ["purchase-orders", org.id],
-    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/purchase-orders", { params: { path: { org_id: org.id } } })),
+    queryKey: ["purchase-orders", org.id, "list", term],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/purchase-orders", {
+      params: { path: { org_id: org.id }, query: { q: term || undefined, limit: 500 } } })),
     placeholderData: keepPreviousData,
   });
+  const all = orders.data ?? [];
+  const shown = filter ? all.filter((o) => o.status === filter) : all;
+  const columns: Column<OrderRow>[] = [
+    { key: "number", header: t("invoices.number"), sort: (o) => o.number,
+      cell: (o) => <Link to={path(`purchases/orders/${o.id}`)} className="cell-strong num">{o.number}</Link> },
+    { key: "vendor", header: t("purchases.vendor"), sort: (o) => o.vendor_name, cell: (o) => <span dir="auto">{o.vendor_name}</span> },
+    { key: "date", header: t("sales.orderDate"), sort: (o) => o.order_date, cell: (o) => <span className="num small">{date(o.order_date)}</span> },
+    { key: "expected", header: t("purchases.expected"), sort: (o) => o.expected_date ?? "",
+      cell: (o) => <span className="num small">{date(o.expected_date)}</span> },
+    { key: "total", header: t("invoices.total"), align: "end", sort: (o) => Number(o.total),
+      cell: (o) => <span className="num">{money(o.total, o.currency)}</span>,
+      total: totalIn(shown, (o) => o.currency, (o) => o.total, money) },
+    { key: "status", header: t("common.status"), sort: (o) => o.status, cell: (o) => <StatusBadge status={o.status} /> },
+  ];
+  const statuses: OrderFilter[] = ["draft", "confirmed", "cancelled"];
   return (
-    <QueryView query={orders}>
-      {(list) =>
-        list.length === 0 ? (
-          <Empty>{t("purchases.empty")}</Empty>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("invoices.number")}</th>
-                  <th>{t("purchases.vendor")}</th>
-                  <th>{t("sales.orderDate")}</th>
-                  <th>{t("purchases.expected")}</th>
-                  <th className="end">{t("invoices.total")}</th>
-                  <th>{t("common.status")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((o) => (
-                  <tr key={o.id}>
-                    <td>
-                      <Link to={path(`purchases/orders/${o.id}`)} className="mono">{o.number}</Link>
-                    </td>
-                    <td>{o.vendor_name}</td>
-                    <td className="num small">{date(o.order_date)}</td>
-                    <td className="num small">{date(o.expected_date)}</td>
-                    <td className="end num">{money(o.total, org.default_currency)}</td>
-                    <td><StatusBadge status={o.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      }
-    </QueryView>
+    <>
+      <ListToolbar
+        search={q} onSearch={setQ} placeholder={t("purchases.searchHint")}
+        filters={[{ key: "" as OrderFilter | "", label: t("common.all"), count: all.length },
+          ...statuses.map((st) => ({ key: st as OrderFilter | "", label: t(`status.${st}`), count: all.filter((o) => o.status === st).length }))
+            .filter((f) => f.key === filter || f.count > 0)]}
+        filter={filter} onFilter={setFilter} shown={orders.data ? shown.length : undefined}
+      />
+      <QueryView query={orders}>
+        {() =>
+          shown.length === 0 ? (
+            <Empty>{term || filter ? t("common.noMatches") : t("purchases.empty")}</Empty>
+          ) : (
+            <DataTable rows={shown} columns={columns} rowKey={(o) => o.id} label={t("purchases.orders")}
+              onRowClick={(o) => navigate(path(`purchases/orders/${o.id}`))} />
+          )
+        }
+      </QueryView>
+    </>
   );
 }
+
+type BillRow = Schemas["BillSummary"];
+type BillFilter = "draft" | "posted" | "partially_paid" | "overdue" | "paid" | "credited" | "cancelled";
 
 function BillsList() {
   const { t, money, date } = useI18n();
   const { org, path } = useOrg();
+  const navigate = useNavigate();
+  const { filter, setFilter, q, setQ, term } = useListParams<BillFilter>();
   const bills = useQuery({
-    queryKey: ["bills", org.id],
-    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/bills", { params: { path: { org_id: org.id } } })),
+    queryKey: ["bills", org.id, "list", term],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/bills", {
+      params: { path: { org_id: org.id }, query: { q: term || undefined, limit: 500 } } })),
     placeholderData: keepPreviousData,
   });
+  const now = today();
+  const overdue = (b: BillRow) => isPositive(b.amount_due) && b.due_date < now && b.status !== "draft" && b.status !== "cancelled";
+  const matches = (b: BillRow, f: BillFilter | "") => (f === "" ? true : f === "overdue" ? overdue(b) : b.status === f);
+  const all = bills.data ?? [];
+  const shown = all.filter((b) => matches(b, filter));
+  const columns: Column<BillRow>[] = [
+    { key: "number", header: t("invoices.number"), sort: (b) => b.number ?? "",
+      cell: (b) => <Link to={path(`purchases/bills/${b.id}`)} className="cell-strong num">{b.number ?? t("invoices.draftNoNumber")}</Link> },
+    { key: "reference", header: t("bills.vendorReference"), sort: (b) => b.vendor_reference,
+      cell: (b) => (b.vendor_reference ? <span className="num small">{b.vendor_reference}</span> : <span className="muted">—</span>) },
+    { key: "vendor", header: t("purchases.vendor"), sort: (b) => b.vendor_name, cell: (b) => <span dir="auto">{b.vendor_name}</span> },
+    { key: "date", header: t("bills.billDate"), sort: (b) => b.bill_date, cell: (b) => <span className="num small">{date(b.bill_date)}</span> },
+    { key: "due", header: t("invoices.dueDate"), sort: (b) => b.due_date,
+      cell: (b) => <span className={`num small ${overdue(b) ? "text-danger" : ""}`}>{date(b.due_date)}</span> },
+    { key: "total", header: t("invoices.total"), align: "end", sort: (b) => Number(b.total),
+      cell: (b) => <span className="num">{money(b.total, b.currency)}</span>,
+      total: totalIn(shown, (b) => b.currency, (b) => b.total, money) },
+    { key: "amount_due", header: t("invoices.due"), align: "end", sort: (b) => Number(b.amount_due),
+      cell: (b) => <span className={`num ${isPositive(b.amount_due) ? "cell-strong" : "muted"}`}>{money(b.amount_due, b.currency)}</span>,
+      total: totalIn(shown, (b) => b.currency, (b) => b.amount_due, money) },
+    { key: "status", header: t("common.status"), sort: (b) => b.status, cell: (b) => <StatusBadge status={b.status} /> },
+  ];
+  const keys: (BillFilter | "")[] = ["", "draft", "posted", "partially_paid", "overdue", "paid", "credited", "cancelled"];
+  const filters = keys
+    .map((k) => ({ key: k, label: k === "" ? t("common.all") : k === "overdue" ? t("invoices.overdue") : t(`status.${k}`),
+                   count: all.filter((b) => matches(b, k)).length }))
+    .filter((f) => f.key === "" || f.key === filter || f.count > 0);
   return (
-    <QueryView query={bills}>
-      {(list) =>
-        list.length === 0 ? (
-          <Empty>{t("bills.empty")}</Empty>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("invoices.number")}</th>
-                  <th>{t("bills.vendorReference")}</th>
-                  <th>{t("purchases.vendor")}</th>
-                  <th>{t("bills.billDate")}</th>
-                  <th>{t("invoices.dueDate")}</th>
-                  <th className="end">{t("invoices.total")}</th>
-                  <th className="end">{t("invoices.due")}</th>
-                  <th>{t("common.status")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((b) => (
-                  <tr key={b.id}>
-                    <td>
-                      <Link to={path(`purchases/bills/${b.id}`)} className="mono">{b.number ?? t("invoices.draftNoNumber")}</Link>
-                    </td>
-                    <td className="mono small">{b.vendor_reference || "—"}</td>
-                    <td>{b.vendor_name}</td>
-                    <td className="num small">{date(b.bill_date)}</td>
-                    <td className="num small">{date(b.due_date)}</td>
-                    <td className="end num">{money(b.total, org.default_currency)}</td>
-                    <td className="end num">{money(b.amount_due, org.default_currency)}</td>
-                    <td><StatusBadge status={b.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      }
-    </QueryView>
+    <>
+      <ListToolbar search={q} onSearch={setQ} placeholder={t("bills.searchHint")}
+        filters={filters} filter={filter} onFilter={setFilter} shown={bills.data ? shown.length : undefined} />
+      <QueryView query={bills}>
+        {() =>
+          shown.length === 0 ? (
+            <Empty>{term || filter ? t("common.noMatches") : t("bills.empty")}</Empty>
+          ) : (
+            <DataTable rows={shown} columns={columns} rowKey={(b) => b.id} label={t("bills.title")}
+              onRowClick={(b) => navigate(path(`purchases/bills/${b.id}`))} rowClassName={(b) => (overdue(b) ? "row-overdue" : "")} />
+          )
+        }
+      </QueryView>
+    </>
   );
 }
 
 function VendorsList() {
   const { t } = useI18n();
-  const { can } = useOrg();
-  const vendors = useVendors();
+  const { org, can } = useOrg();
+  const [q, setQ] = useState("");
+  const term = useDebounced(q.trim(), 250);
+  const [archived, setArchived] = useState(false);
   const [editing, setEditing] = useState<Vendor | null>(null);
+  const vendors = useQuery({
+    queryKey: ["vendors", org.id, "list", term, archived],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/vendors", {
+      params: { path: { org_id: org.id }, query: { q: term || undefined, include_archived: archived, limit: 500 } } })),
+    placeholderData: keepPreviousData,
+  });
+  const write = can("purchases.write");
+  const columns: Column<Vendor>[] = [
+    { key: "name", header: t("common.name"), sort: (v) => v.name,
+      cell: (v) => (
+        <span className="row" style={{ gap: 10, flexWrap: "nowrap" }}>
+          <span className="avatar" aria-hidden>{initialsOf(v.name)}</span>
+          <span className="stack-xs" style={{ gap: 0, minWidth: 0 }}>
+            <span className="cell-strong" dir="auto">{v.name}</span>
+            {v.email && <span className="cell-sub ltr-inline">{v.email}</span>}
+          </span>
+        </span>
+      ) },
+    { key: "phone", header: t("common.phone"), cell: (v) => (v.phone ? <span className="num">{v.phone}</span> : <span className="muted">—</span>) },
+    { key: "tax", header: t("customers.taxNumber"), sort: (v) => v.tax_number,
+      cell: (v) => (v.tax_number ? <span className="num">{v.tax_number}</span> : <span className="muted">—</span>) },
+    { key: "city", header: t("customers.city"), sort: (v) => v.city, cell: (v) => <span dir="auto">{v.city}</span> },
+    { key: "status", header: t("common.status"),
+      cell: (v) => (v.active ? <Badge tone="success">{t("common.active")}</Badge> : <Badge>{t("common.archived")}</Badge>) },
+    ...(write ? [{
+      key: "actions", header: <span className="sr-only">{t("common.actions")}</span>, align: "end" as const,
+      cell: (v: Vendor) => <IconButton label={`${t("common.edit")} ${v.name}`} onClick={() => setEditing(v)}><Pencil size={16} /></IconButton>,
+    }] : []),
+  ];
   return (
-    <QueryView query={vendors}>
-      {(list) =>
-        list.length === 0 ? (
-          <Empty>{t("vendors.empty")}</Empty>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("common.name")}</th>
-                  <th>{t("common.email")}</th>
-                  <th>{t("common.phone")}</th>
-                  <th>{t("customers.taxNumber")}</th>
-                  {can("purchases.write") && <th className="end">{t("common.actions")}</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((v) => (
-                  <tr key={v.id}>
-                    <td>{v.name}</td>
-                    <td className="mono small">{v.email || "—"}</td>
-                    <td className="mono small">{v.phone || "—"}</td>
-                    <td className="mono small">{v.tax_number || "—"}</td>
-                    {can("purchases.write") && (
-                      <td className="end">
-                        <Button size="sm" icon={<Pencil size={14} />} onClick={() => setEditing(v)}>{t("common.edit")}</Button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {editing && <VendorDialog vendor={editing} onClose={() => setEditing(null)} />}
-          </div>
-        )
-      }
-    </QueryView>
+    <>
+      <ListToolbar search={q} onSearch={setQ} placeholder={t("vendors.searchHint")}
+        extra={<Checkbox label={t("customers.includeArchived")} checked={archived} onChange={(e) => setArchived(e.target.checked)} />}
+        shown={vendors.data?.length} />
+      <QueryView query={vendors}>
+        {(list) =>
+          list.length === 0 ? (
+            <Empty>{term ? t("common.noMatches") : t("vendors.empty")}</Empty>
+          ) : (
+            <DataTable rows={list} columns={columns} rowKey={(v) => v.id} label={t("vendors.title")}
+              onRowClick={write ? (v) => setEditing(v) : undefined} />
+          )
+        }
+      </QueryView>
+      {editing && <VendorDialog vendor={editing} onClose={() => setEditing(null)} />}
+    </>
   );
 }
 
@@ -323,7 +375,7 @@ function OrderEditor({ order }: { order?: Order }) {
   const warehouses = useWarehouses();
   const [header, setHeader] = useState({
     vendor_id: order?.vendor_id ?? "", order_date: order?.order_date ?? today(), expected_date: order?.expected_date ?? "",
-    warehouse_id: order?.warehouse_id ?? "", notes: order?.notes ?? "",
+    warehouse_id: order?.warehouse_id ?? "", notes: order?.notes ?? "", currency: order?.currency ?? org.default_currency,
   });
   const [lines, setLines] = useState<LineDraft[]>(order ? orderLinesToDraft(order.lines) : [{ ...newLine(), unit_price: "" }]);
   const save = useMutation({
@@ -363,6 +415,7 @@ function OrderEditor({ order }: { order?: Order }) {
           <Field label={t("purchases.expected")} error={err["expected_date"]} optional>
             <Input type="date" value={header.expected_date} min={header.order_date} onChange={(e) => setHeader({ ...header, expected_date: e.target.value })} ltr />
           </Field>
+          <CurrencyField value={header.currency} onChange={(currency) => setHeader({ ...header, currency })} />
           {warehouses.data && warehouses.data.length > 1 && (
             <Field label={t("inventory.warehouse")} optional>
               <Select value={header.warehouse_id} onChange={(e) => setHeader({ ...header, warehouse_id: e.target.value })}>
@@ -374,7 +427,7 @@ function OrderEditor({ order }: { order?: Order }) {
         </div>
       </Card>
       <Card title={t("invoices.lines")}>
-        <LinesEditor lines={lines} onChange={setLines} currency={org.default_currency} purchase />
+        <LinesEditor lines={lines} onChange={setLines} currency={header.currency} purchase />
       </Card>
       <Field label={t("invoices.notes")} optional>
         <Textarea value={header.notes} onChange={(e) => setHeader({ ...header, notes: e.target.value })} />
@@ -554,6 +607,7 @@ function ReceiveDialog({ order, onClose, onDone }: { order: Order; onClose: () =
   const open = order.lines.filter((l) => isPositive(l.qty_to_receive));
   const [all, setAll] = useState(true);
   const [moveDate, setMoveDate] = useState(today());
+  const rate = useRate(order.currency, moveDate);
   const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(open.map((l) => [l.id, l.qty_to_receive])));
   const receive = useMutation({
     mutationFn: () =>
@@ -562,6 +616,7 @@ function ReceiveDialog({ order, onClose, onDone }: { order: Order; onClose: () =
         body: {
           move_date: moveDate,
           lines: all ? null : open.filter((l) => isPositive(qty[l.id] ?? "")).map((l) => ({ line_id: l.id, quantity: qty[l.id] ?? "" })),
+          exchange_rate: rate.rate || null,
         },
       })),
     onSuccess: (r) => onDone(r.reference),
@@ -571,9 +626,12 @@ function ReceiveDialog({ order, onClose, onDone }: { order: Order; onClose: () =
       <form className="stack" onSubmit={(e) => { e.preventDefault(); receive.mutate(); }}>
         <p className="muted">{t("purchases.receiveHint")}</p>
         {receive.isError && <ErrorNotice error={receive.error} />}
-        <Field label={t("purchases.receiptDate")}>
-          <Input type="date" value={moveDate} min={order.order_date} onChange={(e) => setMoveDate(e.target.value)} required ltr />
-        </Field>
+        <div className="grid-2">
+          <Field label={t("purchases.receiptDate")}>
+            <Input type="date" value={moveDate} min={order.order_date} onChange={(e) => setMoveDate(e.target.value)} required ltr />
+          </Field>
+          <RateField state={rate} currency={order.currency} hint={t("purchases.receiptRateHint")} />
+        </div>
         <Checkbox label={t("purchases.receiveAll")} checked={all} onChange={(e) => setAll(e.target.checked)} />
         {!all && (
           <table>
@@ -611,11 +669,12 @@ function BillFromOrderDialog({ order, onClose, onDone }: { order: Order; onClose
   const { t } = useI18n();
   const { org } = useOrg();
   const [form, setForm] = useState({ bill_date: today(), due_date: "", vendor_reference: "" });
+  const rate = useRate(order.currency, form.bill_date);
   const create = useMutation({
     mutationFn: () =>
       unwrap(api.POST("/api/v1/orgs/{org_id}/purchase-orders/{order_id}/bill", {
         params: { path: { org_id: org.id, order_id: order.id } },
-        body: { ...form, due_date: form.due_date || null },
+        body: { ...form, due_date: form.due_date || null, exchange_rate: rate.rate || null },
       })),
     onSuccess: (b) => onDone(b.id),
   });
@@ -634,6 +693,7 @@ function BillFromOrderDialog({ order, onClose, onDone }: { order: Order; onClose
           <Field label={t("invoices.dueDate")} optional>
             <Input type="date" value={form.due_date} min={form.bill_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} ltr />
           </Field>
+          <RateField state={rate} currency={order.currency} hint={t("purchases.billRateHint")} />
         </div>
         <div className="form-actions">
           <Button onClick={onClose}>{t("common.cancel")}</Button>
@@ -662,12 +722,15 @@ function BillEditor({ bill }: { bill?: Bill }) {
   const vendors = useVendors();
   const [header, setHeader] = useState({
     vendor_id: bill?.vendor_id ?? "", vendor_reference: bill?.vendor_reference ?? "", bill_date: bill?.bill_date ?? today(),
-    due_date: bill?.due_date ?? "", notes: bill?.notes ?? "",
+    due_date: bill?.due_date ?? "", notes: bill?.notes ?? "", currency: bill?.currency ?? org.default_currency,
   });
+  const rate = useRate(header.currency, header.bill_date,
+                       bill && bill.currency !== org.default_currency ? bill.exchange_rate : "");
   const [lines, setLines] = useState<LineDraft[]>(bill ? orderLinesToDraft(bill.lines) : [{ ...newLine(), unit_price: "" }]);
   const save = useMutation({
     mutationFn: () => {
-      const body = { ...header, due_date: header.due_date || null, lines: lines.map(toPurchaseLineIn) };
+      const body = { ...header, due_date: header.due_date || null, lines: lines.map(toPurchaseLineIn),
+                     exchange_rate: rate.rate || null };
       return bill
         ? unwrap(api.PUT("/api/v1/orgs/{org_id}/bills/{bill_id}", { params: { path: { org_id: org.id, bill_id: bill.id } }, body }))
         : unwrap(api.POST("/api/v1/orgs/{org_id}/bills", { params: { path: { org_id: org.id } }, body }));
@@ -700,10 +763,12 @@ function BillEditor({ bill }: { bill?: Bill }) {
           <Field label={t("invoices.dueDate")} error={err["due_date"]} optional>
             <Input type="date" value={header.due_date} min={header.bill_date} onChange={(e) => setHeader({ ...header, due_date: e.target.value })} ltr />
           </Field>
+          <CurrencyField value={header.currency} onChange={(currency) => setHeader({ ...header, currency })} />
+          <RateField state={rate} currency={header.currency} error={err["exchange_rate"]} />
         </div>
       </Card>
       <Card title={t("invoices.lines")}>
-        <LinesEditor lines={lines} onChange={setLines} currency={org.default_currency} purchase services />
+        <LinesEditor lines={lines} onChange={setLines} currency={header.currency} purchase services />
       </Card>
       <Field label={t("invoices.notes")} optional>
         <Textarea value={header.notes} onChange={(e) => setHeader({ ...header, notes: e.target.value })} />
@@ -840,6 +905,16 @@ function BillDetail({ bill: b }: { bill: Bill }) {
                 )}
                 <dt>{t("invoices.due")}</dt>
                 <dd className="num" style={{ textAlign: "end" }}><strong>{money(b.amount_due, b.currency)}</strong></dd>
+                {b.base_total && (
+                  <>
+                    <dt>{t("invoices.rateBooked", { currency: b.currency, base: b.base_currency })}</dt>
+                    <dd className="num" style={{ textAlign: "end" }}>{b.exchange_rate}</dd>
+                    <dt>{t("invoices.inBase", { base: b.base_currency })}</dt>
+                    <dd className="num" style={{ textAlign: "end" }}>{money(b.base_total, b.base_currency)}</dd>
+                    <dt>{t("invoices.dueInBase", { base: b.base_currency })}</dt>
+                    <dd className="num" style={{ textAlign: "end" }}>{money(b.base_due ?? "0", b.base_currency)}</dd>
+                  </>
+                )}
               </>
             )}
           />
@@ -903,7 +978,16 @@ function BillDetail({ bill: b }: { bill: Bill }) {
                     <tr key={p.id}>
                       <td className="num">{date(p.payment_date)}</td>
                       <td>{p.method === "bank" ? t("invoices.bank") : t("invoices.cash")}</td>
-                      <td>{p.reference}</td>
+                      <td>
+                        {p.reference}
+                        {p.base_amount && (
+                          <div className="small muted num">
+                            {t("invoices.paidInBase", { amount: money(p.base_amount, b.base_currency), rate: p.exchange_rate })}
+                            {p.exchange_difference && p.exchange_difference !== "0.00" &&
+                              ` · ${t("invoices.exchangeDifference")} ${money(p.exchange_difference, b.base_currency)}`}
+                          </div>
+                        )}
+                      </td>
                       <td className="end num">{money(p.amount, b.currency)}</td>
                     </tr>
                   ))}
@@ -994,11 +1078,12 @@ function BillPaymentDialog({ bill, onClose, onDone }: { bill: Bill; onClose: () 
   const { org } = useOrg();
   const [idempotencyKey] = useIdempotencyKey();
   const [form, setForm] = useState({ amount: bill.amount_due, payment_date: today(), method: "bank" as "bank" | "cash", reference: "" });
+  const rate = useRate(bill.currency, form.payment_date);
   const pay = useMutation({
     mutationFn: () =>
       unwrap(api.POST("/api/v1/orgs/{org_id}/bills/{bill_id}/payments", {
         params: { path: { org_id: org.id, bill_id: bill.id }, header: { "idempotency-key": idempotencyKey } },
-        body: form,
+        body: { ...form, exchange_rate: rate.rate || null },
       })),
     onSuccess: onDone,
   });
@@ -1023,6 +1108,9 @@ function BillPaymentDialog({ bill, onClose, onDone }: { bill: Bill; onClose: () 
           <Field label={t("invoices.reference")} optional>
             <Input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
           </Field>
+          <RateField state={rate} currency={bill.currency} error={err["exchange_rate"]}
+            label={t("invoices.paymentRate", { currency: bill.currency, base: org.default_currency })}
+            hint={t("bills.paymentRateHint", { rate: bill.exchange_rate })} />
         </div>
         <div className="form-actions">
           <Button onClick={onClose}>{t("common.cancel")}</Button>

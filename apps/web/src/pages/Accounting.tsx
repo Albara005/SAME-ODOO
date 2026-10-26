@@ -883,8 +883,13 @@ function Revaluation() {
                   </thead>
                   <tbody>
                     {r.lines.map((l) => (
-                      <tr key={l.invoice_id}>
-                        <td><Link className="mono" to={to(`invoices/${l.invoice_id}`)}>{l.number}</Link></td>
+                      <tr key={l.invoice_id ?? l.bill_id ?? l.number}>
+                        <td>
+                          <Link className="mono" to={to(l.kind === "payable" ? `purchases/bills/${l.bill_id}` : `invoices/${l.invoice_id}`)}>
+                            {l.number}
+                          </Link>
+                          <div className="small muted">{l.kind === "payable" ? t("fx.payable") : t("fx.receivable")}</div>
+                        </td>
                         <td className="end num">{money(l.due, l.currency)}</td>
                         <td className="end num">{money(l.booked, base)}</td>
                         <td className="end num">{l.revalued ? money(l.revalued, base) : "—"}</td>
@@ -895,7 +900,8 @@ function Revaluation() {
                 </table>
               </div>
               {r.difference !== null && r.difference !== undefined && (
-                <p><strong>{t("fx.net")}:</strong> <span className="num">{money(r.difference, base)}</span></p>
+                <p><strong>{t("fx.net")}:</strong> <span className="num">{money(r.difference, base)}</span>
+                  {r.lines.some((l) => l.kind === "payable") && <span className="small muted"> · {t("fx.differenceHint")}</span>}</p>
               )}
               {manage && doneThatDay && <p className="small muted">{t("fx.doneThatDay")}</p>}
               {manage && !doneThatDay && (

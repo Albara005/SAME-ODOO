@@ -1,13 +1,76 @@
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api, tokenStore, toApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
 import { computeTotals, formatUnits } from "../lib/decimal";
 import { StepStar } from "./Art";
-import { Badge, Button, IconButton, Input, Select, type Tone } from "./ui";
+import { Badge, Button, Field, IconButton, Input, Select, type Tone } from "./ui";
+
+// ---------------------------------------------------------------- currencies
+
+export const CURRENCIES = ["SAR", "AED", "QAR", "KWD", "BHD", "OMR", "EGP", "JOD", "IQD", "MAD", "TND", "LYD", "TRY", "USD", "EUR", "GBP", "JPY"];
+
+/** The organization's latest rate for a currency on or before a day (Accounting > Currencies), to suggest on a form. */
+export function useSuggestedRate(currency: string, day: string, enabled: boolean) {
+  const { org } = useOrg();
+  return useQuery({
+    queryKey: ["exchange-rate", org.id, currency, day],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/exchange-rates/latest", {
+      params: { path: { org_id: org.id }, query: { currency, on: day } } })),
+    enabled: enabled && currency !== org.default_currency && Boolean(day),
+    staleTime: 60_000,
+    retry: false,
+  }).data ?? null;
+}
+
+export type RateState = { foreign: boolean; rate: string; suggestedDay: string | null; set: (v: string) => void };
+
+/** The exchange rate on a form for a document or payment in another currency: the organization's latest rate for the
+ *  day is filled in until the person types their own. ``rate`` is empty for the organization's own currency. */
+export function useRate(currency: string, day: string, initial = ""): RateState {
+  const { org } = useOrg();
+  const foreign = currency !== org.default_currency;
+  const [rate, setRate] = useState(initial);
+  const [touched, setTouched] = useState(Boolean(initial));
+  const suggested = useSuggestedRate(currency, day, foreign && !touched);
+  useEffect(() => {
+    if (suggested && !touched) setRate(suggested.rate);
+  }, [suggested, touched]);
+  return { foreign, rate: foreign ? rate : "", suggestedDay: !touched && suggested ? suggested.day : null,
+           set: (v) => { setTouched(true); setRate(v); } };
+}
+
+/** The rate field for ``useRate``, shown only for another currency. */
+export function RateField({ state, currency, label, hint, error }: {
+  state: RateState; currency: string; label?: string; hint?: string; error?: string;
+}) {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  if (!state.foreign) return null;
+  const hints = [state.suggestedDay ? t("fx.rateSuggested", { day: state.suggestedDay }) : null, hint].filter(Boolean);
+  return (
+    <Field label={label ?? t("invoices.exchangeRate", { currency, base: org.default_currency })} error={error}
+      hint={hints.length ? hints.join(" · ") : undefined}>
+      <Input value={state.rate} inputMode="decimal" required ltr onChange={(e) => state.set(e.target.value)} />
+    </Field>
+  );
+}
+
+/** The currency of a quotation, order or bill: prices on it are in that currency. */
+export function CurrencyField({ value, onChange, disabled }: { value: string; onChange: (c: string) => void; disabled?: boolean }) {
+  const { t } = useI18n();
+  const { org } = useOrg();
+  return (
+    <Field label={t("invoices.currency")} hint={value !== org.default_currency ? t("invoices.foreignHint", { currency: value }) : undefined}>
+      <Select value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+        {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+      </Select>
+    </Field>
+  );
+}
 
 // ---------------------------------------------------------------- status
 

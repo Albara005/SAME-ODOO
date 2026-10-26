@@ -5,8 +5,8 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import {
-  Journey, journeySteps, LinesEditor, newLine, StatusBadge, toLineIn, TotalsBox, useCustomers, useIdempotencyKey, useWarehouses,
-  type LineDraft,
+  CurrencyField, Journey, journeySteps, LinesEditor, newLine, RateField, StatusBadge, toLineIn, TotalsBox, useCustomers,
+  useIdempotencyKey, useRate, useWarehouses, type LineDraft,
 } from "../components/business";
 import {
   Badge, Button, Card, Checkbox, Dialog, Empty, ErrorNotice, Field, Input, PageHeader, QueryView, Select, Textarea, errorText,
@@ -60,14 +60,16 @@ export function SalesOrdersPage() {
   }, [filter, term, setParams]);
   const all = orders.data ?? [];
   const shown = filter ? all.filter((o) => o.status === filter) : all;
+  const currencies = new Set(shown.map((o) => o.currency));
+  const one = currencies.size === 1 ? [...currencies][0]! : null;   // amounts in two currencies don't add up
   const columns: Column<OrderRow>[] = [
     { key: "number", header: t("invoices.number"), sort: (o) => o.number,
       cell: (o) => <Link to={path(`sales/${o.id}`)} className="cell-strong num">{o.number}</Link> },
     { key: "customer", header: t("invoices.customer"), sort: (o) => o.customer_name, cell: (o) => <span dir="auto">{o.customer_name}</span> },
     { key: "date", header: t("sales.orderDate"), sort: (o) => o.order_date, cell: (o) => <span className="num small">{date(o.order_date)}</span> },
     { key: "total", header: t("invoices.total"), align: "end", sort: (o) => Number(o.total),
-      cell: (o) => <span className="num">{money(o.total, org.default_currency)}</span>,
-      total: <span className="num">{money(sumDec(shown.map((o) => o.total), digitsFor(org.default_currency)), org.default_currency)}</span> },
+      cell: (o) => <span className="num">{money(o.total, o.currency)}</span>,
+      total: one ? <span className="num">{money(sumDec(shown.map((o) => o.total), digitsFor(one)), one)}</span> : undefined },
     { key: "status", header: t("common.status"), sort: (o) => o.status, cell: (o) => <StatusBadge status={o.status} /> },
   ];
   return (
@@ -210,6 +212,7 @@ function OrderEditor({ order }: { order?: Order }) {
     valid_until: order?.valid_until ?? "",
     warehouse_id: order?.warehouse_id ?? "",
     notes: order?.notes ?? "",
+    currency: order?.currency ?? org.default_currency,
   });
   const [lines, setLines] = useState<LineDraft[]>(order ? toDraft(order) : [newLine()]);
   const save = useMutation({
@@ -259,6 +262,7 @@ function OrderEditor({ order }: { order?: Order }) {
           <Field label={t("sales.validUntil")} error={err["valid_until"]} optional>
             <Input type="date" value={header.valid_until} min={header.order_date} onChange={(e) => setHeader({ ...header, valid_until: e.target.value })} ltr />
           </Field>
+          <CurrencyField value={header.currency} onChange={(currency) => setHeader({ ...header, currency })} />
           {warehouses.data && warehouses.data.length > 1 && (
             <Field label={t("inventory.warehouse")} optional>
               <Select value={header.warehouse_id} onChange={(e) => setHeader({ ...header, warehouse_id: e.target.value })}>
@@ -274,7 +278,7 @@ function OrderEditor({ order }: { order?: Order }) {
         </div>
       </Card>
       <Card title={t("invoices.lines")}>
-        <LinesEditor lines={lines} onChange={setLines} currency={org.default_currency} />
+        <LinesEditor lines={lines} onChange={setLines} currency={header.currency} />
       </Card>
       <Field label={t("invoices.notes")} optional>
         <Textarea value={header.notes} onChange={(e) => setHeader({ ...header, notes: e.target.value })} />
@@ -533,11 +537,12 @@ function InvoiceFromOrderDialog({ order, onClose, onDone }: { order: Order; onCl
   const { t } = useI18n();
   const { org } = useOrg();
   const [form, setForm] = useState({ issue_date: today(), due_date: "" });
+  const rate = useRate(order.currency, form.issue_date);
   const create = useMutation({
     mutationFn: () =>
       unwrap(api.POST("/api/v1/orgs/{org_id}/sales-orders/{order_id}/invoice", {
         params: { path: { org_id: org.id, order_id: order.id } },
-        body: { issue_date: form.issue_date, due_date: form.due_date || null },
+        body: { issue_date: form.issue_date, due_date: form.due_date || null, exchange_rate: rate.rate || null },
       })),
     onSuccess: (inv) => onDone(inv.id),
   });
@@ -553,6 +558,7 @@ function InvoiceFromOrderDialog({ order, onClose, onDone }: { order: Order; onCl
           <Field label={t("invoices.dueDate")} optional>
             <Input type="date" value={form.due_date} min={form.issue_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} ltr />
           </Field>
+          <RateField state={rate} currency={order.currency} />
         </div>
         <div className="form-actions">
           <Button onClick={onClose}>{t("common.cancel")}</Button>

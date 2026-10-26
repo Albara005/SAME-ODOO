@@ -21,13 +21,15 @@ from novara.modules.invoicing.router import InvoiceOut, invoice_out
 from novara.modules.partners.models import Customer
 from novara.modules.sales import reservations, service as svc
 from novara.modules.sales.models import SalesOrder, SalesOrderLine
-from novara.money import fmt_decimal, from_minor
+from novara.money import CURRENCY_DIGITS, fmt_decimal, from_minor
 
 router = APIRouter(tags=["sales"])
 
 
 class OrderIn(BaseModel):
     customer_id: str
+    # Another currency than the organization's: line prices are in it (give each line's price).
+    currency: str | None = Field(default=None, pattern="^[A-Z]{3}$")
     order_date: date
     valid_until: date | None = None
     warehouse_id: str | None = None
@@ -55,6 +57,8 @@ class DeliveryIn(BaseModel):
 class InvoiceFromOrderIn(BaseModel):
     issue_date: date
     due_date: date | None = None
+    # An order in another currency: the invoice's rate (default: the latest kept on or before the issue date).
+    exchange_rate: Decimal | None = Field(default=None, gt=0, max_digits=18, decimal_places=8)
 
 
 class OrderLineOut(BaseModel):
@@ -104,6 +108,7 @@ class OrderSummary(BaseModel):
     customer_id: str
     customer_name: str
     order_date: date
+    currency: str = ""
     total: str
 
 
@@ -170,6 +175,14 @@ def _apply(db: Session, order: SalesOrder, body: OrderIn) -> list[SalesOrderLine
     order.valid_until = body.valid_until
     order.warehouse_id = body.warehouse_id
     order.notes = body.notes
+    base = svc.base_currency(db)
+    currency = body.currency or base
+    if currency not in CURRENCY_DIGITS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"unsupported currency: {currency}")
+    if currency != base and any(l.unit_price is None for l in body.lines):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            f"give each line's price in {currency} (product prices are in {base})")
+    order.currency = currency
     lines = [SalesOrderLine(**fields) for fields in resolve_lines(db, body.lines)]
     svc.recompute(order, lines)
     return lines
@@ -190,7 +203,7 @@ def list_orders(status_filter: str | None = Query(default=None, alias="status"),
         like = f"%{q.lower()}%"
         stmt = stmt.where(or_(func.lower(SalesOrder.number).like(like), func.lower(Customer.name).like(like)))
     return [OrderSummary(id=o.id, number=o.number, status=o.status, customer_id=o.customer_id, customer_name=name,
-                         order_date=o.order_date, total=_money(o.total_minor, o.currency))
+                         order_date=o.order_date, currency=o.currency, total=_money(o.total_minor, o.currency))
             for o, name in db.execute(stmt)]
 
 
@@ -303,7 +316,7 @@ def invoice_order(order_id: str, body: InvoiceFromOrderIn, request: Request,
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "due_date cannot be before issue_date")
     order = _get_order(db, order_id, lock=True)
     invoice = _domain(lambda: svc.create_invoice(db, order, issue_date=body.issue_date, due_date=body.due_date,
-                                                 user_id=ctx.user.id))
+                                                 user_id=ctx.user.id, exchange_rate=body.exchange_rate))
     audit.record(db, actor_user_id=ctx.user.id, action="invoice.created", target_type="invoice",
                  target_id=invoice.id, details={"sales_order": order.number,
                                                 "total": _money(invoice.total_minor, invoice.currency)},

@@ -12,6 +12,10 @@
 * Bill lines from an order keep the order's unit cost, so the clearing account
   empties exactly; a different price means editing the order first.
 * Vendor credits (goods sent back, allowances) are in ``credit.py``.
+* Orders and bills can be in another currency than the organization's; the ledger stays in its currency.
+  Receipts value goods at the rate on the receipt day (stock is always in the organization's currency), a bill
+  is booked at its own rate and clears what the receipts put in GRNI, the change in rate between the two being
+  an exchange difference; payments are at the payment day's rate, against what they clear at the bill's.
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import event, inspect, select
+from sqlalchemy import event, func, inspect, select
 from sqlalchemy.orm import Session
 
 from novara.db import utcnow
@@ -30,9 +34,10 @@ from novara.modules.accounting.service import LineSpec, next_number, post_entry,
 from novara.modules.catalog.models import Product
 from novara.modules.inventory import service as stock
 from novara.modules.inventory.models import StockLevel, StockMove, Warehouse
-from novara.modules.invoicing.service import PAYMENT_METHODS, line_net_minor, tax_groups
+from novara.modules.invoicing import fx
+from novara.modules.invoicing.service import PAYMENT_METHODS, base_currency, line_net_minor, tax_groups
 from novara.modules.purchasing.models import BillPayment, PurchaseOrder, PurchaseOrderLine, VendorBill, VendorBillLine
-from novara.money import from_minor
+from novara.money import convert, from_minor
 
 
 class PurchaseStateError(RuntimeError):
@@ -59,6 +64,17 @@ def order_lines(db: Session, order: PurchaseOrder) -> list[PurchaseOrderLine]:
 def bill_lines(db: Session, bill: VendorBill) -> list[VendorBillLine]:
     return list(db.scalars(select(VendorBillLine).where(VendorBillLine.bill_id == bill.id)
                            .order_by(VendorBillLine.position)))
+
+
+def booked_rate(db: Session, bill: VendorBill) -> Decimal:
+    return bill.exchange_rate if bill.currency != base_currency(db) else Decimal(1)
+
+
+def rate_for(db: Session, currency: str, day: date, given: Decimal | None) -> Decimal:
+    try:
+        return fx.rate_for(db, currency, day, given)
+    except fx.FxError as e:
+        raise PurchaseValidationError(str(e)) from None
 
 
 def lock_order(db: Session, order_id: str) -> PurchaseOrder | None:
@@ -138,8 +154,10 @@ def cancel(db: Session, order: PurchaseOrder) -> None:
 
 
 def receive(db: Session, order: PurchaseOrder, *, move_date: date, quantities: dict[str, Decimal] | None,
-            user_id: str) -> stock.StockResult:
-    """Receive goods. ``quantities`` maps order line id -> qty; None receives everything outstanding."""
+            user_id: str, exchange_rate: Decimal | None = None) -> stock.StockResult:
+    """Receive goods. ``quantities`` maps order line id -> qty; None receives everything outstanding.
+
+    An order in another currency is valued at the rate on the receipt day (given, else the latest kept)."""
     if order.status != "confirmed":
         raise PurchaseStateError("only confirmed orders can be received")
     if move_date < order.order_date:
@@ -160,8 +178,11 @@ def receive(db: Session, order: PurchaseOrder, *, move_date: date, quantities: d
             raise PurchaseValidationError(f"'{item.line.description}': can receive at most {item.to_receive.normalize():f}")
         plan.append((item, qty))
     warehouse = db.get(Warehouse, order.warehouse_id) if order.warehouse_id else stock.default_warehouse(db)
-    result = stock.receive(db, warehouse=warehouse, move_date=move_date, currency=order.currency, counterpart="grni",
-                           lines=[(i.product, qty, i.line.unit_cost) for i, qty in plan], memo=order.number,
+    base = base_currency(db)
+    rate = rate_for(db, order.currency, move_date, exchange_rate)
+    memo = order.number if order.currency == base else f"{order.number} ({order.currency} at {rate.normalize():f})"
+    result = stock.receive(db, warehouse=warehouse, move_date=move_date, currency=base, counterpart="grni",
+                           lines=[(i.product, qty, i.line.unit_cost * rate) for i, qty in plan], memo=memo,
                            user_id=user_id, source_type="purchase_order", source_id=order.id,
                            source_line_ids=[i.line.id for i, _ in plan])
     for item, qty in plan:
@@ -170,7 +191,7 @@ def receive(db: Session, order: PurchaseOrder, *, move_date: date, quantities: d
 
 
 def bill_from_order(db: Session, order: PurchaseOrder, *, bill_date: date, due_date: date | None,
-                    vendor_reference: str, user_id: str) -> VendorBill:
+                    vendor_reference: str, user_id: str, exchange_rate: Decimal | None = None) -> VendorBill:
     if order.status != "confirmed":
         raise PurchaseStateError("only confirmed orders can be billed")
     if bill_date < order.order_date:
@@ -179,7 +200,8 @@ def bill_from_order(db: Session, order: PurchaseOrder, *, bill_date: date, due_d
     if not items:
         raise PurchaseStateError("nothing to bill: receive goods first, or everything is already billed")
     bill = VendorBill(vendor_id=order.vendor_id, vendor_reference=vendor_reference, bill_date=bill_date,
-                      due_date=due_date or bill_date, currency=order.currency, created_by=user_id)
+                      due_date=due_date or bill_date, currency=order.currency, created_by=user_id,
+                      exchange_rate=rate_for(db, order.currency, bill_date, exchange_rate))
     db.add(bill)
     db.flush()
     expense = system_account(db, "expense")
@@ -249,6 +271,24 @@ def _revalue(db: Session, bill: VendorBill, line: VendorBillLine, difference_min
     return moves
 
 
+def _grni_share(db: Session, bill: VendorBill, line: VendorBillLine) -> int:
+    """What a bill line from a purchase order takes out of GRNI, in the organization's currency: its share of what the
+    order line's receipts put there (at their own rates) not yet cleared by other bills; the last takes the rest."""
+    po_line = db.get(PurchaseOrderLine, line.purchase_order_line_id)
+    received = int(db.scalar(select(func.coalesce(func.sum(StockMove.value_minor), 0)).where(
+        StockMove.kind == "receipt", StockMove.source_type == "purchase_order",
+        StockMove.source_line_id == po_line.id)))
+    others = db.execute(select(VendorBill.grni_base, VendorBillLine.quantity)
+                        .join(VendorBillLine, VendorBillLine.bill_id == VendorBill.id)
+                        .where(VendorBillLine.purchase_order_line_id == po_line.id, VendorBill.id != bill.id,
+                               VendorBill.status.not_in(("draft", "cancelled")))).all()
+    left = received - sum(int((g or {}).get(po_line.id, 0)) for g, _ in others)
+    open_qty = po_line.qty_received - sum((q for _, q in others), Decimal(0))
+    if open_qty <= 0 or line.quantity >= open_qty:
+        return left
+    return int((Decimal(left) * line.quantity / open_qty).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
 def post_bill(db: Session, bill: VendorBill, *, user_id: str) -> JournalEntry:
     if bill.status != "draft":
         raise PurchaseStateError(f"only draft bills can be posted (status: {bill.status})")
@@ -258,20 +298,39 @@ def post_bill(db: Session, bill: VendorBill, *, user_id: str) -> JournalEntry:
     recompute(bill, lines)
     if bill.total_minor <= 0:
         raise PurchaseValidationError("bill total must be greater than zero")
+    base = base_currency(db)
+    foreign = bill.currency != base
+    if foreign and bill.exchange_rate <= 0:
+        raise PurchaseValidationError(f"a bill in {bill.currency} needs its exchange rate to {base}")
+    rate = booked_rate(db, bill)
+    to_base = lambda minor: convert(minor, bill.currency, rate, base)  # noqa: E731
     year = bill.bill_date.year
     bill.number = next_number(db, f"bill:{year}", f"BILL-{year}-")
+    bill.base_subtotal_minor = to_base(bill.subtotal_minor)
+    base_tax = sum(to_base(g.tax_minor) for g in tax_groups(lines, bill.currency))
+    bill.base_total_minor = bill.base_subtotal_minor + base_tax
+    bill.base_settled_minor = 0
     debits: dict[str, int] = defaultdict(int)
-    grni = system_account(db, "grni")
+    grni, exchange = system_account(db, "grni"), system_account(db, "fx_gain_loss")
     ordered = ordered_costs(db, lines)
     revaluations: list[StockMove] = []
+    cleared: dict[str, int] = {}
     for line in lines:
         if line.account_id is None and line.id in ordered:
             # Received goods clear GRNI at the order's price (what the receipt credited). A vendor charging
             # another price leaves a difference: the share for goods still in stock changes their value
             # (and average cost); the rest, for goods already gone, is a purchase price difference.
             at_order_price = line_net_minor(line.quantity, ordered[line.id], Decimal(0), bill.currency)
-            debits[grni.id] += at_order_price
-            difference = line.net_minor - at_order_price
+            if foreign:
+                # In another currency the receipts put their own rates' value in GRNI: that is what clears, and
+                # the bill's rate making it more or less is an exchange difference (more owed: a loss).
+                cleared[line.purchase_order_line_id] = _grni_share(db, bill, line)
+                debits[grni.id] += cleared[line.purchase_order_line_id]
+                debits[exchange.id] += to_base(at_order_price) - cleared[line.purchase_order_line_id]
+                difference = to_base(line.net_minor) - to_base(at_order_price)
+            else:
+                debits[grni.id] += at_order_price
+                difference = line.net_minor - at_order_price
             moves = _revalue(db, bill, line, difference, user_id)
             in_stock = sum(m.value_minor for m in moves)
             revaluations += moves
@@ -280,21 +339,29 @@ def post_bill(db: Session, bill: VendorBill, *, user_id: str) -> JournalEntry:
             if difference - in_stock:
                 debits[system_account(db, "price_variance").id] += difference - in_stock
         else:
-            debits[line.account_id or grni.id] += line.net_minor
+            debits[line.account_id or grni.id] += to_base(line.net_minor)
+    # Lines converted one by one can round a unit away from the converted subtotal.
+    debits[exchange.id] += bill.base_subtotal_minor - sum(debits.values())
     accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_(set(debits))))}
+
+    def label(aid: str, amount: int) -> str:
+        if aid == exchange.id:
+            return f"Exchange difference on {bill.number}"
+        return f"Bill {bill.number}" if amount >= 0 else f"Price difference on {bill.number}"
     # A lower vendor price makes the difference a credit.
-    specs = [LineSpec(accounts[aid], debit_minor=amount, label=f"Bill {bill.number}") if amount >= 0
-             else LineSpec(accounts[aid], credit_minor=-amount, label=f"Price difference on {bill.number}")
+    specs = [LineSpec(accounts[aid], debit_minor=max(amount, 0), credit_minor=max(-amount, 0), label=label(aid, amount))
              for aid, amount in sorted(debits.items(), key=lambda kv: accounts[kv[0]].code) if amount]
-    specs.append(LineSpec(system_account(db, "vat_input"), debit_minor=bill.tax_minor, label=f"VAT on {bill.number}"))
-    specs.append(LineSpec(system_account(db, "payable"), credit_minor=bill.total_minor, vendor_id=bill.vendor_id,
-                          label=f"Bill {bill.number} {bill.vendor_reference}".strip()))
-    entry = post_entry(db, entry_date=bill.bill_date, currency=bill.currency, lines=specs,
-                       memo=f"Vendor bill {bill.number}", source_type="vendor_bill", source_id=bill.id,
+    note = f" ({bill.currency} {from_minor(bill.total_minor, bill.currency)} at {rate.normalize():f})" if foreign else ""
+    specs.append(LineSpec(system_account(db, "vat_input"), debit_minor=base_tax, label=f"VAT on {bill.number}"))
+    specs.append(LineSpec(system_account(db, "payable"), credit_minor=bill.base_total_minor, vendor_id=bill.vendor_id,
+                          label=f"Bill {bill.number} {bill.vendor_reference}{note}".strip()))
+    entry = post_entry(db, entry_date=bill.bill_date, currency=base, lines=specs,
+                       memo=f"Vendor bill {bill.number}{note}", source_type="vendor_bill", source_id=bill.id,
                        created_by=user_id)
     for m in revaluations:
         m.journal_entry_id = entry.id
     db.add_all(revaluations)
+    bill.grni_base = cleared
     bill.status = "posted"
     bill.journal_entry_id = entry.id
     bill.posted_at = utcnow()
@@ -303,7 +370,9 @@ def post_bill(db: Session, bill: VendorBill, *, user_id: str) -> JournalEntry:
 
 
 def pay_bill(db: Session, bill: VendorBill, *, amount_minor: int, payment_date: date, method: str, reference: str,
-             user_id: str, idempotency_key: str | None = None) -> tuple[BillPayment, bool]:
+             user_id: str, idempotency_key: str | None = None,
+             exchange_rate: Decimal | None = None) -> tuple[BillPayment, bool]:
+    """Pay a bill. For a bill in another currency, exchange_rate is the rate on the payment date (required)."""
     if idempotency_key:
         existing = db.scalar(select(BillPayment).where(BillPayment.idempotency_key == idempotency_key))
         if existing is not None:
@@ -319,19 +388,33 @@ def pay_bill(db: Session, bill: VendorBill, *, amount_minor: int, payment_date: 
             f"payment must be between 0 and the open amount {from_minor(bill.amount_due_minor, bill.currency)}")
     if payment_date < bill.bill_date:
         raise PurchaseValidationError("payment date cannot be before the bill date")
+    base = base_currency(db)
+    foreign = bill.currency != base
+    if foreign and (exchange_rate is None or exchange_rate <= 0):
+        raise PurchaseValidationError(f"a payment in {bill.currency} needs the exchange rate to {base} on the payment date")
+    rate = exchange_rate if foreign else Decimal(1)
+    paid = convert(amount_minor, bill.currency, rate, base)
+    cleared = (bill.base_due_minor if amount_minor == bill.amount_due_minor
+               else min(convert(amount_minor, bill.currency, booked_rate(db, bill), base), bill.base_due_minor))
+    difference = paid - cleared                  # paying more than was booked is a loss
+    lines = [LineSpec(system_account(db, "payable"), debit_minor=cleared, vendor_id=bill.vendor_id,
+                      label=f"Payment {bill.number}"),
+             LineSpec(system_account(db, PAYMENT_METHODS[method]), credit_minor=paid,
+                      label=f"Payment {bill.number} {reference}".strip())]
+    if difference:
+        lines.append(LineSpec(system_account(db, "fx_gain_loss"), debit_minor=max(difference, 0),
+                              credit_minor=max(-difference, 0),
+                              label=f"Exchange {'loss' if difference > 0 else 'gain'} on {bill.number}"))
     entry = post_entry(
-        db, entry_date=payment_date, currency=bill.currency, created_by=user_id,
-        memo=f"Payment of {bill.number}", source_type="bill_payment", source_id=bill.id,
-        lines=[LineSpec(system_account(db, "payable"), debit_minor=amount_minor, vendor_id=bill.vendor_id,
-                        label=f"Payment {bill.number}"),
-               LineSpec(system_account(db, PAYMENT_METHODS[method]), credit_minor=amount_minor,
-                        label=f"Payment {bill.number} {reference}".strip())],
+        db, entry_date=payment_date, currency=base, created_by=user_id,
+        memo=f"Payment of {bill.number}", source_type="bill_payment", source_id=bill.id, lines=lines,
     )
     payment = BillPayment(bill_id=bill.id, payment_date=payment_date, amount_minor=amount_minor, method=method,
                           reference=reference, journal_entry_id=entry.id, idempotency_key=idempotency_key,
-                          created_by=user_id)
+                          created_by=user_id, exchange_rate=rate, base_amount_minor=paid, fx_minor=difference)
     db.add(payment)
     bill.amount_paid_minor += amount_minor
+    bill.base_settled_minor += cleared
     settle(bill)
     db.flush()
     return payment, True
@@ -395,7 +478,7 @@ def _undo_revaluations(db: Session, bill: VendorBill, cancel_date: date, user_id
         lines = ([LineSpec(inventory, debit_minor=-stuck, label=label), LineSpec(variance, credit_minor=-stuck, label=label)]
                  if stuck < 0 else
                  [LineSpec(variance, debit_minor=stuck, label=label), LineSpec(inventory, credit_minor=stuck, label=label)])
-        entry = post_entry(db, entry_date=cancel_date, currency=bill.currency, lines=lines, created_by=user_id,
+        entry = post_entry(db, entry_date=cancel_date, currency=base_currency(db), lines=lines, created_by=user_id,
                            memo=f"Stock revaluation on cancelling {bill.number}", source_type="vendor_bill",
                            source_id=bill.id)
     for m in undone:
@@ -408,7 +491,7 @@ class BillLocked(RuntimeError):
 
 
 _MUTABLE_AFTER_POST = {"status", "amount_paid_minor", "amount_credited_minor", "reversal_entry_id", "cancelled_at",
-                       "number", "journal_entry_id", "posted_at", "posted_by"}
+                       "number", "journal_entry_id", "posted_at", "posted_by", "base_settled_minor"}
 
 
 @event.listens_for(Session, "before_flush")

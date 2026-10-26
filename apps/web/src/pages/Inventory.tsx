@@ -1,15 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardList, PackagePlus, Plus, Trash2, Warehouse as WarehouseIcon } from "lucide-react";
 import { useState } from "react";
-import { api, ApiError, unwrap } from "../api/client";
+import { api, ApiError, unwrap, type Schemas } from "../api/client";
 import { useOrg } from "../auth/Org";
 import { Tabs, useIdempotencyKey, useProducts, useWarehouses } from "../components/business";
+import { DataTable, type Column } from "../components/DataTable";
+import { ListToolbar } from "../components/ListToolbar";
 import {
   Badge, Button, Card, Dialog, Empty, ErrorNotice, Field, IconButton, Input, PageHeader, QueryView, Select, useToast,
 } from "../components/ui";
 import type { MessageKey } from "../i18n/en";
 import { useI18n } from "../i18n/I18n";
-import { isZero } from "../lib/decimal";
+import { digitsFor, isZero, sumDec } from "../lib/decimal";
 import { today } from "../lib/format";
 
 type Tab = "levels" | "moves" | "warehouses";
@@ -86,103 +88,102 @@ function Valuation() {
   );
 }
 
+type Level = Schemas["LevelOut"];
+type Move = Schemas["MoveOut"];
+
 function Levels() {
   const { t, money, amount } = useI18n();
   const { org } = useOrg();
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<"" | "reserved" | "short">("");
   const levels = useQuery({
     queryKey: ["stock", org.id, "levels"],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/inventory/levels", { params: { path: { org_id: org.id } } })),
   });
+  const term = q.trim().toLowerCase();
+  const all = (levels.data ?? []).filter((l) => !term || [l.product_name, l.sku, l.warehouse_code].some((v) => v?.toLowerCase().includes(term)));
+  const short = (l: Level) => l.available.startsWith("-");
+  const shown = all.filter((l) => (filter === "short" ? short(l) : filter === "reserved" ? !isZero(l.reserved) : true));
+  const base = org.default_currency;
+  const columns: Column<Level>[] = [
+    { key: "product", header: t("invoices.product"), sort: (l) => l.product_name, cell: (l) => <span className="cell-strong" dir="auto">{l.product_name}</span> },
+    { key: "sku", header: t("products.sku"), sort: (l) => l.sku ?? "", cell: (l) => (l.sku ? <span className="num">{l.sku}</span> : <span className="muted">—</span>) },
+    { key: "warehouse", header: t("inventory.warehouse"), sort: (l) => l.warehouse_code, cell: (l) => <span className="num">{l.warehouse_code}</span> },
+    { key: "quantity", header: t("inventory.quantity"), align: "end", sort: (l) => Number(l.quantity), cell: (l) => <span className="num">{amount(l.quantity)}</span> },
+    { key: "reserved", header: t("inventory.reserved"), align: "end", sort: (l) => Number(l.reserved),
+      cell: (l) => (isZero(l.reserved) ? <span className="muted">—</span> : <span className="num">{amount(l.reserved)}</span>) },
+    { key: "available", header: t("inventory.available"), align: "end", sort: (l) => Number(l.available),
+      cell: (l) => <span className={`num ${short(l) ? "short" : ""}`}>{amount(l.available)}</span> },
+    { key: "cost", header: t("inventory.avgCost"), align: "end", sort: (l) => Number(l.average_cost),
+      cell: (l) => <span className="num">{money(l.average_cost, base)}</span> },
+    { key: "value", header: t("inventory.value"), align: "end", sort: (l) => Number(l.value),
+      cell: (l) => <span className="num">{money(l.value, base)}</span>,
+      total: <span className="num">{money(sumDec(shown.map((l) => l.value), digitsFor(base)), base)}</span> },
+  ];
+  const count = (f: "" | "reserved" | "short") => all.filter((l) => (f === "short" ? short(l) : f === "reserved" ? !isZero(l.reserved) : true)).length;
   return (
-    <QueryView query={levels}>
-      {(list) =>
-        list.length === 0 ? (
-          <Empty>{t("inventory.empty")}</Empty>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("invoices.product")}</th>
-                  <th>{t("products.sku")}</th>
-                  <th>{t("inventory.warehouse")}</th>
-                  <th className="end">{t("inventory.quantity")}</th>
-                  <th className="end">{t("inventory.reserved")}</th>
-                  <th className="end">{t("inventory.available")}</th>
-                  <th className="end">{t("inventory.avgCost")}</th>
-                  <th className="end">{t("inventory.value")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((l) => (
-                  <tr key={`${l.product_id}:${l.warehouse_id}`}>
-                    <td>{l.product_name}</td>
-                    <td className="mono">{l.sku ?? "—"}</td>
-                    <td className="mono">{l.warehouse_code}</td>
-                    <td className="end num">{amount(l.quantity)}</td>
-                    <td className="end num">{isZero(l.reserved) ? "—" : amount(l.reserved)}</td>
-                    <td className={`end num ${l.available.startsWith("-") ? "short" : ""}`}>{amount(l.available)}</td>
-                    <td className="end num">{money(l.average_cost, org.default_currency)}</td>
-                    <td className="end num">{money(l.value, org.default_currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      }
-    </QueryView>
+    <div className="stack">
+      <ListToolbar search={q} onSearch={setQ} placeholder={t("inventory.searchHint")}
+        filters={([["", t("common.all")], ["reserved", t("inventory.reserved")], ["short", t("inventory.short")]] as const)
+          .map(([key, label]) => ({ key, label, count: count(key) }))
+          .filter((f) => f.key === "" || f.key === filter || f.count > 0)}
+        filter={filter} onFilter={setFilter} shown={levels.data ? shown.length : undefined} />
+      <QueryView query={levels}>
+        {(list) => list.length === 0 ? <Empty>{t("inventory.empty")}</Empty> : shown.length === 0 ? <Empty>{t("common.noMatches")}</Empty> : (
+          <DataTable rows={shown} columns={columns} rowKey={(l) => `${l.product_id}:${l.warehouse_id}`} label={t("inventory.levels")}
+            rowClassName={(l) => (short(l) ? "row-overdue" : "")} />
+        )}
+      </QueryView>
+    </div>
   );
 }
+
+const MOVE_KINDS = ["receipt", "delivery", "adjustment", "return", "vendor_return", "revaluation"];
 
 function Moves() {
   const { t, money, amount, date } = useI18n();
   const { org } = useOrg();
   const products = useProducts();
   const warehouses = useWarehouses();
+  const [q, setQ] = useState("");
+  const [kind, setKind] = useState("");
   const moves = useQuery({
     queryKey: ["stock", org.id, "moves"],
     queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/inventory/moves", { params: { path: { org_id: org.id }, query: { limit: 200 } } })),
   });
   const productName = (id: string) => products.data?.find((p) => p.id === id)?.name ?? "…";
   const whCode = (id: string) => warehouses.data?.find((w) => w.id === id)?.code ?? "…";
+  const term = q.trim().toLowerCase();
+  const all = (moves.data ?? []).filter((m) => !term || [m.reference, productName(m.product_id), whCode(m.warehouse_id)]
+    .some((v) => v.toLowerCase().includes(term)));
+  const shown = kind ? all.filter((m) => m.kind === kind) : all;
+  const kinds = [...new Set([...MOVE_KINDS, ...all.map((m) => m.kind)])];
+  const base = org.default_currency;
+  const columns: Column<Move>[] = [
+    { key: "date", header: t("common.date"), sort: (m) => m.move_date, cell: (m) => <span className="num small">{date(m.move_date)}</span> },
+    { key: "reference", header: t("inventory.reference"), sort: (m) => m.reference, cell: (m) => <span className="num cell-strong">{m.reference}</span> },
+    { key: "kind", header: t("products.kind"), sort: (m) => m.kind,
+      cell: (m) => <Badge tone={m.kind === "receipt" || m.kind === "return" ? "success" : m.kind === "delivery" ? "info" : "neutral"}>
+        {t(`inventory.kind.${m.kind}` as MessageKey)}</Badge> },
+    { key: "product", header: t("invoices.product"), sort: (m) => productName(m.product_id), cell: (m) => <span dir="auto">{productName(m.product_id)}</span> },
+    { key: "warehouse", header: t("inventory.warehouse"), sort: (m) => whCode(m.warehouse_id), cell: (m) => <span className="num">{whCode(m.warehouse_id)}</span> },
+    { key: "quantity", header: t("inventory.quantity"), align: "end", sort: (m) => Number(m.quantity),
+      cell: (m) => <span className={`num ${m.quantity.startsWith("-") ? "text-danger" : ""}`}>{amount(m.quantity)}</span> },
+    { key: "value", header: t("inventory.value"), align: "end", sort: (m) => Number(m.value), cell: (m) => <span className="num">{money(m.value, base)}</span> },
+  ];
   return (
-    <QueryView query={moves}>
-      {(list) =>
-        list.length === 0 ? (
-          <Empty />
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t("common.date")}</th>
-                  <th>{t("inventory.reference")}</th>
-                  <th>{t("products.kind")}</th>
-                  <th>{t("invoices.product")}</th>
-                  <th>{t("inventory.warehouse")}</th>
-                  <th className="end">{t("inventory.quantity")}</th>
-                  <th className="end">{t("inventory.value")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((m) => (
-                  <tr key={m.id}>
-                    <td className="num small">{date(m.move_date)}</td>
-                    <td className="mono">{m.reference}</td>
-                    <td>{t(`inventory.kind.${m.kind}` as MessageKey)}</td>
-                    <td>{productName(m.product_id)}</td>
-                    <td className="mono">{whCode(m.warehouse_id)}</td>
-                    <td className="end num">{amount(m.quantity)}</td>
-                    <td className="end num">{money(m.value, org.default_currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      }
-    </QueryView>
+    <div className="stack">
+      <ListToolbar search={q} onSearch={setQ} placeholder={t("inventory.movesSearchHint")}
+        filters={[{ key: "", label: t("common.all"), count: all.length },
+          ...kinds.map((k) => ({ key: k, label: t(`inventory.kind.${k}` as MessageKey), count: all.filter((m) => m.kind === k).length }))
+            .filter((f) => f.key === kind || f.count > 0)]}
+        filter={kind} onFilter={setKind} filterLabel={t("products.kind")} shown={moves.data ? shown.length : undefined} />
+      <QueryView query={moves}>
+        {(list) => list.length === 0 ? <Empty /> : shown.length === 0 ? <Empty>{t("common.noMatches")}</Empty> : (
+          <DataTable rows={shown} columns={columns} rowKey={(m) => m.id} label={t("inventory.moves")} />
+        )}
+      </QueryView>
+    </div>
   );
 }
 

@@ -5,6 +5,8 @@
 * Invoiced quantity is derived from invoice lines linked to the order line,
   excluding cancelled invoices, so deleting a draft or cancelling an invoice
   makes the quantity invoiceable again without any bookkeeping to undo.
+* A quotation can be in another currency than the organization's (prices in it). Deliveries cost goods at their
+  stock value (the organization's currency); the invoice takes the order's currency and a rate for its date.
 """
 
 from __future__ import annotations
@@ -21,8 +23,9 @@ from novara.db import utcnow
 from novara.modules.catalog.models import Product
 from novara.modules.inventory import service as stock
 from novara.modules.inventory.models import Warehouse
+from novara.modules.invoicing import fx
 from novara.modules.invoicing.models import Invoice, InvoiceLine
-from novara.modules.invoicing.service import line_net_minor, recompute as recompute_invoice, tax_groups
+from novara.modules.invoicing.service import base_currency, line_net_minor, recompute as recompute_invoice, tax_groups
 from novara.modules.sales import reservations
 from novara.modules.sales.models import SalesOrder, SalesOrderLine
 
@@ -144,7 +147,7 @@ def deliver(db: Session, order: SalesOrder, *, move_date: date, quantities: dict
             raise stock.InsufficientStock(
                 f"only {max(free, Decimal(0)).normalize():f} of '{item.product.name}' is free for this order "
                 f"in {warehouse.code}; the rest is reserved for orders confirmed earlier")
-    result = stock.deliver(db, warehouse=warehouse, move_date=move_date, currency=order.currency,
+    result = stock.deliver(db, warehouse=warehouse, move_date=move_date, currency=base_currency(db),
                            lines=[(i.product, qty, i.line.id) for i, qty in plan],
                            source_type="sales_order", source_id=order.id, user_id=user_id)
     for item, qty in plan:
@@ -153,7 +156,9 @@ def deliver(db: Session, order: SalesOrder, *, move_date: date, quantities: dict
 
 
 def create_invoice(db: Session, order: SalesOrder, *, issue_date: date, due_date: date | None,
-                   user_id: str) -> Invoice:
+                   user_id: str, exchange_rate: Decimal | None = None) -> Invoice:
+    """A draft invoice for what is delivered (goods) or ordered (services) and not invoiced yet. An order in another
+    currency is invoiced in it at the rate given, else the latest kept on or before the invoice date."""
     if order.status != "confirmed":
         raise OrderStateError("only confirmed orders can be invoiced")
     if issue_date < order.order_date:
@@ -161,8 +166,12 @@ def create_invoice(db: Session, order: SalesOrder, *, issue_date: date, due_date
     items = [i for i in progress(db, order) if i.to_invoice > 0]
     if not items:
         raise OrderStateError("nothing to invoice: deliver goods first, or everything is already invoiced")
+    try:
+        rate = fx.rate_for(db, order.currency, issue_date, exchange_rate)
+    except fx.FxError as e:
+        raise OrderValidationError(str(e)) from None
     invoice = Invoice(customer_id=order.customer_id, issue_date=issue_date, due_date=due_date or issue_date,
-                      currency=order.currency, notes="", created_by=user_id)
+                      currency=order.currency, notes="", created_by=user_id, exchange_rate=rate)
     db.add(invoice)
     db.flush()
     lines = [

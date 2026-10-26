@@ -13,6 +13,9 @@ been credited in full, the last credit takes the exact remainder, like customer 
 
 The total first reduces what is still due on the bill; the rest the vendor owes back, and is
 recorded when the money arrives with ``record_refund``:  Dr Bank/Cash, Cr Accounts Payable.
+
+A bill in another currency is credited at its own rate (the ledger is in the organization's currency); the part
+that settles the bill clears exactly what is left of it there, and rounding goes to exchange differences.
 """
 
 from __future__ import annotations
@@ -30,11 +33,12 @@ from novara.modules.accounting.service import LineSpec, next_number, post_entry,
 from novara.modules.catalog.models import Product
 from novara.modules.inventory import service as stock
 from novara.modules.inventory.models import StockMove, Warehouse
-from novara.modules.invoicing.service import PAYMENT_METHODS, line_net_minor, tax_groups
+from novara.modules.invoicing.service import PAYMENT_METHODS, base_currency, line_net_minor, tax_groups
 from novara.modules.purchasing.models import (VendorBill, VendorBillLine, VendorCredit, VendorCreditLine,
                                               VendorCreditTax, VendorRefund)
-from novara.modules.purchasing.service import PurchaseStateError, PurchaseValidationError, bill_lines, settle
-from novara.money import from_minor, to_minor
+from novara.modules.purchasing.service import (PurchaseStateError, PurchaseValidationError, bill_lines, booked_rate,
+                                               settle)
+from novara.money import convert, from_minor, to_minor
 
 CREDITABLE = ("posted", "partially_paid", "paid", "credited")
 
@@ -169,30 +173,42 @@ def create_vendor_credit(db: Session, bill: VendorBill, *, issue_date: date, rea
             credits[line.account_id] += cl.net_minor
     accounts = {a.id: a for a in db.scalars(select(Account).where(Account.id.in_(set(credits))))}
     tax_records = {t.id: t for t in db.scalars(select(Tax).where(Tax.id.in_([t.tax_id for t in taxes])))}
+    # In the organization's currency at the bill's rate. The part that settles the bill clears exactly what is
+    # left of it in the books once the bill is settled in full.
+    base, rate = base_currency(db), booked_rate(db, bill)
+    to_base = lambda minor: convert(minor, bill.currency, rate, base)  # noqa: E731
+    applied = min(total, bill.amount_due_minor)
+    base_applied = (bill.base_due_minor if applied == bill.amount_due_minor
+                    else min(to_base(applied), bill.base_due_minor))
+    base_payable = base_applied + to_base(total - applied)
     label = f"Vendor credit {number}"
-    specs = [LineSpec(system_account(db, "payable"), debit_minor=total, vendor_id=bill.vendor_id,
+    specs = [LineSpec(system_account(db, "payable"), debit_minor=base_payable, vendor_id=bill.vendor_id,
                       label=f"{label} for {bill.number} {vendor_reference}".strip())]
     for aid, amount in sorted(credits.items(), key=lambda kv: accounts[kv[0]].code):
-        specs.append(LineSpec(accounts[aid], credit_minor=amount, label=label))
+        specs.append(LineSpec(accounts[aid], credit_minor=to_base(amount), label=label))
     if stock_value:
         specs.append(LineSpec(system_account(db, "inventory"), credit_minor=stock_value, label=label))
-    difference = goods_net - stock_value
+    difference = to_base(goods_net) - stock_value      # stock value is already in the organization's currency
     if difference:
         adjustment = system_account(db, "inventory_adjustment")
         specs.append(LineSpec(adjustment, credit_minor=difference, label=label) if difference > 0
                      else LineSpec(adjustment, debit_minor=-difference, label=label))
     for t in taxes:  # bills debit all their VAT to input VAT, so credits take it back from there
-        specs.append(LineSpec(system_account(db, "vat_input"), credit_minor=t.tax_minor,
+        specs.append(LineSpec(system_account(db, "vat_input"), credit_minor=to_base(t.tax_minor),
                               label=f"{tax_records[t.tax_id].name} on {number}"))
-    entry = post_entry(db, entry_date=issue_date, currency=bill.currency, lines=specs,
+    rounding = base_payable - sum(sp.credit_minor - sp.debit_minor for sp in specs[1:])
+    if rounding:
+        specs.append(LineSpec(system_account(db, "fx_gain_loss"), credit_minor=max(rounding, 0),
+                              debit_minor=max(-rounding, 0), label=f"Exchange difference on {number}"))
+    entry = post_entry(db, entry_date=issue_date, currency=base, lines=specs,
                        memo=f"{label} for {bill.number}", source_type="vendor_credit", source_id=bill.id,
                        created_by=user_id)
 
-    applied = min(total, bill.amount_due_minor)
     credit = VendorCredit(number=number, bill_id=bill.id, vendor_id=bill.vendor_id, vendor_reference=vendor_reference,
                           issue_date=issue_date, currency=bill.currency, reason=reason, subtotal_minor=subtotal,
                           tax_minor=tax_total, total_minor=total, applied_minor=applied, journal_entry_id=entry.id,
-                          stock_reference=", ".join(ref for ref, _ in planned)[:40], created_by=user_id)
+                          stock_reference=", ".join(ref for ref, _ in planned)[:40], created_by=user_id,
+                          base_total_minor=base_payable, base_applied_minor=base_applied)
     db.add(credit)
     db.flush()
     for cl in credit_lines:
@@ -205,6 +221,7 @@ def create_vendor_credit(db: Session, bill: VendorBill, *, issue_date: date, rea
             m.source_id = credit.id
         stock.attach(db, ref, ms, entry)
     bill.amount_credited_minor += applied
+    bill.base_settled_minor += base_applied
     settle(bill)
     db.flush()
     return credit
@@ -231,19 +248,25 @@ def record_refund(db: Session, credit: VendorCredit, *, amount_minor: int, refun
             f"refund must be between 0 and the amount the vendor owes {from_minor(owed, credit.currency)}")
     if refund_date < credit.issue_date:
         raise PurchaseValidationError("the refund cannot be dated before the credit")
+    # At the bill's rate; the last refund takes exactly what the credit still has in the books.
+    base = base_currency(db)
+    base_owed = credit.base_total_minor - credit.base_applied_minor - credit.base_refunded_minor
+    base_amount = base_owed if amount_minor == owed else min(
+        convert(amount_minor, credit.currency, booked_rate(db, db.get(VendorBill, credit.bill_id)), base), base_owed)
     entry = post_entry(
-        db, entry_date=refund_date, currency=credit.currency, created_by=user_id,
+        db, entry_date=refund_date, currency=base, created_by=user_id,
         memo=f"Vendor refund for {credit.number}", source_type="vendor_refund", source_id=credit.id,
-        lines=[LineSpec(system_account(db, PAYMENT_METHODS[method]), debit_minor=amount_minor,
+        lines=[LineSpec(system_account(db, PAYMENT_METHODS[method]), debit_minor=base_amount,
                         label=f"Vendor refund {credit.number} {reference}".strip()),
-               LineSpec(system_account(db, "payable"), credit_minor=amount_minor, vendor_id=credit.vendor_id,
+               LineSpec(system_account(db, "payable"), credit_minor=base_amount, vendor_id=credit.vendor_id,
                         label=f"Vendor refund {credit.number}")],
     )
     record = VendorRefund(credit_id=credit.id, refund_date=refund_date, amount_minor=amount_minor, method=method,
                           reference=reference, journal_entry_id=entry.id, idempotency_key=idempotency_key,
-                          created_by=user_id)
+                          created_by=user_id, base_amount_minor=base_amount)
     db.add(record)
     credit.refunded_minor += amount_minor
+    credit.base_refunded_minor += base_amount
     db.flush()
     return record, True
 

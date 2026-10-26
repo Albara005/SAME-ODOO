@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
@@ -93,6 +93,15 @@ class VendorBill(IdMixin, TimestampMixin, TenantScoped, Base):
     amount_paid_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     # The part of vendor credits that reduced what is due on this bill.
     amount_credited_minor: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    # In another currency than the organization's: units of its currency per unit of the bill's, as booked. The
+    # ledger is kept in the organization's currency: base_* are the posted amounts there, base_settled_minor how
+    # much of the payable payments and vendor credits have cleared, and grni_base what posting took out of goods
+    # received not invoiced per purchase order line (their receipts' value, at the receipts' rates).
+    exchange_rate: Mapped[Decimal] = mapped_column(ExactDecimal(18, 8), default=Decimal(1), server_default="1", nullable=False)
+    base_subtotal_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    base_total_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    base_settled_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    grni_base: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     journal_entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     reversal_entry_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -105,6 +114,13 @@ class VendorBill(IdMixin, TimestampMixin, TenantScoped, Base):
         if self.status in ("draft", "cancelled"):
             return 0
         return self.total_minor - self.amount_paid_minor - self.amount_credited_minor
+
+    @property
+    def base_due_minor(self) -> int:
+        """What is still due, in the organization's currency (the payable's balance for this bill)."""
+        if self.status in ("draft", "cancelled"):
+            return 0
+        return self.base_total_minor - self.base_settled_minor
 
 
 class VendorBillLine(IdMixin, TenantScoped, Base):
@@ -151,6 +167,11 @@ class BillPayment(IdMixin, TimestampMixin, TenantScoped, Base):
     journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+    # A bill in another currency: the rate on the payment date, what left the bank in the organization's currency,
+    # and the exchange difference (paid minus what it cleared at the bill's rate: positive is a loss).
+    exchange_rate: Mapped[Decimal] = mapped_column(ExactDecimal(18, 8), default=Decimal(1), server_default="1", nullable=False)
+    base_amount_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    fx_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
 
 
 class VendorCredit(IdMixin, TimestampMixin, TenantScoped, Base):
@@ -187,6 +208,10 @@ class VendorCredit(IdMixin, TimestampMixin, TenantScoped, Base):
     journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
     stock_reference: Mapped[str] = mapped_column(String(40), default="", nullable=False)  # goods sent back
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+    # In the organization's currency, at the bill's rate (like customer credit notes).
+    base_total_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    base_applied_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    base_refunded_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
 
 
 class VendorCreditLine(IdMixin, TenantScoped, Base):
@@ -249,3 +274,4 @@ class VendorRefund(IdMixin, TimestampMixin, TenantScoped, Base):
     journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
+    base_amount_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
