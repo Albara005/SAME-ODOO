@@ -2162,6 +2162,7 @@ export const en = {
   "org.apps": "Apps on the menu",
   "org.appsHint": "Turning an app off only takes it off the menu: its data stays, and turning it back on loses nothing.",
   "org.appsSaved": "The menu is updated",
+  "org.appsSave": "Save apps",
 } as const;
 
 export type MessageKey = keyof typeof en;

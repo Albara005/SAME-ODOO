@@ -2164,4 +2164,5 @@ export const ar: Record<MessageKey, string> = {
   "org.apps": "التطبيقات في القائمة",
   "org.appsHint": "إيقاف التطبيق يُخفيه من القائمة فقط: تبقى بياناته، وإعادته لا تُفقدك شيئًا.",
   "org.appsSaved": "تم تحديث القائمة",
+  "org.appsSave": "حفظ التطبيقات",
 };

@@ -589,7 +589,7 @@ function MenuAppsCard() {
         <AppsPicker value={apps} onChange={setApps} />
         <div className="form-actions">
           <Button type="submit" variant="primary" loading={save.isPending} disabled={apps.length === 0}>
-            {t("common.save")}
+            {t("org.appsSave")}
           </Button>
         </div>
       </form>

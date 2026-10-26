@@ -68,7 +68,7 @@ test("first run: say what the business does, get its apps, VAT, sample data and 
   await menu(page).getByRole("link", { name: "المؤسسة", exact: true }).click();
   const apps = page.locator("section.card").filter({ has: page.getByRole("heading", { name: "التطبيقات في القائمة" }) });
   await apps.locator("label.choice", { hasText: "الرواتب" }).click();
-  await apps.getByRole("button", { name: "حفظ" }).click();
+  await apps.getByRole("button", { name: "حفظ التطبيقات" }).click();
   await expect(page.getByText("تم تحديث القائمة")).toBeVisible();
   await expect(menu(page).getByRole("link", { name: "الرواتب", exact: true })).toBeVisible();
   await menu(page).getByRole("link", { name: "الرئيسية", exact: true }).click();
