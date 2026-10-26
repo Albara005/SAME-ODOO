@@ -82,26 +82,32 @@ const NotificationsPage = page(work, "NotificationsPage");
 const TasksPage = page(work, "TasksPage");
 
 /** A page that throws while rendering: say so, offer a reload, and keep what went wrong for whoever reports it. */
-class ErrorBoundary extends Component<{ children: ReactNode; path: string }, { error: Error | null; path: string }> {
-  state = { error: null as Error | null, path: "" };
+type Crash = { error: Error; where: string };
+class ErrorBoundary extends Component<{ children: ReactNode; path: string }, { crash: Crash | null; path: string }> {
+  state = { crash: null as Crash | null, path: "" };
   static getDerivedStateFromError(error: Error) {
-    return { error };
+    return { crash: { error, where: "" } };
   }
   componentDidCatch(error: Error, info: ErrorInfo) {
-    this.setState({ path: this.props.path });
+    // The first components on the way down to the one that threw, for the report (the bundle's source maps
+    // turn their file:line:column back into the source).
+    const where = (info.componentStack ?? "").trim().split("\n").slice(0, 4).map((l) => l.trim()).join("\n");
+    this.setState({ crash: { error, where }, path: this.props.path });
     console.error("NOVARA page error", error, info.componentStack);
   }
   componentDidUpdate() {
     // Going to another page (the browser's back button) tries again there.
-    if (this.state.error && this.state.path && this.props.path !== this.state.path) this.setState({ error: null, path: "" });
+    if (this.state.crash && this.state.path && this.props.path !== this.state.path) this.setState({ crash: null, path: "" });
   }
   render() {
-    return this.state.error ? <Crashed error={this.state.error} /> : this.props.children;
+    return this.state.crash ? <Crashed crash={this.state.crash} path={this.state.path || this.props.path} /> : this.props.children;
   }
 }
 
-function Crashed({ error }: { error: Error }) {
+function Crashed({ crash, path }: { crash: Crash; path: string }) {
   const { t } = useI18n();
+  const { error, where } = crash;
+  const stack = (error.stack ?? "").split("\n").filter((l) => l.includes("/assets/")).slice(0, 4).map((l) => l.trim());
   return (
     <div className="content" style={{ maxWidth: 760 }}>
       <div className="notice notice-error stack-sm" role="alert">
@@ -112,7 +118,10 @@ function Crashed({ error }: { error: Error }) {
         </div>
         <details className="small">
           <summary>{t("error.details")}</summary>
-          <code dir="ltr">{error.name}: {error.message}</code>
+          <pre className="crash-details" dir="ltr">
+            {[`${error.name}: ${error.message}`, `page: ${path.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, ":id")}`, ...stack, where]
+              .filter(Boolean).join("\n")}
+          </pre>
         </details>
       </div>
     </div>

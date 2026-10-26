@@ -1167,3 +1167,7 @@ tbody tr:not(:hover) .row-actions .icon-btn { color: var(--color-text-muted); }
   .setup-actions .grow { display: none; }
   .setup-actions .btn-primary { flex: 1 1 100%; justify-content: center; order: -1; }
 }
+
+/* The technical details under a page error: what threw and where, for a report. */
+.crash-details { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--color-surface-raised);
+                 font-size: 0.75rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; max-block-size: 260px; overflow: auto; }
