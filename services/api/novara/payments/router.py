@@ -11,6 +11,9 @@
     GET  /api/v1/public/payments/hyperpay/{session}     the customer's page: HyperPay's widget for a checkout made now
     GET  /api/v1/public/payments/hyperpay/{session}/result   where HyperPay sends the customer back (checked with HyperPay)
     POST /api/v1/public/payments/hyperpay/{token}       HyperPay's encrypted webhook calls (checked the same way)
+    GET  /api/v1/public/payments/paytabs/{session}      the customer's link: a PayTabs payment page made now
+    POST /api/v1/public/payments/paytabs/{session}/return    PayTabs' signed return (checked with PayTabs)
+    POST /api/v1/public/payments/paytabs/{token}        PayTabs' signed callback (checked the same way)
     GET  /api/v1/public/payments/test/{session}         the test provider's checkout page (not in production)
     POST /api/v1/public/payments/test/{session}/pay
     GET  /api/v1/public/payments/done?status=paid       where the customer lands afterwards
@@ -24,6 +27,7 @@ import json
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
+from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -45,8 +49,9 @@ from novara.modules.sales.models import WebOrder
 from novara.money import from_minor, to_minor
 from novara.payments import service as svc
 from novara.payments.models import PaymentLink, PaymentSettings
-from novara.payments.providers import (BadSignature, Expired, HyperPay, HyperPayResult, Moyasar, Paid, ProviderError,
-                                       decrypt_hyperpay, moyasar_invoice, stripe_event, verify_stripe)
+from novara.payments.providers import (BadSignature, Expired, HyperPay, HyperPayResult, Moyasar, Paid, PayTabs,
+                                       PayTabsResult, ProviderError, decrypt_hyperpay, moyasar_invoice, stripe_event,
+                                       verify_paytabs_callback, verify_paytabs_return, verify_stripe)
 from novara.tenancy import bind_tenant, current_tenant, system_scope
 
 MAX_BYTES = 256 * 1024
@@ -55,6 +60,9 @@ STRIPE_WEBHOOK_SECRET = r"^whsec_[A-Za-z0-9+/=_-]{10,200}$"
 MOYASAR_KEY = r"^sk_(test|live)_[A-Za-z0-9]{20,200}$"
 HYPERPAY_TOKEN = r"^[A-Za-z0-9+/=_-]{20,300}$"
 HYPERPAY_ENTITY = r"^([A-Za-z0-9]{16,64})?$"
+PAYTABS_PROFILE = r"^[0-9]{1,12}$"
+PAYTABS_KEY = r"^[A-Za-z0-9-]{20,100}$"
+PayTabsRegion = Literal["sa", "ae", "eg", "om", "jo", "kw", "iq", "ma", "qa", "global"]
 PAGE_HEADERS = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
                                            "frame-ancestors 'none'; base-uri 'none'",
                 "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Cache-Control": "no-store"}
@@ -63,7 +71,7 @@ router = APIRouter(tags=["online payments"])
 public_router = APIRouter(tags=["online payments"])
 
 
-Provider = Literal["none", "stripe", "moyasar", "hyperpay", "test"]
+Provider = Literal["none", "stripe", "moyasar", "hyperpay", "paytabs", "test"]
 
 
 class PaymentSettingsOut(BaseModel):
@@ -83,6 +91,11 @@ class PaymentSettingsOut(BaseModel):
     hyperpay_live: bool
     has_hyperpay_webhook_key: bool
     hyperpay_webhook_url: str
+    paytabs_profile_id: str
+    paytabs_key_hint: str
+    has_paytabs_key: bool
+    paytabs_region: str
+    paytabs_callback_url: str           # sent with each payment page: nothing to set in PayTabs' dashboard
     test_provider_available: bool
 
 
@@ -100,6 +113,9 @@ class PaymentSettingsIn(BaseModel):
     hyperpay_live: bool | None = None
     # The webhook's decryption key from HyperPay's dashboard (64 hex characters).
     hyperpay_webhook_key: str | None = Field(default=None, pattern=r"^[0-9A-Fa-f]{64}$")
+    paytabs_profile_id: str | None = Field(default=None, pattern=PAYTABS_PROFILE)
+    paytabs_server_key: str | None = Field(default=None, pattern=PAYTABS_KEY)
+    paytabs_region: PayTabsRegion | None = None
 
 
 class PaymentProviderOut(BaseModel):
@@ -138,6 +154,9 @@ def _settings_out(db: Session, settings, row: PaymentSettings) -> PaymentSetting
                        hyperpay_entity_id=row.hyperpay_entity_id, hyperpay_mada_entity_id=row.hyperpay_mada_entity_id,
                        hyperpay_live=row.hyperpay_live, has_hyperpay_webhook_key=row.hyperpay_webhook_key is not None,
                        hyperpay_webhook_url=svc.webhook_url(db, settings, row, "hyperpay"),
+                       paytabs_profile_id=row.paytabs_profile_id, paytabs_key_hint=row.paytabs_key_hint,
+                       has_paytabs_key=row.paytabs_server_key is not None, paytabs_region=row.paytabs_region,
+                       paytabs_callback_url=svc.webhook_url(db, settings, row, "paytabs"),
                        test_provider_available=svc.test_provider_allowed(settings))
 
 
@@ -203,6 +222,17 @@ def change_settings(body: PaymentSettingsIn, request: Request, ctx: OrgContext =
     if body.hyperpay_webhook_key:
         row.hyperpay_webhook_key = crypto.encrypt(settings, body.hyperpay_webhook_key.lower(), context=org)
         changed.append("hyperpay_webhook_key")
+    if body.paytabs_server_key:
+        row.paytabs_server_key = crypto.encrypt(settings, body.paytabs_server_key, context=org)
+        row.paytabs_key_hint = body.paytabs_server_key[:4] + "…" + body.paytabs_server_key[-4:]
+        changed.append("paytabs_server_key")
+    for field in ("paytabs_profile_id", "paytabs_region"):
+        value = getattr(body, field)
+        if value is not None and value != getattr(row, field):
+            setattr(row, field, value)
+            changed.append(field)
+    if body.provider == "paytabs" and (row.paytabs_server_key is None or not row.paytabs_profile_id):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "PayTabs needs the profile id and the server key")
     if body.provider == "hyperpay" and (row.hyperpay_access_token is None
                                         or not (row.hyperpay_entity_id or row.hyperpay_mada_entity_id)):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -219,7 +249,8 @@ def change_settings(body: PaymentSettingsIn, request: Request, ctx: OrgContext =
                  target_id=org, details={"provider": body.provider, "changed": changed,
                                          "stripe_key_hint": row.stripe_key_hint,
                                          "moyasar_key_hint": row.moyasar_key_hint,
-                                         "hyperpay_token_hint": row.hyperpay_token_hint}, ip_address=client_ip(request))
+                                         "hyperpay_token_hint": row.hyperpay_token_hint,
+                                         "paytabs_key_hint": row.paytabs_key_hint}, ip_address=client_ip(request))
     db.commit()
     return _settings_out(db, settings, row)
 
@@ -647,3 +678,167 @@ async def hyperpay_webhook(token: str, request: Request, db: Session = Depends(g
     return await run_in_threadpool(_hyperpay_call, db, request.app.state.settings, request.app.state.payment_http, token,
                                    body, request.headers.get("x-initialization-vector", ""),
                                    request.headers.get("x-authentication-tag", ""))
+
+
+# ---------------------------------------------------------------- PayTabs (hosted payment page)
+
+
+def _paytabs_link(db: Session, session: str) -> PaymentLink:
+    if not session.startswith("pt_") or len(session) > 100:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+    org_id = _org_by_session(db, "paytabs", session)
+    if org_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+    bind_tenant(db, org_id)
+    return db.scalar(select(PaymentLink).where(PaymentLink.provider == "paytabs", PaymentLink.session_id == session))
+
+
+def _paytabs(db: Session, settings, http) -> PayTabs:
+    try:
+        gateway = svc.provider(db, settings, svc.settings_row(db, settings), http, name="paytabs")
+    except svc.PaymentsUnavailable:
+        raise HTTPException(status.HTTP_410_GONE, "online payments are no longer taken this way") from None
+    assert isinstance(gateway, PayTabs)
+    return gateway
+
+
+def _paytabs_customer(db: Session, link: PaymentLink) -> dict[str, str]:
+    """Fills PayTabs' page in advance, as far as the customer's record (or the site order) has it."""
+    if link.web_order_id:
+        w = db.get(WebOrder, link.web_order_id)
+        return {"name": w.customer_name[:128], "email": w.email, "phone": w.phone, "country": "SA"}
+    c = db.get(Customer, db.get(Invoice, link.invoice_id).customer_id)
+    if c is None:
+        return {}
+    return {"name": (c.name or "")[:128], "email": c.email or "", "phone": c.phone or "", "street1": c.address_line or "",
+            "city": c.city or "", "zip": c.postal_code or "", "country": c.country or "SA"}
+
+
+@public_router.get("/public/payments/paytabs/{session}", response_class=HTMLResponse)
+def paytabs_checkout(session: str, request: Request, db: Session = Depends(get_db)):
+    """The customer's link: PayTabs is asked for a payment page for the amount now, and the customer goes there."""
+    link = _paytabs_link(db, session)
+    state = svc.effective_status(link)
+    if state != "open":
+        return _page("الدفع", f"<h1>هذا الرابط لم يعد متاحاً</h1><p class='muted'>This link is {html.escape(state)}.</p>", 410)
+    settings = request.app.state.settings
+    org = db.get(Organization, link.organization_id)
+    gateway = _paytabs(db, settings, request.app.state.payment_http)
+    row = svc.settings_row(db, settings)
+    base = f"{settings.app_base_url}/api/v1/public/payments/paytabs"
+    try:
+        page = gateway.prepare(link_id=link.id, title=f"{org.name} · {svc.subject_number(db, link)}",
+                               amount_minor=link.amount_minor, currency=link.currency,
+                               customer=_paytabs_customer(db, link), return_url=f"{base}/{session}/return",
+                               callback_url=svc.webhook_url(db, settings, row, "paytabs"),
+                               lang="ar" if org.default_locale == "ar" else "en")
+    except ProviderError as e:
+        return _page("الدفع", f"<h1>{html.escape(org.name)}</h1><p>تعذّر بدء الدفع، حاول بعد قليل.</p>"
+                              f"<p class='muted'>{html.escape(str(e))}</p>", 502)
+    return RedirectResponse(page.redirect_url, status_code=status.HTTP_303_SEE_OTHER)
+
+
+def _paytabs_record(db: Session, settings, link: PaymentLink, outcome: PayTabsResult) -> str:
+    """What PayTabs said about a transaction for this link: recorded when authorised, noted when on hold."""
+    if outcome.state == "paid":
+        if outcome.amount_minor is None:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "PayTabs' answer had no amount")
+        result = svc.complete(db, link.id, amount_minor=outcome.amount_minor, currency=outcome.currency,
+                              reference=outcome.tran_ref, paid_at=utcnow(), settings=settings)
+        db.commit()
+        return result
+    if outcome.state == "review" and link.status == "open":
+        link.note = f"PayTabs is holding the payment ({outcome.message}); it is recorded once PayTabs releases it"[:300]
+        db.commit()
+    return outcome.state
+
+
+def _paytabs_back(db: Session, settings, http, session: str, form: dict[str, str]):
+    link = _paytabs_link(db, session)
+    gateway = _paytabs(db, settings, http)
+    try:
+        verify_paytabs_return(svc.secret(db, settings, svc.settings_row(db, settings).paytabs_server_key) or "", form)
+    except BadSignature as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"rejected: {e}")
+    if form.get("cartId") != link.id:                            # a transaction made for another link
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "that payment wasn't made for this link")
+    try:
+        outcome = gateway.query(form.get("tranRef", ""))         # PayTabs' own answer decides
+    except ProviderError as e:
+        if e.invalid:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+        return _page("الدفع", "<h1>لم نتأكد من الدفع بعد</h1><p>إن سُحب المبلغ فسيظهر على الفاتورة خلال لحظات.</p>"
+                              f"<p class='muted'>{html.escape(str(e))}</p>", 502)
+    if outcome.cart_id != link.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "that payment wasn't made for this link")
+    state = _paytabs_record(db, settings, link, outcome)
+    if state in ("pending", "failed"):
+        return _page("لم يكتمل الدفع", "<h1>لم يكتمل الدفع</h1><p>لم يُسحب أي مبلغ. يمكنك المحاولة مرة أخرى.</p>"
+                                        f"<p><a class='pay' href='../{html.escape(session)}'>حاول مرة أخرى · Try again</a></p>"
+                                        "<p class='muted'>The payment wasn't completed and nothing was charged.</p>"
+                                        f"<p class='muted'>{html.escape(outcome.message)}</p>")
+    if state == "review":
+        return _page("الدفع قيد المراجعة", "<h1>دفعتك قيد المراجعة</h1><p>ستظهر على الفاتورة حين يقبلها مزوّد الدفع.</p>"
+                                           "<p class='muted'>Your payment is being reviewed by the provider.</p>")
+    return RedirectResponse(f"{settings.app_base_url}/api/v1/public/payments/done?status=paid",
+                            status_code=status.HTTP_303_SEE_OTHER)
+
+
+@public_router.post("/public/payments/paytabs/{session}/return", response_class=HTMLResponse)
+async def paytabs_return(session: str, request: Request, db: Session = Depends(get_db)):
+    """Where PayTabs sends the customer back (a signed form). Even signed, PayTabs is asked what happened."""
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too large")
+    body = await request.body()
+    if len(body) > MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too large")
+    try:
+        form = dict(parse_qsl(body.decode("utf-8"), keep_blank_values=True))   # an urlencoded form
+    except UnicodeDecodeError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "not a form") from None
+    return await run_in_threadpool(_paytabs_back, db, request.app.state.settings, request.app.state.payment_http,
+                                   session, form)
+
+
+def _paytabs_call(db: Session, settings, http, token: str, body: bytes, signature: str) -> JSONResponse:
+    org_id = _org_by_webhook(db, crypto.token_hash(token))
+    if org_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown payment webhook address")
+    bind_tenant(db, org_id)
+    row = db.scalar(select(PaymentSettings))
+    key = svc.secret(db, settings, row.paytabs_server_key)
+    if key is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown payment webhook address")
+    try:
+        event = verify_paytabs_callback(key, body, signature)
+    except BadSignature as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"rejected: {e}")
+    link = db.scalar(select(PaymentLink).where(PaymentLink.id == str(event.get("cart_id", "")),
+                                               PaymentLink.provider == "paytabs"))
+    if link is None or not event.get("tran_ref"):
+        return JSONResponse({"received": True, "result": "not ours"})   # a payment made outside NOVARA
+    try:
+        outcome = _paytabs(db, settings, http).query(str(event["tran_ref"]))
+    except ProviderError as e:
+        if e.invalid:
+            return JSONResponse({"received": True, "result": "ignored"})
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))         # PayTabs calls again later
+    if outcome.cart_id != link.id:
+        return JSONResponse({"received": True, "result": "not ours"})
+    return JSONResponse({"received": True, "result": _paytabs_record(db, settings, link, outcome)})
+
+
+@public_router.post("/public/payments/paytabs/{token}")
+async def paytabs_webhook(token: str, request: Request, db: Session = Depends(get_db)):
+    """PayTabs' callback for a transaction of this organization: its signature checked, then PayTabs is asked."""
+    if len(token) > 100:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown payment webhook address")
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too large")
+    body = await request.body()
+    if len(body) > MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too large")
+    return await run_in_threadpool(_paytabs_call, db, request.app.state.settings, request.app.state.payment_http, token,
+                                   body, request.headers.get("signature", ""))

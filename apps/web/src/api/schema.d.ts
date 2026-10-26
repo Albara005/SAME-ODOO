@@ -5218,6 +5218,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/payments/paytabs/{session}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Paytabs Checkout
+         * @description The customer's link: PayTabs is asked for a payment page for the amount now, and the customer goes there.
+         */
+        get: operations["paytabs_checkout_api_v1_public_payments_paytabs__session__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/payments/paytabs/{session}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Paytabs Return
+         * @description Where PayTabs sends the customer back (a signed form). Even signed, PayTabs is asked what happened.
+         */
+        post: operations["paytabs_return_api_v1_public_payments_paytabs__session__return_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/payments/paytabs/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Paytabs Webhook
+         * @description PayTabs' callback for a transaction of this organization: its signature checked, then PayTabs is asked.
+         */
+        post: operations["paytabs_webhook_api_v1_public_payments_paytabs__token__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/payments/stripe/{token}": {
         parameters: {
             query?: never;
@@ -8700,7 +8760,7 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "none" | "stripe" | "moyasar" | "hyperpay" | "test";
+            provider: "none" | "stripe" | "moyasar" | "hyperpay" | "paytabs" | "test";
         };
         /** PaymentSettingsIn */
         PaymentSettingsIn: {
@@ -8718,11 +8778,17 @@ export interface components {
             moyasar_secret_key?: string | null;
             /** Moyasar Webhook Secret */
             moyasar_webhook_secret?: string | null;
+            /** Paytabs Profile Id */
+            paytabs_profile_id?: string | null;
+            /** Paytabs Region */
+            paytabs_region?: ("sa" | "ae" | "eg" | "om" | "jo" | "kw" | "iq" | "ma" | "qa" | "global") | null;
+            /** Paytabs Server Key */
+            paytabs_server_key?: string | null;
             /**
              * Provider
              * @enum {string}
              */
-            provider: "none" | "stripe" | "moyasar" | "hyperpay" | "test";
+            provider: "none" | "stripe" | "moyasar" | "hyperpay" | "paytabs" | "test";
             /** Stripe Secret Key */
             stripe_secret_key?: string | null;
             /** Stripe Webhook Secret */
@@ -8738,6 +8804,8 @@ export interface components {
             has_moyasar_key: boolean;
             /** Has Moyasar Webhook Secret */
             has_moyasar_webhook_secret: boolean;
+            /** Has Paytabs Key */
+            has_paytabs_key: boolean;
             /** Has Stripe Key */
             has_stripe_key: boolean;
             /** Has Webhook Secret */
@@ -8756,11 +8824,19 @@ export interface components {
             moyasar_key_hint: string;
             /** Moyasar Webhook Url */
             moyasar_webhook_url: string;
+            /** Paytabs Callback Url */
+            paytabs_callback_url: string;
+            /** Paytabs Key Hint */
+            paytabs_key_hint: string;
+            /** Paytabs Profile Id */
+            paytabs_profile_id: string;
+            /** Paytabs Region */
+            paytabs_region: string;
             /**
              * Provider
              * @enum {string}
              */
-            provider: "none" | "stripe" | "moyasar" | "hyperpay" | "test";
+            provider: "none" | "stripe" | "moyasar" | "hyperpay" | "paytabs" | "test";
             /** Stripe Key Hint */
             stripe_key_hint: string;
             /** Test Provider Available */
@@ -23176,6 +23252,99 @@ export interface operations {
         };
     };
     moyasar_webhook_api_v1_public_payments_moyasar__token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    paytabs_checkout_api_v1_public_payments_paytabs__session__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    paytabs_return_api_v1_public_payments_paytabs__session__return_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    paytabs_webhook_api_v1_public_payments_paytabs__token__post: {
         parameters: {
             query?: never;
             header?: never;

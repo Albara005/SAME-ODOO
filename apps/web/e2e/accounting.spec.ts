@@ -337,6 +337,13 @@ test("online payment: the customer pays through a link and the invoice is paid w
   await page.getByRole("button", { name: "حفظ إعدادات الدفع" }).click();
   await expect(page.getByText("تم الحفظ")).toBeVisible();
   await expect(page.getByText(/محفوظ؛.*OGFjN2…/)).toBeVisible();
+  await provider.selectOption({ label: "PayTabs (مدى، فيزا، ماستركارد)" });
+  await page.getByLabel("رقم الملف (Profile ID)").fill("98765");
+  await page.getByLabel("منطقة الحساب").selectOption({ label: "السعودية" });
+  await page.getByLabel(/مفتاح الخادم/).fill("SJN999999999-JDMMMMMMM-6KKKKKKK");
+  await page.getByRole("button", { name: "حفظ إعدادات الدفع" }).click();
+  await expect(page.getByText(/محفوظ؛.*SJN9…KKKK/)).toBeVisible();
+  await expect(page.getByText("تم الحفظ")).toHaveCount(0);        // its toast gone before the next save's
   await provider.selectOption({ label: "مزوّد تجريبي (للتطوير فقط)" });
   await page.getByRole("button", { name: "حفظ إعدادات الدفع" }).click();
   await expect(page.getByText("تم الحفظ")).toBeVisible();

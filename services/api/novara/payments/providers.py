@@ -21,6 +21,11 @@ NOVARA's own page, which prepares a fresh checkout each time it is opened; the r
 checkout was made for (the link is its merchantTransactionId). HyperPay's webhook is encrypted with a key from its
 dashboard (AES-256-GCM); a call that decrypts is still only a hint, checked against HyperPay's API the same way.
 
+PayTabs (https://docs.paytabs.com, PT2 hosted payment page), common across the Gulf and Egypt: like HyperPay, the link
+is NOVARA's own page, which asks PayTabs for a payment page (the link as the cart id) when the customer opens it. The
+customer's return and PayTabs' callback are signed with the profile's server key; the transaction is still read back
+from PayTabs' API, which decides, and only pays the link it was made for.
+
 The test provider is the same flow without a real provider, for development and tests: its
 checkout page is served by NOVARA itself and refused in production.
 """
@@ -35,6 +40,7 @@ import secrets
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 import httpx
 from cryptography.exceptions import InvalidTag
@@ -439,6 +445,151 @@ def decrypt_hyperpay(key_hex: str, iv_hex: str, tag_hex: str, body_hex: str) -> 
     if not isinstance(event, dict):
         raise BadSignature("not an event")
     return event
+
+
+# ---------------------------------------------------------------- PayTabs
+
+# The API host is the one for the region the merchant's account is in (the wrong one refuses the key).
+PAYTABS_HOSTS = {
+    "sa": "https://secure.paytabs.sa", "ae": "https://secure.paytabs.com", "eg": "https://secure-egypt.paytabs.com",
+    "om": "https://secure-oman.paytabs.com", "jo": "https://secure-jordan.paytabs.com",
+    "kw": "https://secure-kuwait.paytabs.com", "iq": "https://secure-iraq.paytabs.com",
+    "ma": "https://secure-morocco.paytabs.com", "qa": "https://secure-doha.paytabs.com",
+    "global": "https://secure-global.paytabs.com",
+}
+PAYTABS_CURRENCIES = {"SAR", "AED", "EGP", "OMR", "JOD", "KWD", "IQD", "MAD", "QAR", "BHD", "USD", "EUR", "GBP"}
+PAYTABS_TRAN_REF = re.compile(r"^[A-Za-z0-9]{6,40}$")
+
+
+@dataclass(frozen=True)
+class PayTabsPage:
+    tran_ref: str
+    redirect_url: str
+
+
+@dataclass(frozen=True)
+class PayTabsResult:
+    state: str              # paid | review | pending | failed
+    status: str             # PayTabs' response_status: A authorised, H on hold, P pending, others declined or failed
+    message: str
+    tran_ref: str
+    cart_id: str            # the link it was made for
+    amount_minor: int | None
+    currency: str
+
+
+def _minor(amount, currency: str) -> int | None:
+    """PayTabs' cart_amount ("1150", "1150.5", 1150.5) in minor units, or None when it isn't an exact amount."""
+    digits = 3 if currency in ("OMR", "JOD", "KWD", "BHD", "IQD") else 2
+    whole, _, frac = str(amount).strip().partition(".")
+    if not whole.isdigit() or (frac and (not frac.isdigit() or len(frac.rstrip("0")) > digits)):
+        return None
+    frac = frac.rstrip("0")
+    return int(whole) * 10 ** digits + (int(frac.ljust(digits, "0")) if frac else 0)
+
+
+class PayTabs:
+    """PayTabs' hosted payment page (PT2 API, https://docs.paytabs.com). The link is NOVARA's own page, which asks
+    PayTabs for a payment page when the customer opens it, with the link as the cart id; whatever happens is read back
+    with a transaction query using the profile's server key. The return to NOVARA and the server-to-server callback
+    are signed (HMAC-SHA256 with the server key), and even then only a hint: the query decides."""
+
+    name = "paytabs"
+
+    def __init__(self, profile_id: str, server_key: str, region: str, base_url: str, http: httpx.Client | None = None):
+        self._profile = int(profile_id)
+        self._key = server_key
+        self.host = PAYTABS_HOSTS[region]
+        self._base = base_url
+        self._http = http
+
+    def _call(self, path: str, body: dict) -> dict:
+        client = self._http or httpx.Client(timeout=TIMEOUT)
+        try:
+            r = client.post(f"{self.host}{path}", json=body, headers={"authorization": self._key})
+        except httpx.HTTPError as e:
+            raise ProviderError(f"PayTabs didn't answer ({type(e).__name__}); try again") from None
+        finally:
+            if self._http is None:
+                client.close()
+        try:
+            data = r.json()
+        except ValueError:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        if r.status_code in (401, 403):
+            raise ProviderError("PayTabs refused the server key (is the region right?)")
+        if r.status_code >= 500:
+            raise ProviderError(f"PayTabs answered {r.status_code}; try again")
+        if r.status_code >= 400:
+            raise ProviderError(f"PayTabs refused: {data.get('message') or f'HTTP {r.status_code}'}"[:300], invalid=True)
+        return data
+
+    def create_checkout(self, req: CheckoutRequest) -> Checkout:
+        if req.currency not in PAYTABS_CURRENCIES:
+            raise ProviderError(f"PayTabs can't charge in {req.currency} here", invalid=True)
+        session = "pt_" + secrets.token_urlsafe(24)
+        return Checkout(session_id=session, url=f"{self._base}/api/v1/public/payments/paytabs/{session}",
+                        expires_at=req.expires_at)
+
+    def expire(self, session_id: str) -> None:
+        return None                         # nothing at PayTabs is made until the customer opens the link
+
+    def prepare(self, *, link_id: str, title: str, amount_minor: int, currency: str, customer: dict[str, str],
+                return_url: str, callback_url: str, lang: str) -> PayTabsPage:
+        """A payment page for the link's amount, with the link as the cart id (so a result only pays its own link)."""
+        digits = 3 if currency in ("OMR", "JOD", "KWD", "BHD", "IQD") else 2
+        amount = f"{amount_minor // 10 ** digits}.{amount_minor % 10 ** digits:0{digits}d}"
+        body = {"profile_id": self._profile, "tran_type": "sale", "tran_class": "ecom", "cart_id": link_id,
+                "cart_description": title[:128], "cart_currency": currency, "cart_amount": float(amount),
+                "return": return_url, "callback": callback_url, "paypage_lang": lang, "hide_shipping": True}
+        details = {k: v for k, v in customer.items() if v}
+        if details:
+            body["customer_details"] = details
+        data = self._call("/payment/request", body)
+        ref, url = str(data.get("tran_ref", "")), str(data.get("redirect_url", ""))
+        if not PAYTABS_TRAN_REF.match(ref) or not url.startswith(self.host + "/"):
+            raise ProviderError(f"PayTabs refused: {data.get('message') or 'no payment page'}"[:300])
+        return PayTabsPage(tran_ref=ref, redirect_url=url)
+
+    def query(self, tran_ref: str) -> PayTabsResult:
+        if not PAYTABS_TRAN_REF.match(tran_ref):
+            raise ProviderError("not a PayTabs transaction", invalid=True)
+        data = self._call("/payment/query", {"profile_id": self._profile, "tran_ref": tran_ref})
+        result = data.get("payment_result") if isinstance(data.get("payment_result"), dict) else {}
+        status_letter = str(result.get("response_status", ""))
+        sale = str(data.get("tran_type", "")).lower() == "sale"
+        state = ("paid" if status_letter == "A" and sale else "review" if status_letter == "H"
+                 else "pending" if status_letter == "P" else "failed")
+        currency = str(data.get("cart_currency", "")).upper()
+        return PayTabsResult(state=state, status=status_letter, message=str(result.get("response_message", ""))[:200],
+                             tran_ref=str(data.get("tran_ref", tran_ref)), cart_id=str(data.get("cart_id", "")),
+                             amount_minor=_minor(data.get("cart_amount", ""), currency), currency=currency)
+
+
+def verify_paytabs_callback(server_key: str, body: bytes, signature: str) -> dict:
+    """The callback's Signature header: HMAC-SHA256 of the whole body with the server key."""
+    expected = hmac.new(server_key.encode(), body, hashlib.sha256).hexdigest()
+    if not signature or not hmac.compare_digest(expected, signature.strip().lower()):
+        raise BadSignature("the signature doesn't match")
+    try:
+        event = json.loads(body)
+    except ValueError:
+        raise BadSignature("not JSON") from None
+    if not isinstance(event, dict):
+        raise BadSignature("not an event")
+    return event
+
+
+def verify_paytabs_return(server_key: str, form: dict[str, str]) -> None:
+    """The customer's return: its fields without the signature and the empty ones, sorted by name and URL-encoded,
+    HMAC-SHA256 with the server key, as PayTabs signs them."""
+    given = form.get("signature", "")
+    fields = sorted((k, v) for k, v in form.items() if k != "signature" and v not in ("", None))
+    expected = hmac.new(server_key.encode(), urlencode(fields).encode(), hashlib.sha256).hexdigest()
+    if not given or not hmac.compare_digest(expected, given.strip().lower()):
+        raise BadSignature("the signature doesn't match")
 
 
 class TestProvider:

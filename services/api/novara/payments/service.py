@@ -42,7 +42,7 @@ from novara.modules.sales import web_orders
 from novara.modules.sales.models import WebOrder
 from novara.money import from_minor
 from novara.payments.models import PaymentLink, PaymentSettings
-from novara.payments.providers import CheckoutRequest, HyperPay, Moyasar, ProviderError, Stripe, TestProvider
+from novara.payments.providers import CheckoutRequest, HyperPay, Moyasar, PayTabs, ProviderError, Stripe, TestProvider
 from novara.tenancy import current_tenant
 
 LINK_HOURS = 23  # Stripe allows at most 24
@@ -100,6 +100,11 @@ def provider(db: Session, settings, row: PaymentSettings, http=None, name: str |
             raise PaymentsUnavailable("HyperPay isn't set up: add the access token and an entity id in the organization's settings")
         return HyperPay(token, {"card": row.hyperpay_entity_id, "mada": row.hyperpay_mada_entity_id}, row.hyperpay_live,
                         settings.app_base_url, http)
+    if name == "paytabs":
+        key = secret(db, settings, row.paytabs_server_key)
+        if key is None or not row.paytabs_profile_id:
+            raise PaymentsUnavailable("PayTabs isn't set up: add the profile id and the server key in the organization's settings")
+        return PayTabs(row.paytabs_profile_id, key, row.paytabs_region, settings.app_base_url, http)
     if name == "test" and test_provider_allowed(settings):
         return TestProvider(settings.app_base_url)
     raise PaymentsUnavailable("online payments aren't set up for this organization")

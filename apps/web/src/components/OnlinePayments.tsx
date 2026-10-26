@@ -10,6 +10,8 @@ import { Button, Card, Checkbox, ErrorNotice, Field, Input, Select, useToast } f
 
 type Invoice = Schemas["InvoiceOut"];
 type Provider = Schemas["PaymentSettingsIn"]["provider"];
+type Region = NonNullable<Schemas["PaymentSettingsIn"]["paytabs_region"]>;
+const REGIONS: Region[] = ["sa", "ae", "eg", "om", "jo", "kw", "qa", "iq", "ma", "global"];
 
 /** Which provider takes online payments ("none" when they're off). */
 export function usePaymentProvider() {
@@ -145,6 +147,7 @@ export function OnlinePaymentsCard() {
   const [moyasarToken, setMoyasarToken] = useState("");
   const [hp, setHp] = useState<{ token: string; entity: string | null; mada: string | null; live: boolean | null; key: string }>(
     { token: "", entity: null, mada: null, live: null, key: "" });
+  const [pt, setPt] = useState<{ profile: string | null; key: string; region: Region | null }>({ profile: null, key: "", region: null });
   const save = useMutation({
     mutationFn: () =>
       unwrap(api.PUT("/api/v1/orgs/{org_id}/payments/settings", {
@@ -160,6 +163,9 @@ export function OnlinePaymentsCard() {
           hyperpay_mada_entity_id: hp.mada === null ? null : hp.mada.trim(),
           hyperpay_live: hp.live,
           hyperpay_webhook_key: hp.key.trim() || null,
+          paytabs_profile_id: pt.profile === null ? null : pt.profile.trim(),
+          paytabs_server_key: pt.key.trim() || null,
+          paytabs_region: pt.region,
         },
       })),
     onSuccess: (s) => {
@@ -171,6 +177,7 @@ export function OnlinePaymentsCard() {
       setMoyasarKey("");
       setMoyasarToken("");
       setHp({ token: "", entity: null, mada: null, live: null, key: "" });
+      setPt({ profile: null, key: "", region: null });
       toast(t("common.saved"));
     },
   });
@@ -194,6 +201,7 @@ export function OnlinePaymentsCard() {
             <option value="none">{t("pay.providerNone")}</option>
             <option value="moyasar">{t("pay.providerMoyasar")}</option>
             <option value="hyperpay">{t("pay.providerHyperpay")}</option>
+            <option value="paytabs">{t("pay.providerPaytabs")}</option>
             <option value="stripe">Stripe</option>
             {s.test_provider_available && <option value="test">{t("pay.providerTest")}</option>}
           </Select>
@@ -262,6 +270,25 @@ export function OnlinePaymentsCard() {
             <Field label={t("pay.hyperpayKey")} hint={s.has_hyperpay_webhook_key ? t("pay.stored") : t("pay.hyperpayKeyHint")} optional>
               <Input type="password" value={hp.key} onChange={(e) => setHp({ ...hp, key: e.target.value })} autoComplete="off" ltr />
             </Field>
+          </>
+        )}
+        {chosen === "paytabs" && (
+          <>
+            <div className="grid-2">
+              <Field label={t("pay.paytabsProfile")} hint={t("pay.paytabsProfileHint")}>
+                <Input value={pt.profile ?? s.paytabs_profile_id} inputMode="numeric" onChange={(e) => setPt({ ...pt, profile: e.target.value })} ltr />
+              </Field>
+              <Field label={t("pay.paytabsRegion")} hint={t("pay.paytabsRegionHint")}>
+                <Select value={pt.region ?? s.paytabs_region} onChange={(e) => setPt({ ...pt, region: e.target.value as Region })}>
+                  {REGIONS.map((r) => <option key={r} value={r}>{t(`pay.region.${r}`)}</option>)}
+                </Select>
+              </Field>
+            </div>
+            <Field label={t("pay.paytabsKey")} hint={s.has_paytabs_key ? `${t("pay.stored")} ${s.paytabs_key_hint}` : t("pay.paytabsKeyHint")}
+              optional={s.has_paytabs_key}>
+              <Input type="password" value={pt.key} onChange={(e) => setPt({ ...pt, key: e.target.value })} autoComplete="off" ltr />
+            </Field>
+            <p className="muted small">{t("pay.paytabsCallbackHint")}</p>
           </>
         )}
         {chosen === "test" && <p className="notice notice-info small">{t("pay.testNotice")}</p>}

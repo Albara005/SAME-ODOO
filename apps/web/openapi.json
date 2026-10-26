@@ -8748,6 +8748,7 @@
        "stripe",
        "moyasar",
        "hyperpay",
+       "paytabs",
        "test"
       ],
       "title": "Provider",
@@ -8847,12 +8848,60 @@
       ],
       "title": "Moyasar Webhook Secret"
      },
+     "paytabs_profile_id": {
+      "anyOf": [
+       {
+        "pattern": "^[0-9]{1,12}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Paytabs Profile Id"
+     },
+     "paytabs_region": {
+      "anyOf": [
+       {
+        "enum": [
+         "sa",
+         "ae",
+         "eg",
+         "om",
+         "jo",
+         "kw",
+         "iq",
+         "ma",
+         "qa",
+         "global"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Paytabs Region"
+     },
+     "paytabs_server_key": {
+      "anyOf": [
+       {
+        "pattern": "^[A-Za-z0-9-]{20,100}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Paytabs Server Key"
+     },
      "provider": {
       "enum": [
        "none",
        "stripe",
        "moyasar",
        "hyperpay",
+       "paytabs",
        "test"
       ],
       "title": "Provider",
@@ -8907,6 +8956,10 @@
       "title": "Has Moyasar Webhook Secret",
       "type": "boolean"
      },
+     "has_paytabs_key": {
+      "title": "Has Paytabs Key",
+      "type": "boolean"
+     },
      "has_stripe_key": {
       "title": "Has Stripe Key",
       "type": "boolean"
@@ -8943,12 +8996,29 @@
       "title": "Moyasar Webhook Url",
       "type": "string"
      },
+     "paytabs_callback_url": {
+      "title": "Paytabs Callback Url",
+      "type": "string"
+     },
+     "paytabs_key_hint": {
+      "title": "Paytabs Key Hint",
+      "type": "string"
+     },
+     "paytabs_profile_id": {
+      "title": "Paytabs Profile Id",
+      "type": "string"
+     },
+     "paytabs_region": {
+      "title": "Paytabs Region",
+      "type": "string"
+     },
      "provider": {
       "enum": [
        "none",
        "stripe",
        "moyasar",
        "hyperpay",
+       "paytabs",
        "test"
       ],
       "title": "Provider",
@@ -8984,6 +9054,11 @@
      "hyperpay_live",
      "has_hyperpay_webhook_key",
      "hyperpay_webhook_url",
+     "paytabs_profile_id",
+     "paytabs_key_hint",
+     "has_paytabs_key",
+     "paytabs_region",
+     "paytabs_callback_url",
      "test_provider_available"
     ],
     "title": "PaymentSettingsOut",
@@ -36874,6 +36949,133 @@
      }
     },
     "summary": "Moyasar Webhook",
+    "tags": [
+     "online payments"
+    ]
+   }
+  },
+  "/api/v1/public/payments/paytabs/{session}": {
+   "get": {
+    "description": "The customer's link: PayTabs is asked for a payment page for the amount now, and the customer goes there.",
+    "operationId": "paytabs_checkout_api_v1_public_payments_paytabs__session__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "session",
+      "required": true,
+      "schema": {
+       "title": "Session",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "text/html": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Paytabs Checkout",
+    "tags": [
+     "online payments"
+    ]
+   }
+  },
+  "/api/v1/public/payments/paytabs/{session}/return": {
+   "post": {
+    "description": "Where PayTabs sends the customer back (a signed form). Even signed, PayTabs is asked what happened.",
+    "operationId": "paytabs_return_api_v1_public_payments_paytabs__session__return_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "session",
+      "required": true,
+      "schema": {
+       "title": "Session",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "text/html": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Paytabs Return",
+    "tags": [
+     "online payments"
+    ]
+   }
+  },
+  "/api/v1/public/payments/paytabs/{token}": {
+   "post": {
+    "description": "PayTabs' callback for a transaction of this organization: its signature checked, then PayTabs is asked.",
+    "operationId": "paytabs_webhook_api_v1_public_payments_paytabs__token__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "token",
+      "required": true,
+      "schema": {
+       "title": "Token",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Paytabs Webhook",
     "tags": [
      "online payments"
     ]

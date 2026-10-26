@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from novara.db import Base, IdMixin, TimestampMixin
 from novara.tenancy import TenantScoped, same_org_fk
 
-PROVIDERS = ("none", "stripe", "moyasar", "hyperpay", "test")
+PROVIDERS = ("none", "stripe", "moyasar", "hyperpay", "paytabs", "test")
 LINK_STATUSES = ("open", "paid", "unapplied", "expired", "cancelled")
 
 
@@ -21,7 +21,10 @@ class PaymentSettings(IdMixin, TimestampMixin, TenantScoped, Base):
     __tablename__ = "payment_settings"
     __table_args__ = (
         UniqueConstraint("organization_id", name="uq_payment_settings_org"),
-        CheckConstraint("provider IN ('none', 'stripe', 'moyasar', 'hyperpay', 'test')", name="ck_payment_settings_provider"),
+        CheckConstraint("provider IN ('none', 'stripe', 'moyasar', 'hyperpay', 'paytabs', 'test')",
+                        name="ck_payment_settings_provider"),
+        CheckConstraint("paytabs_region IN ('sa', 'ae', 'eg', 'om', 'jo', 'kw', 'iq', 'ma', 'qa', 'global')",
+                        name="ck_payment_settings_paytabs_region"),
     )
 
     provider: Mapped[str] = mapped_column(String(10), default="none", nullable=False)
@@ -40,6 +43,12 @@ class PaymentSettings(IdMixin, TimestampMixin, TenantScoped, Base):
     hyperpay_mada_entity_id: Mapped[str] = mapped_column(String(64), default="", server_default="", nullable=False)
     hyperpay_live: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
     hyperpay_webhook_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # PayTabs: the profile id (not secret), its server key (secret: it signs PayTabs' calls too), and the region the
+    # account is in, which decides PayTabs' API address.
+    paytabs_profile_id: Mapped[str] = mapped_column(String(20), default="", server_default="", nullable=False)
+    paytabs_server_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paytabs_key_hint: Mapped[str] = mapped_column(String(16), default="", server_default="", nullable=False)
+    paytabs_region: Mapped[str] = mapped_column(String(8), default="sa", server_default="sa", nullable=False)
     webhook_token: Mapped[str] = mapped_column(Text, nullable=False)
     webhook_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     updated_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
