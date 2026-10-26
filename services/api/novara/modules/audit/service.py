@@ -1,9 +1,20 @@
 from __future__ import annotations
 
+from typing import Callable
+
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from novara.modules.audit.models import AuditLog
+
+# Called with (session, entry) for every audit entry, in the same transaction.
+# Workflow automation subscribes here to turn audited actions into events.
+_subscribers: list[Callable[[Session, AuditLog], None]] = []
+
+
+def subscribe(fn: Callable[[Session, AuditLog], None]) -> Callable[[Session, AuditLog], None]:
+    _subscribers.append(fn)
+    return fn
 
 
 class AuditLogImmutable(RuntimeError):
@@ -30,6 +41,8 @@ def record(
         ip_address=ip_address,
     )
     session.add(entry)
+    for fn in _subscribers:
+        fn(session, entry)
     return entry
 
 

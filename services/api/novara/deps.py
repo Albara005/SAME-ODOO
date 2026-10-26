@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from novara.db import utcnow
 from novara.modules.access.models import Role
+from novara.modules.access.permissions import effective_permissions
 from novara.modules.identity.models import User, UserSession
 from novara.modules.organizations.models import Membership, Organization
 from novara.security import decode_token
@@ -69,37 +70,67 @@ def current_user(auth: AuthContext = Depends(current_auth)) -> User:
     return auth.user
 
 
+def two_step(auth: AuthContext) -> bool:
+    """Whether this sign-in meets a two-step requirement: the account has the app on (so every password
+    sign-in asks for a code), or this session was opened with a passkey or a code."""
+    return auth.user.mfa_enabled or auth.session.two_step
+
+
 @dataclass
 class OrgContext:
     organization: Organization
     membership: Membership
     role: Role
     user: User
+    two_step: bool = False  # see two_step(); set for requests, False for the workflow worker
 
     @property
     def permissions(self) -> set[str]:
-        return set(self.role.permissions)
+        return effective_permissions(self.role)
 
     def has(self, permission: str) -> bool:
         return permission in self.permissions
 
 
-def org_context(
+MFA_REQUIRED = ("this organization requires two-step sign-in: sign in with a passkey, or turn on an authenticator "
+                "app in your account, to continue")
+
+
+def membership_context(
     org_id: str = Path(...),
-    user: User = Depends(current_user),
+    auth: AuthContext = Depends(current_auth),
     db: Session = Depends(get_db),
 ) -> OrgContext:
+    """Membership only, without the organization's two-step sign-in requirement. Used just to
+    describe the organization to its member (so the app can explain what is needed)."""
+    ctx = member_context(db, org_id, auth.user)
+    if ctx is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+    ctx.two_step = two_step(auth)
+    return ctx
+
+
+def org_context(ctx: OrgContext = Depends(membership_context)) -> OrgContext:
     """Bind the request's DB session to the organization in the URL after checking membership.
 
-    Non-members get 404 rather than 403 so organization ids can't be probed.
+    Non-members get 404 rather than 403 so organization ids can't be probed. When the
+    organization requires two-step sign-in, a sign-in without a second step gets 403.
     """
+    if ctx.organization.require_mfa and not ctx.two_step:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, MFA_REQUIRED)
+    return ctx
+
+
+def member_context(db: Session, org_id: str, user: User) -> OrgContext | None:
+    """The user's context in an organization, or None if they aren't an active member.
+    Binds the session to that organization. Also used outside requests (workflow worker)."""
     org = db.get(Organization, org_id)
     if org is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+        return None
     bind_tenant(db, org.id)
     membership = db.scalar(select(Membership).where(Membership.user_id == user.id))
-    if membership is None or membership.status != "active":
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+    if membership is None or membership.status != "active" or user.status != "active":
+        return None
     role = db.get(Role, membership.role_id)
     return OrgContext(organization=org, membership=membership, role=role, user=user)
 
@@ -108,6 +139,15 @@ def require(permission: str):
     def checker(ctx: OrgContext = Depends(org_context)) -> OrgContext:
         if not ctx.has(permission):
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"missing permission: {permission}")
+        return ctx
+
+    return checker
+
+
+def require_any(*permissions: str):
+    def checker(ctx: OrgContext = Depends(org_context)) -> OrgContext:
+        if not ctx.permissions.intersection(permissions):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"missing one of: {', '.join(permissions)}")
         return ctx
 
     return checker

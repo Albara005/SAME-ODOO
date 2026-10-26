@@ -6,14 +6,15 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from novara.db import new_id
 from novara.deps import OrgContext, client_ip, get_db, require
 from novara.modules.access import permissions as P
 from novara.modules.audit import service as audit
-from novara.modules.files.models import StoredFile
+from novara.modules.files import text as file_text
+from novara.modules.files.models import FileChunk, StoredFile
 from novara.modules.files.storage import object_key
 
 router = APIRouter(tags=["files"])
@@ -29,6 +30,16 @@ class FileOut(BaseModel):
     sha256: str
     created_by: str | None
     created_at: datetime
+    text_status: str  # pending | ready | none | failed: whether the assistant can search its text
+    text_chars: int
+
+
+class PassageOut(BaseModel):
+    file_id: str
+    filename: str
+    position: int
+    score: float
+    text: str
 
 
 @router.post("/orgs/{org_id}/files", response_model=FileOut, status_code=status.HTTP_201_CREATED)
@@ -55,6 +66,8 @@ async def upload_file(
     row = StoredFile(id=file_id, storage_key=key, filename=filename, content_type=content_type,
                      size_bytes=len(data), sha256=hashlib.sha256(data).hexdigest(), created_by=ctx.user.id)
     db.add(row)
+    db.flush()
+    file_text.index_file(db, storage, row, bytes(data))  # PDF, Word and text files become searchable passages
     audit.record(db, actor_user_id=ctx.user.id, action="file.uploaded", target_type="file", target_id=file_id,
                  details={"filename": filename, "size_bytes": len(data)}, ip_address=client_ip(request))
     try:
@@ -68,6 +81,15 @@ async def upload_file(
 @router.get("/orgs/{org_id}/files", response_model=list[FileOut])
 def list_files(_: OrgContext = Depends(require(P.FILES_READ)), db: Session = Depends(get_db)):
     return db.scalars(select(StoredFile).order_by(StoredFile.created_at.desc())).all()
+
+
+@router.get("/orgs/{org_id}/files/search", response_model=list[PassageOut])
+def search_files(request: Request, q: str = Query(min_length=2, max_length=200), limit: int = Query(default=8, ge=1, le=25),
+                 _: OrgContext = Depends(require(P.FILES_READ)), db: Session = Depends(get_db)):
+    """The passages inside the organization's files that best match the words (ranked; see text.py)."""
+    file_text.index_pending(db, request.app.state.storage)
+    db.commit()
+    return [PassageOut(**p.__dict__) for p in file_text.search(db, q, limit=limit)]
 
 
 def _get_file(db: Session, file_id: str) -> StoredFile:
@@ -99,6 +121,7 @@ def delete_file(file_id: str, request: Request, ctx: OrgContext = Depends(requir
     audit.record(db, actor_user_id=ctx.user.id, action="file.deleted", target_type="file", target_id=row.id,
                  details={"filename": row.filename}, ip_address=client_ip(request))
     key = row.storage_key
+    db.execute(delete(FileChunk).where(FileChunk.file_id == row.id))
     db.delete(row)
     db.commit()
     request.app.state.storage.delete(key)

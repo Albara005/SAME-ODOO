@@ -24,7 +24,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: System libraries (libcairo for logo PNG export, age for encrypted backups)
+        run: sudo apt-get update && sudo apt-get install -y libcairo2 age
       - run: pip install -r requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Playwright and Chromium for App Studio's browser checks
+        working-directory: ${{ runner.temp }}
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install --with-deps chromium
+          echo "NOVARA_BROWSER_NODE_PATH=$PWD/node_modules" >> "$GITHUB_ENV"
       - name: Tests (SQLite)
         run: pytest
       - name: Create PostgreSQL roles
@@ -39,4 +50,42 @@ jobs:
         env:
           NOVARA_TEST_PG_OWNER_URL: postgresql+psycopg://novara_owner:owner@localhost:5432/novara_test
           NOVARA_TEST_PG_APP_URL: postgresql+psycopg://novara_app:app@localhost:5432/novara_test
+          # Backup round trip (tests/test_backup.py) restores into a scratch database it creates and drops.
+          NOVARA_TEST_PG_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: pytest
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: System libraries
+        run: sudo apt-get update && sudo apt-get install -y libcairo2
+      - run: pip install -r ../../services/api/requirements.txt
+      - run: npm ci
+      - name: API contract is up to date
+        run: |
+          PYTHON=python npm run gen:api
+          git diff --exit-code -- openapi.json src/api/schema.d.ts
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - name: End-to-end (real API + production build)
+        run: PYTHON=python npm run e2e
+      - name: Keep screenshots and traces of failed end-to-end tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: apps/web/test-results/
+          retention-days: 7

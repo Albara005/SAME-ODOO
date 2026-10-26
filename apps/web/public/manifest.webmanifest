@@ -1,0 +1,18 @@
+{
+  "name": "NOVARA",
+  "short_name": "NOVARA",
+  "description": "منصة أعمال عربية: فواتير ومحاسبة ومخزون ومساعد ذكي",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/orgs",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f1a3d",
+  "theme_color": "#0f1a3d",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

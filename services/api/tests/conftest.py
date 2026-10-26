@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 
 from novara.config import Settings
+from novara.mail import MemoryMailer
 from novara.main import create_app
 from novara.migrate import migrate
 from novara.modules.files.storage import LocalObjectStorage
@@ -29,6 +30,19 @@ PG_APP_ROLE = os.environ.get("NOVARA_TEST_PG_APP_ROLE", "novara_app")
 USING_PG = bool(PG_OWNER_URL and PG_APP_URL)
 
 requires_pg = pytest.mark.skipif(not USING_PG, reason="PostgreSQL test database not configured")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def fast_password_hashing():
+    """Argon2 is deliberately slow; tests use minimal cost. Production keeps the library defaults."""
+    from argon2 import PasswordHasher
+
+    from novara import security
+
+    original = security._hasher
+    security._hasher = PasswordHasher(time_cost=1, memory_cost=1024, parallelism=1)
+    yield
+    security._hasher = original
 
 
 @pytest.fixture(scope="session")
@@ -50,9 +64,10 @@ def database_url(tmp_path, pg_owner_engine):
     if not USING_PG:
         return f"sqlite:///{tmp_path / 'test.db'}", True
     with pg_owner_engine.begin() as conn:
-        conn.execute(text(
-            "TRUNCATE users, user_sessions, organizations, roles, memberships, audit_logs, files CASCADE"
-        ))
+        tables = conn.execute(text(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'schema_migrations'"
+        )).scalars().all()
+        conn.execute(text(f"TRUNCATE {', '.join(tables)} CASCADE"))
     return PG_APP_URL, False
 
 
@@ -66,9 +81,20 @@ def app(tmp_path, database_url):
         storage_root=str(tmp_path / "storage"),
         max_upload_bytes=1024,
     )
-    app = create_app(settings, storage=LocalObjectStorage(settings.storage_root), create_schema=create_schema)
+    app = create_app(settings, storage=LocalObjectStorage(settings.storage_root), create_schema=create_schema,
+                     mailer=MemoryMailer())
     yield app
     app.state.engine.dispose()
+
+
+@pytest.fixture
+def ops_sessionmaker(app, pg_owner_engine):
+    """Operator database access: the schema owner on PostgreSQL (RLS applies to the API role only)."""
+    if pg_owner_engine is None:
+        return app.state.sessionmaker
+    from novara.db import make_sessionmaker
+
+    return make_sessionmaker(pg_owner_engine)
 
 
 @pytest.fixture

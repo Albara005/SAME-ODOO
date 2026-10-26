@@ -1,0 +1,23 @@
+# Customers' own domains for published App Studio sites, with certificates issued on demand.
+#
+# Customers point their domain at this server with a CNAME (NOVARA_SITES_CNAME_TARGET). Before Caddy
+# asks a certificate authority for a certificate, it asks NOVARA whether the domain is one a
+# customer has proven (DNS TXT record) and whose site is live; anything else gets no certificate,
+# so nobody can make this server request certificates for names it doesn't serve.
+#
+# Run Caddy next to the API (it listens on 80 and 443; the API stays on 127.0.0.1:8000). The API
+# serves the site for any proven Host it is given (studio/domains.py), so Caddy only has to pass
+# the original Host header through, which reverse_proxy does by default.
+{
+	on_demand_tls {
+		ask http://127.0.0.1:8000/api/v1/public/domains/check
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8000
+}

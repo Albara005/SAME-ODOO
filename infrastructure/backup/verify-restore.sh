@@ -36,11 +36,16 @@ q() { psql "$scratch_url" -Atqc "$1"; }
 latest="$(q "SELECT max(version) FROM schema_migrations")"
 orgs="$(q "SELECT count(*) FROM organizations")"
 users="$(q "SELECT count(*) FROM users")"
+invoices="$(q "SELECT count(*) FROM invoices")"
 orphans="$(q "SELECT count(*) FROM memberships m LEFT JOIN organizations o ON o.id = m.organization_id WHERE o.id IS NULL")"
-rls="$(q "SELECT count(*) FROM pg_class WHERE relname IN ('roles','memberships','audit_logs','files') AND relrowsecurity")"
+rls="$(q "SELECT count(*) FROM pg_class WHERE relname IN ('roles','memberships','audit_logs','files','customers','invoices','journal_entries','journal_lines') AND relrowsecurity")"
+# Double-entry bookkeeping must survive the round trip: every entry, and so the whole ledger, balances.
+unbalanced="$(q "SELECT count(*) FROM (SELECT entry_id FROM journal_lines GROUP BY entry_id HAVING sum(debit_minor) <> sum(credit_minor)) x")"
 
-echo "schema version: $latest | organizations: $orgs | users: $users"
+echo "schema version: $latest | organizations: $orgs | users: $users | invoices: $invoices"
 [[ -n "$latest" ]] || { echo "FAIL: no schema_migrations" >&2; exit 1; }
 [[ "$orphans" == "0" ]] || { echo "FAIL: $orphans memberships without organization" >&2; exit 1; }
-[[ "$rls" == "4" ]] || { echo "FAIL: row-level security missing on restored tables" >&2; exit 1; }
+[[ "$rls" == "8" ]] || { echo "FAIL: row-level security missing on restored tables" >&2; exit 1; }
+[[ "$unbalanced" == "0" ]] || { echo "FAIL: $unbalanced journal entries don't balance" >&2; exit 1; }
+echo "ledger balanced"
 echo "restore verified"
