@@ -95,8 +95,12 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
   const all = [...commands, ...records.map((r) => ({ ...r, hint: r.hint ? t(r.hint as MessageKey) : undefined }))];
   const current = Math.min(active, Math.max(all.length - 1, 0));
 
-  useEffect(() => input.current?.focus(), []);
-  useEffect(() => setActive(0), [q]);
+  useEffect(() => {
+    input.current?.focus();
+  }, []);
+  useEffect(() => {
+    setActive(0);
+  }, [q]);
 
   const go = (c: Command | undefined) => {
     if (!c) return;

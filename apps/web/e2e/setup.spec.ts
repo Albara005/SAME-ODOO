@@ -4,6 +4,16 @@ import { signUpAndIn, uniqueEmail } from "./helpers";
 const menu = (page: Page) => page.getByRole("complementary");
 
 test("first run: say what the business does, get its apps, VAT, sample data and a store taking orders", async ({ page, context }) => {
+  // As in newer Chrome, scrolling returns a promise: an effect that returned it crashed the wizard's steps.
+  await context.addInitScript(() => {
+    for (const [target, name] of [[window, "scrollTo"], [Element.prototype, "scrollIntoView"]] as const) {
+      const original = (target as unknown as Record<string, (...a: unknown[]) => void>)[name]!;
+      (target as unknown as Record<string, unknown>)[name] = function (this: unknown, ...args: unknown[]) {
+        original.apply(this, args);
+        return Promise.resolve();
+      };
+    }
+  });
   await signUpAndIn(page, uniqueEmail("setup"));
   await page.getByRole("button", { name: "مؤسسة جديدة" }).click();
   const dialog = page.getByRole("dialog");

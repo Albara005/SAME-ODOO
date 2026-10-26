@@ -92,7 +92,10 @@ function Wizard({ catalog }: { catalog: Schemas["SetupCatalogOut"] }) {
   useEffect(() => {
     document.title = `${t("setup.title")} · ${org.name} · ${t("app.name")}`;
   }, [t, org.name]);
-  useEffect(() => window.scrollTo({ top: 0 }), [step]);
+  // Braces: an effect returns its cleanup, and newer browsers' scrollTo returns a promise React would call.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [step]);
 
   const keep = (o: Schemas["OrgOut"]) => {
     qc.setQueryData<Org>(["org", org.id], (old) => (old ? { ...old, ...o } : old));

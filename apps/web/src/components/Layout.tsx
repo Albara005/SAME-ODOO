@@ -231,7 +231,9 @@ export function Layout() {
   const [title, setTitle] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useStoredFlag("novara.nav-collapsed");
   const location = useLocation();
-  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
