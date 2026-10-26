@@ -10,6 +10,9 @@ export default defineConfig({
   preview: { port: 4173, proxy: { "/api": api, "/sites": api } },
   build: {
     sourcemap: true,
+    // Fonts are never inlined as data: URIs: the production policy only takes fonts from the app's own origin
+    // (font-src 'self', infrastructure/deployment/nginx.conf and services/api/novara/webapp.py).
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
     rollupOptions: {
       output: {
         // The framework changes far less often than the app: its own chunk stays cached across releases.

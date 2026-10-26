@@ -45,6 +45,10 @@ infrastructure/
 docs/                    المخطط ووثائق المراحل
 ```
 
+## تجربتها على Railway
+
+ملف `Dockerfile` في الجذر يبني المنصة كلها في حاوية واحدة، ولا تحتاج إلا قاعدة PostgreSQL من Railway ومتغيراً واحداً هو `DATABASE_URL`. الخطوات في [`docs/deploy-railway.md`](docs/deploy-railway.md).
+
 ## البدء السريع
 
 ```bash

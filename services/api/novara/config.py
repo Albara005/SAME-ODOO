@@ -57,6 +57,8 @@ class Settings:
     browser_checks: str = "off"
     browser_sandbox: bool = True
     browser_node_path: str = ""   # where Node.js finds the playwright package (NODE_PATH)
+    # The built web app (apps/web/dist), served by the API itself when there is no nginx in front (novara/webapp.py).
+    web_dist: str = ""
 
     def validate(self) -> None:
         if self.browser_checks not in ("on", "off"):
@@ -115,6 +117,7 @@ def load_settings() -> Settings:
         browser_checks=env.get("NOVARA_BROWSER_CHECKS", "off" if production else "on").lower(),
         browser_sandbox=env.get("NOVARA_BROWSER_SANDBOX", "true" if production else "false").lower() != "false",
         browser_node_path=env.get("NOVARA_BROWSER_NODE_PATH", env.get("NODE_PATH", "")),
+        web_dist=env.get("NOVARA_WEB_DIST", ""),
     )
     settings.validate()
     return settings

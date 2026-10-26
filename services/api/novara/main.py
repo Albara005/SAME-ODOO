@@ -53,6 +53,7 @@ from novara.payments.router import public_router as public_payments_router, rout
 from novara.einvoice.router import router as einvoice_router
 from novara import push
 from novara.studio import browser as studio_browser
+from novara.webapp import mount_web
 
 # Import models so they are registered on Base.metadata.
 from novara.modules.access import models as _access_models  # noqa: F401
@@ -138,6 +139,8 @@ def create_app(settings: Settings | None = None, storage: ObjectStorage | None =
               payments_router, public_payments_router, einvoice_router, push.router, fx_router, attendance_router, fx_feed_router):
         app.include_router(r, prefix="/api/v1")
     app.include_router(sites_router)  # public, unauthenticated: published App Studio sites
+    if settings.web_dist:
+        mount_web(app, settings.web_dist)   # last: only what no route above answers
 
     # Customers' own domains (studio/domains.py): a request for a proven domain gets that site. Every other
     # host, the platform's own included, goes through to the routes above.
