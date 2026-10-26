@@ -13,6 +13,16 @@ A published site with the "checkout" scope takes payment for the order it sends 
 is for the order itself, and when the money is confirmed the order becomes the customer's invoice, posted and
 paid in the same transaction (and e-invoiced, when that is on). Until then nothing is posted.
 
+A credit note on an invoice paid online can be refunded through the same provider (refund_online): back
+through the link's payment, at most what that link took less what already went back through it, out of the
+clearing account:
+
+    Dr Accounts Receivable     Cr Online Payments Clearing (1250)
+
+The refund is first booked as a trial and undone (so a closed period or an amount the note doesn't owe stops it
+before any money moves), then the provider is asked, and only when it agrees is the refund written, with the
+provider's id for it; if the provider refuses, nothing is kept.
+
 Confirmations can arrive twice or late: a link is paid at most once (by its id as the payment's
 idempotency key). If the invoice can't take the money any more (paid another way meanwhile,
 cancelled, or the amount differs), the link becomes "unapplied", nothing is posted, and the person
@@ -24,7 +34,7 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from novara import crypto
@@ -34,7 +44,8 @@ from novara.einvoice.service import EInvoiceError, EInvoiceState
 from novara.modules.access.service import holders
 from novara.modules.accounting.service import LedgerError, PeriodLocked
 from novara.modules.audit import service as audit
-from novara.modules.invoicing.models import Invoice
+from novara.modules.invoicing.credit import refund as refund_note
+from novara.modules.invoicing.models import CreditNote, Invoice, Refund
 from novara.modules.invoicing.service import InvoiceStateError, InvoiceValidationError, lock_invoice, register_payment
 from novara.modules.organizations.models import Organization
 from novara.modules.partners.models import Customer
@@ -331,3 +342,54 @@ def _complete_order(db: Session, link: PaymentLink, *, amount_minor: int, curren
 def expired(db: Session, link: PaymentLink) -> None:
     if link.status == "open":
         link.status = "expired"
+
+
+# ---------------------------------------------------------------- refunds through the provider
+
+
+def refundable_links(db: Session, invoice_id: str) -> list[tuple[PaymentLink, int]]:
+    """The invoice's paid links, newest first, with what can still go back through each."""
+    links = list(db.scalars(select(PaymentLink).where(PaymentLink.invoice_id == invoice_id, PaymentLink.status == "paid")
+                            .order_by(PaymentLink.paid_at.desc())))
+    out = []
+    for link in links:
+        back = db.scalar(select(func.coalesce(func.sum(Refund.amount_minor), 0)).where(Refund.payment_link_id == link.id))
+        out.append((link, link.amount_minor - int(back or 0)))
+    return out
+
+
+def refund_online(db: Session, settings, note: CreditNote, *, amount_minor: int, refund_date, user_id: str,
+                  idempotency_key: str | None, http=None) -> tuple[Refund, bool]:
+    """Pay a credit note back through the provider the invoice was paid with (see the module's docstring)."""
+    if idempotency_key:
+        existing = db.scalar(select(Refund).where(Refund.idempotency_key == idempotency_key))
+        if existing is not None:
+            if existing.credit_note_id != note.id or existing.amount_minor != amount_minor:
+                raise PaymentsInvalid("idempotency key already used for a different refund")
+            return existing, False
+    candidates = refundable_links(db, note.invoice_id)
+    if not candidates:
+        raise PaymentsUnavailable("the invoice wasn't paid online: refund by bank transfer or cash")
+    link = next((l for l, room in candidates if room >= amount_minor and l.currency == note.currency), None)
+    if link is None:
+        most = max(room for _, room in candidates)
+        raise PaymentsInvalid(f"at most {from_minor(max(most, 0), note.currency)} {note.currency} can go back through "
+                              "one online payment")
+    gateway = provider(db, settings, settings_row(db, settings), http, name=link.provider)
+    booking = dict(amount_minor=amount_minor, refund_date=refund_date, method="online", user_id=user_id,
+                   idempotency_key=idempotency_key, online=True, payment_link_id=link.id)
+    # Booked once as a trial (the amount the note owes, the date, closed periods...), undone, so the provider is only
+    # asked for a refund the books will take; refunds are never changed once written.
+    trial = db.begin_nested()
+    try:
+        refund_note(db, note, reference="", **booking)
+    finally:
+        trial.rollback()
+    reference = gateway.refund(link.provider_reference, amount_minor, link.currency,
+                               key=idempotency_key or secrets.token_hex(12), detail=link.provider_detail)
+    record, _ = refund_note(db, note, reference=f"{link.provider} {reference}"[:120], provider_reference=reference,
+                            **booking)
+    audit.record(db, actor_user_id=user_id, action="credit_note.refunded_online", target_type="credit_note",
+                 target_id=note.id, details={"number": note.number, "amount": str(from_minor(amount_minor, note.currency)),
+                                             "currency": note.currency, "provider": link.provider, "reference": reference})
+    return record, True

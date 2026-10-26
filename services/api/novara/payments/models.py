@@ -8,7 +8,7 @@ from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKe
 from sqlalchemy.orm import Mapped, mapped_column
 
 from novara.db import Base, IdMixin, TimestampMixin
-from novara.tenancy import TenantScoped, same_org_fk
+from novara.tenancy import TenantScoped, org_unique_id, same_org_fk
 
 PROVIDERS = ("none", "stripe", "moyasar", "hyperpay", "paytabs", "test")
 LINK_STATUSES = ("open", "paid", "unapplied", "expired", "cancelled")
@@ -63,6 +63,7 @@ class PaymentLink(IdMixin, TimestampMixin, TenantScoped, Base):
 
     __tablename__ = "payment_links"
     __table_args__ = (
+        org_unique_id(),
         same_org_fk("invoice_id", "invoices"),
         same_org_fk("web_order_id", "web_orders"),
         same_org_fk("payment_id", "payments"),
@@ -85,4 +86,6 @@ class PaymentLink(IdMixin, TimestampMixin, TenantScoped, Base):
     payment_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     provider_reference: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     note: Mapped[str] = mapped_column(String(300), default="", nullable=False)  # why it's unapplied
+    # How the provider took the money, when refunding needs it (HyperPay: mada or card, the entity paid through).
+    provider_detail: Mapped[str] = mapped_column(String(16), default="", server_default="", nullable=False)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))

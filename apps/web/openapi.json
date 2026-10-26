@@ -10935,7 +10935,7 @@
       "title": "Amount"
      },
      "method": {
-      "pattern": "^(bank|cash)$",
+      "pattern": "^(bank|cash|online)$",
       "title": "Method",
       "type": "string"
      },

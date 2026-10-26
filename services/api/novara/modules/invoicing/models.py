@@ -117,7 +117,7 @@ class Payment(IdMixin, TimestampMixin, TenantScoped, Base):
     invoice_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False)
     amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    method: Mapped[str] = mapped_column(String(20), nullable=False)  # bank | cash | online (a payment link)
+    method: Mapped[str] = mapped_column(String(20), nullable=False)  # bank | cash | online (through the provider) | online (a payment link)
     reference: Mapped[str] = mapped_column(String(120), default="", nullable=False)
     journal_entry_id: Mapped[str] = mapped_column(String(36), nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -220,6 +220,7 @@ class Refund(IdMixin, TimestampMixin, TenantScoped, Base):
         same_org_fk("journal_entry_id", "journal_entries"),
         UniqueConstraint("organization_id", "idempotency_key", name="uq_refund_org_idempotency"),
         CheckConstraint("amount_minor > 0", name="ck_refund_amount_positive"),
+        same_org_fk("payment_link_id", "payment_links"),
     )
 
     credit_note_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
@@ -231,6 +232,9 @@ class Refund(IdMixin, TimestampMixin, TenantScoped, Base):
     idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"))
     base_amount_minor: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0", nullable=False)
+    # An online refund: the payment link it went back through, and the provider's id for it.
+    payment_link_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    provider_reference: Mapped[str] = mapped_column(String(255), default="", server_default="", nullable=False)
 
 
 class ExchangeRate(IdMixin, TimestampMixin, TenantScoped, Base):

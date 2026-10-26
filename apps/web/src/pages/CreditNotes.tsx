@@ -12,6 +12,7 @@ import { useI18n } from "../i18n/I18n";
 import { isPositive } from "../lib/decimal";
 import { today } from "../lib/format";
 
+type Method = "bank" | "cash" | "online";
 type Note = Schemas["CreditNoteOut"];
 
 export function CreditNotePage() {
@@ -137,7 +138,7 @@ function CreditNoteDetail({ note: n }: { note: Note }) {
                 {list.map((r) => (
                   <tr key={r.id}>
                     <td className="num">{date(r.refund_date)}</td>
-                    <td>{r.method === "bank" ? t("invoices.bank") : t("invoices.cash")}</td>
+                    <td>{r.method === "bank" ? t("invoices.bank") : r.method === "online" ? t("credit.methodOnline") : t("invoices.cash")}</td>
                     <td>{r.reference}</td>
                     <td className="end num">{money(r.amount, n.currency)}</td>
                   </tr>
@@ -162,7 +163,15 @@ function RefundDialog({ note, onClose, onDone }: { note: Note; onClose: () => vo
   const { t } = useI18n();
   const { org } = useOrg();
   const [idempotencyKey] = useIdempotencyKey();
-  const [form, setForm] = useState({ amount: note.refundable, refund_date: today(), method: "bank" as "bank" | "cash", reference: "" });
+  const [form, setForm] = useState({ amount: note.refundable, refund_date: today(), method: "bank" as Method, reference: "" });
+  // An invoice paid online can be refunded back through the provider, onto the customer's card.
+  const links = useQuery({
+    queryKey: ["payment-links", org.id, note.invoice_id],
+    queryFn: () => unwrap(api.GET("/api/v1/orgs/{org_id}/invoices/{invoice_id}/payment-links", {
+      params: { path: { org_id: org.id, invoice_id: note.invoice_id } },
+    })),
+  });
+  const paidOnline = (links.data ?? []).some((l) => l.status === "paid");
   const refund = useMutation({
     mutationFn: () =>
       unwrap(api.POST("/api/v1/orgs/{org_id}/credit-notes/{note_id}/refunds", {
@@ -184,15 +193,19 @@ function RefundDialog({ note, onClose, onDone }: { note: Note; onClose: () => vo
             <Input type="date" value={form.refund_date} min={note.issue_date} onChange={(e) => setForm({ ...form, refund_date: e.target.value })} required ltr />
           </Field>
           <Field label={t("invoices.method")}>
-            <Select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value as "bank" | "cash" })}>
+            <Select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value as Method })}>
               <option value="bank">{t("invoices.bank")}</option>
               <option value="cash">{t("invoices.cash")}</option>
+              {paidOnline && <option value="online">{t("credit.methodOnline")}</option>}
             </Select>
           </Field>
-          <Field label={t("invoices.reference")} optional>
-            <Input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
-          </Field>
+          {form.method !== "online" && (
+            <Field label={t("invoices.reference")} optional>
+              <Input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
+            </Field>
+          )}
         </div>
+        {form.method === "online" && <p className="notice notice-info small">{t("credit.onlineHint")}</p>}
         <div className="form-actions">
           <Button onClick={onClose}>{t("common.cancel")}</Button>
           <Button type="submit" variant="primary" loading={refund.isPending}>{t("credit.refund")}</Button>

@@ -2070,6 +2070,9 @@ export const en = {
   "pay.region.iq": "Iraq",
   "pay.region.ma": "Morocco",
   "pay.region.global": "Global",
+  "credit.methodOnline": "Back through the payment provider",
+  "credit.onlineHint": "The provider returns the money to the card or account the customer paid with, out of what that payment took. If the provider refuses, nothing is recorded.",
+  "audit.a.credit_note.refunded_online": "Refund through the payment provider",
 } as const;
 
 export type MessageKey = keyof typeof en;

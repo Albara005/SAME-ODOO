@@ -34,7 +34,7 @@ from novara.modules.catalog.models import Product
 from novara.modules.inventory import service as stock
 from novara.modules.inventory.models import StockMove, Warehouse
 from novara.modules.invoicing.models import CreditNote, CreditNoteLine, CreditNoteTax, Invoice, InvoiceLine, Refund
-from novara.modules.invoicing.service import (PAYMENT_METHODS, InvoiceStateError, InvoiceValidationError,
+from novara.modules.invoicing.service import (PAYMENT_METHODS, RECEIPT_METHODS, InvoiceStateError, InvoiceValidationError,
                                               base_currency, booked_rate, line_net_minor, lines_of, settle,
                                               tax_groups)
 from novara.money import convert, from_minor, to_minor
@@ -214,14 +214,18 @@ def _return_goods(db: Session, invoice: Invoice, note: CreditNote, returns: list
 
 
 def refund(db: Session, note: CreditNote, *, amount_minor: int, refund_date: date, method: str, reference: str,
-           user_id: str, idempotency_key: str | None = None) -> tuple[Refund, bool]:
+           user_id: str, idempotency_key: str | None = None, online: bool = False, payment_link_id: str | None = None,
+           provider_reference: str = "") -> tuple[Refund, bool]:
+    """Pay back what a credit note owes. online: the money goes back through the payment provider, out of Online
+    Payments Clearing (payments/service.py refund_online calls the provider; only it passes online=True)."""
     if idempotency_key:
         existing = db.scalar(select(Refund).where(Refund.idempotency_key == idempotency_key))
         if existing is not None:
             if existing.credit_note_id != note.id or existing.amount_minor != amount_minor:
                 raise InvoiceStateError("idempotency key already used for a different refund")
             return existing, False
-    if method not in PAYMENT_METHODS:
+    methods = RECEIPT_METHODS if online else PAYMENT_METHODS
+    if method not in methods:
         raise InvoiceValidationError(f"unknown payment method: {method}")
     owed = note.total_minor - note.applied_minor - note.refunded_minor
     if amount_minor <= 0 or amount_minor > owed:
@@ -238,12 +242,13 @@ def refund(db: Session, note: CreditNote, *, amount_minor: int, refund_date: dat
         memo=f"Refund for {note.number}", source_type="refund", source_id=note.id,
         lines=[LineSpec(system_account(db, "receivable"), debit_minor=base_amount, customer_id=note.customer_id,
                         label=f"Refund {note.number}"),
-               LineSpec(system_account(db, PAYMENT_METHODS[method]), credit_minor=base_amount,
+               LineSpec(system_account(db, methods[method]), credit_minor=base_amount,
                         label=f"Refund {note.number} {reference}".strip())],
     )
     record = Refund(credit_note_id=note.id, refund_date=refund_date, amount_minor=amount_minor, method=method,
                     reference=reference, journal_entry_id=entry.id, idempotency_key=idempotency_key,
-                    created_by=user_id, base_amount_minor=base_amount)
+                    created_by=user_id, base_amount_minor=base_amount, payment_link_id=payment_link_id,
+                    provider_reference=provider_reference[:255])
     db.add(record)
     note.refunded_minor += amount_minor
     note.base_refunded_minor += base_amount

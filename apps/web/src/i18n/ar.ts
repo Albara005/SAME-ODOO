@@ -2072,4 +2072,7 @@ export const ar: Record<MessageKey, string> = {
   "pay.region.iq": "العراق",
   "pay.region.ma": "المغرب",
   "pay.region.global": "عالمي",
+  "credit.methodOnline": "عبر مزوّد الدفع",
+  "credit.onlineHint": "يعيد مزوّد الدفع المبلغ إلى البطاقة أو الحساب الذي دفع به العميل، في حدود ما أخذته تلك الدفعة. وإن رفض المزوّد لا يُسجَّل شيء.",
+  "audit.a.credit_note.refunded_online": "استرداد عبر مزوّد الدفع",
 };

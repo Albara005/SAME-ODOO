@@ -590,9 +590,11 @@ def _not_completed(session: str, outcome: HyperPayResult | None = None, code: in
                                     "<p class='muted'>The payment wasn't completed and nothing was charged.</p>" + detail, code)
 
 
-def _record(db: Session, settings, link: PaymentLink, outcome: HyperPayResult) -> str:
+def _record(db: Session, settings, link: PaymentLink, outcome: HyperPayResult, brand: str) -> str:
     """What HyperPay said about a payment for this link: recorded when taken, noted when held for review."""
     if outcome.state == "paid":
+        if link.status == "open":
+            link.provider_detail = brand        # a refund goes back through the same entity
         if outcome.amount_minor is None:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "HyperPay's answer had no amount")
         result = svc.complete(db, link.id, amount_minor=outcome.amount_minor, currency=outcome.currency,
@@ -618,7 +620,7 @@ def _hyperpay_back(db: Session, settings, http, session: str, brand: str, checko
         return _not_completed(session, outcome)
     if outcome.merchant_reference != link.id:                # a checkout made for another link
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "that payment wasn't made for this link")
-    if _record(db, settings, link, outcome) == "review":
+    if _record(db, settings, link, outcome, brand) == "review":
         return _page("الدفع قيد المراجعة", "<h1>دفعتك قيد المراجعة</h1><p>ستظهر على الفاتورة حين يقبلها مزوّد الدفع.</p>"
                                            "<p class='muted'>Your payment is being reviewed by the provider.</p>")
     return RedirectResponse(f"{settings.app_base_url}/api/v1/public/payments/done?status=paid",
@@ -661,7 +663,7 @@ def _hyperpay_call(db: Session, settings, http, token: str, body: bytes, iv: str
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))         # HyperPay calls again later
     if outcome.merchant_reference != link.id:
         return JSONResponse({"received": True, "result": "not ours"})
-    return JSONResponse({"received": True, "result": _record(db, settings, link, outcome)})
+    return JSONResponse({"received": True, "result": _record(db, settings, link, outcome, brand)})
 
 
 @public_router.post("/public/payments/hyperpay/{token}")

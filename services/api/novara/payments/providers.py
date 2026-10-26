@@ -158,6 +158,16 @@ class Stripe:
         expires = datetime.fromtimestamp(int(body.get("expires_at") or req.expires_at.timestamp()), timezone.utc)
         return Checkout(session_id=str(body["id"]), url=str(body["url"]), expires_at=expires)
 
+    def refund(self, reference: str, amount_minor: int, currency: str, *, key: str, detail: str = "") -> str:
+        """Pay back part or all of a payment (its PaymentIntent): Stripe's refund id. Pending counts: Stripe sends it."""
+        if not reference.startswith("pi_"):
+            raise ProviderError("this payment can't be refunded through Stripe (no payment intent)", invalid=True)
+        body = self._post("/refunds", {"payment_intent": reference, "amount": str(amount_minor)},
+                          idempotency_key=f"novara-refund-{key}")
+        if body.get("status") not in ("succeeded", "pending") or not body.get("id"):
+            raise ProviderError(f"Stripe didn't refund: {body.get('failure_reason') or body.get('status') or 'no refund'}")
+        return str(body["id"])
+
     def expire(self, session_id: str) -> None:
         self._post(f"/checkout/sessions/{session_id}/expire", {})
 
@@ -278,6 +288,18 @@ class Moyasar:
         if state in ("expired", "canceled", "cancelled"):
             return Expired(session_id=session_id)
         return None
+
+    def refund(self, reference: str, amount_minor: int, currency: str, *, key: str, detail: str = "") -> str:
+        """Pay back part or all of a payment: the payment as Moyasar then has it (refunded, with how much in all)."""
+        before = self._call("GET", f"/payments/{reference}")
+        body = self._call("POST", f"/payments/{reference}/refund", {"amount": amount_minor})
+        try:
+            refunded, earlier = int(body.get("refunded") or 0), int(before.get("refunded") or 0)
+        except (TypeError, ValueError):
+            raise ProviderError("Moyasar's answer had no refunded amount") from None
+        if body.get("status") not in ("refunded", "paid") or refunded - earlier != amount_minor:
+            raise ProviderError(f"Moyasar didn't refund {amount_minor}: it shows {refunded - earlier}")
+        return f"{reference}#refund{refunded}"
 
 
 def _moyasar_time(value) -> datetime:
@@ -425,6 +447,18 @@ class HyperPay:
             raise ProviderError("not a HyperPay payment", invalid=True)
         return self._result(self._call("GET", f"/v1/query/{payment_id}", params={"entityId": self.entity(brand)}))
 
+    def refund(self, reference: str, amount_minor: int, currency: str, *, key: str, detail: str = "") -> str:
+        """Pay back part or all of a payment (paymentType RF), through the entity the payment was made with."""
+        if not HYPERPAY_ID.match(reference):
+            raise ProviderError("not a HyperPay payment", invalid=True)
+        body = self._call("POST", f"/v1/payments/{reference}", data={
+            "entityId": self.entity(detail or "card"), "amount": f"{amount_minor // 100}.{amount_minor % 100:02d}",
+            "currency": currency, "paymentType": "RF"})
+        outcome = self._result(body)
+        if outcome.state != "paid" or not outcome.payment_id:
+            raise ProviderError(f"HyperPay didn't refund: {outcome.description} ({outcome.code})"[:300])
+        return outcome.payment_id
+
 
 def decrypt_hyperpay(key_hex: str, iv_hex: str, tag_hex: str, body_hex: str) -> dict:
     """HyperPay's webhook body: hex AES-256-GCM ciphertext, the IV and tag in headers, under the merchant's key."""
@@ -567,6 +601,20 @@ class PayTabs:
                              tran_ref=str(data.get("tran_ref", tran_ref)), cart_id=str(data.get("cart_id", "")),
                              amount_minor=_minor(data.get("cart_amount", ""), currency), currency=currency)
 
+    def refund(self, reference: str, amount_minor: int, currency: str, *, key: str, detail: str = "") -> str:
+        """Pay back part or all of a transaction: a refund request against it, PayTabs' answer final."""
+        if not PAYTABS_TRAN_REF.match(reference):
+            raise ProviderError("not a PayTabs transaction", invalid=True)
+        digits = 3 if currency in ("OMR", "JOD", "KWD", "BHD", "IQD") else 2
+        amount = f"{amount_minor // 10 ** digits}.{amount_minor % 10 ** digits:0{digits}d}"
+        data = self._call("/payment/request", {
+            "profile_id": self._profile, "tran_type": "refund", "tran_class": "ecom", "cart_id": f"refund-{key}"[:64],
+            "cart_description": "Refund", "cart_currency": currency, "cart_amount": float(amount), "tran_ref": reference})
+        result = data.get("payment_result") if isinstance(data.get("payment_result"), dict) else {}
+        if result.get("response_status") != "A" or not data.get("tran_ref"):
+            raise ProviderError(f"PayTabs didn't refund: {result.get('response_message') or data.get('message') or 'declined'}"[:300])
+        return str(data["tran_ref"])
+
 
 def verify_paytabs_callback(server_key: str, body: bytes, signature: str) -> dict:
     """The callback's Signature header: HMAC-SHA256 of the whole body with the server key."""
@@ -607,3 +655,6 @@ class TestProvider:
 
     def expire(self, session_id: str) -> None:
         return None
+
+    def refund(self, reference: str, amount_minor: int, currency: str, *, key: str, detail: str = "") -> str:
+        return "re_novaratest_" + secrets.token_urlsafe(12)

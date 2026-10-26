@@ -42,7 +42,7 @@ class CreditNoteIn(BaseModel):
 class RefundIn(BaseModel):
     amount: Decimal = Field(gt=0, max_digits=18, decimal_places=3)
     refund_date: date
-    method: str = Field(pattern="^(bank|cash)$")
+    method: str = Field(pattern="^(bank|cash|online)$")    # online: back through the payment provider
     reference: str = Field(default="", max_length=120)
 
 
@@ -243,6 +243,23 @@ def list_refunds(note_id: str, _: OrgContext = Depends(require(P.INVOICES_READ))
     return [_refund_out(r, note.currency) for r in rows]
 
 
+def _online_refund(db: Session, request: Request, note: CreditNote, body: RefundIn, ctx: OrgContext,
+                   idempotency_key: str | None):
+    from novara.payments import service as payments       # payments builds on invoicing, not the other way round
+    from novara.payments.providers import ProviderError
+    try:
+        return _domain(lambda: payments.refund_online(
+            db, request.app.state.settings, note, amount_minor=to_minor(body.amount, note.currency),
+            refund_date=body.refund_date, user_id=ctx.user.id, idempotency_key=idempotency_key,
+            http=request.app.state.payment_http))
+    except payments.PaymentsUnavailable as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e))
+    except payments.PaymentsInvalid as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+    except ProviderError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY if e.invalid else status.HTTP_502_BAD_GATEWAY, str(e))
+
+
 @router.post("/orgs/{org_id}/credit-notes/{note_id}/refunds", response_model=RefundOut,
              status_code=status.HTTP_201_CREATED)
 def refund(note_id: str, body: RefundIn, request: Request, response: Response,
@@ -250,9 +267,12 @@ def refund(note_id: str, body: RefundIn, request: Request, response: Response,
            ctx: OrgContext = Depends(require(P.PAYMENTS_WRITE)), db: Session = Depends(get_db)):
     """Pay back what a credit note owes the customer (the part that didn't reduce an open invoice)."""
     note = _get_note(db, note_id, lock=True)
-    record, created = _domain(lambda: credit.refund(
-        db, note, amount_minor=to_minor(body.amount, note.currency), refund_date=body.refund_date,
-        method=body.method, reference=body.reference, user_id=ctx.user.id, idempotency_key=idempotency_key))
+    if body.method == "online":
+        record, created = _online_refund(db, request, note, body, ctx, idempotency_key)
+    else:
+        record, created = _domain(lambda: credit.refund(
+            db, note, amount_minor=to_minor(body.amount, note.currency), refund_date=body.refund_date,
+            method=body.method, reference=body.reference, user_id=ctx.user.id, idempotency_key=idempotency_key))
     if created:
         audit.record(db, actor_user_id=ctx.user.id, action="credit_note.refunded", target_type="credit_note",
                      target_id=note.id, details={"number": note.number,

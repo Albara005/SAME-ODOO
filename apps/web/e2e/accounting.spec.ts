@@ -372,6 +372,19 @@ test("online payment: the customer pays through a link and the invoice is paid w
   await expect(links.getByText("مدفوعة")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("cell", { name: "إلكترونياً (رابط دفع)" })).toBeVisible();
   await expect(page.getByRole("button", { name: "إنشاء رابط دفع" })).toHaveCount(0);
+
+  // A credit note on it goes back through the provider, to the card the customer paid with.
+  const today = new Date().toISOString().slice(0, 10);
+  const note = await call("POST", `/invoices/${inv.id}/credit-notes`, {
+    issue_date: today, reason: "إلغاء الطلب", lines: [{ invoice_line_id: inv.lines[0].id, quantity: "1" }],
+  });
+  await page.goto(page.url().replace(/invoices\/.*$/, `credit-notes/${note.id}`));
+  await page.getByRole("button", { name: "رد المبلغ" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("الطريقة").selectOption({ label: "عبر مزوّد الدفع" });
+  await expect(dialog.getByText(/يعيد مزوّد الدفع المبلغ/)).toBeVisible();
+  await dialog.getByRole("button", { name: "رد المبلغ" }).click();
+  await expect(page.getByRole("cell", { name: "عبر مزوّد الدفع" })).toBeVisible();
 });
 
 test("e-invoicing: onboard the device with ZATCA, then a posted invoice is signed and reported", async ({ page }) => {
