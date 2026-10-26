@@ -41,7 +41,7 @@ test("full sales cycle: stock, quotation, delivery, invoice, payment, reports", 
   // Quotation for 8 chairs; the editor estimates 4,000 + 15% = 4,600.00 before saving
   await nav(page, "أوامر البيع");
   await page.getByRole("link", { name: "عرض سعر جديد" }).click();
-  await page.getByLabel("العميل").selectOption({ label: "مؤسسة الأفق" });
+  await page.getByLabel("العميل", { exact: true }).selectOption({ label: "مؤسسة الأفق" });
   await page.getByLabel("المنتج 1").selectOption({ label: "كرسي مكتب (CH-1)" });
   await page.getByLabel("الكمية 1").fill("8");
   await expect(page.getByText(/4,600\.00/).first()).toBeVisible();

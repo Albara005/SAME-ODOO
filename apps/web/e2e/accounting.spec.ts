@@ -32,7 +32,7 @@ test("purchasing: vendor, order, receipt, bill, payment", async ({ page }) => {
 
   await page.getByRole("tab", { name: "أوامر الشراء" }).click();
   await page.getByRole("link", { name: "أمر شراء جديد" }).click();
-  await page.getByLabel("المورد").selectOption({ label: "مؤسسة الخليج للتوريد" });
+  await page.getByLabel("المورد", { exact: true }).selectOption({ label: "مؤسسة الخليج للتوريد" });
   await page.getByLabel("المنتج 1").selectOption({ label: "كرسي مكتب (CH-1)" });
   await page.getByLabel("الكمية 1").fill("10");
   await page.getByLabel("تكلفة الوحدة 1").fill("200");
@@ -432,7 +432,7 @@ test("multi-currency: a dollar invoice is booked in riyals and its payment shows
   await call("POST", "/customers", { name: "Gulf Trading LLC" });
   const orgPath = page.url().match(/\/o\/[0-9a-f-]+/)![0];
   await page.goto(`${orgPath}/invoices/new`);
-  await page.getByLabel("العميل").selectOption({ label: "Gulf Trading LLC" });
+  await page.getByLabel("العميل", { exact: true }).selectOption({ label: "Gulf Trading LLC" });
   await page.getByLabel("العملة").selectOption("USD");
   await page.getByLabel(/سعر الصرف/).fill("3.75");
   await page.getByLabel("الوصف 1").fill("Consulting");
@@ -470,7 +470,7 @@ test("debit note: more is charged on a posted invoice, numbered DN- and linked b
   await page.goto(`${orgPath}/invoices/${inv.id}`);
   await page.getByRole("link", { name: "إشعار مدين" }).click();
   await expect(page.getByRole("heading", { name: `إشعار مدين على ⁦${posted.number}⁩` })).toBeVisible();
-  await expect(page.getByLabel("العميل")).toBeDisabled();
+  await expect(page.getByLabel("العميل", { exact: true })).toBeDisabled();
   await page.getByLabel("سبب المبلغ الإضافي").fill("مراجعة إضافية لم تُذكر في الفاتورة");
   await page.getByLabel("الوصف 1").fill("مراجعة إضافية");
   await page.getByLabel("الكمية 1").fill("1");
@@ -567,7 +567,7 @@ test("purchasing in dollars: the rate is suggested, the books stay in riyals", a
 
   await nav(page, "المشتريات");
   await page.getByRole("link", { name: "أمر شراء جديد" }).click();
-  await page.getByLabel("المورد").selectOption({ label: "Texas Furniture" });
+  await page.getByLabel("المورد", { exact: true }).selectOption({ label: "Texas Furniture" });
   await page.getByLabel("العملة").selectOption("USD");
   await page.getByLabel("المنتج 1").selectOption({ label: "كرسي مكتب (CH-1)" });
   await page.getByLabel("الكمية 1").fill("10");
