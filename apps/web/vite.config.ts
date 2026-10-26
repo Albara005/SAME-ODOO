@@ -8,7 +8,15 @@ export default defineConfig({
   plugins: [react()],
   server: { port: 5173, proxy: { "/api": api, "/sites": api } },
   preview: { port: 4173, proxy: { "/api": api, "/sites": api } },
-  build: { sourcemap: true },
+  build: {
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        // The framework changes far less often than the app: its own chunk stays cached across releases.
+        manualChunks: { framework: ["react", "react-dom", "react-router-dom", "@tanstack/react-query"] },
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     globals: true,
